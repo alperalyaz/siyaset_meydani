@@ -105,7 +105,8 @@ async function verifyPerson(s: Summary): Promise<boolean> {
 export async function buildGuestsFromNames(names: string[], count = 3): Promise<Guest[]> {
   const guests: Guest[] = [];
   const used = new Set<string>();
-  for (const name of names) {
+  // Önerilen isimleri karıştır: hep ilk "bariz" 3'ü değil, sürprizli kombinasyonlar.
+  for (const name of shuffle(names)) {
     if (guests.length >= count) break;
     const s = await fetchSummary(name);
     if (!s || (s.type && s.type !== "standard")) continue;
@@ -130,6 +131,49 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     guests.push(await enrich(seed, guests.length));
   }
   return guests.map((g, i) => ({ ...g, color: colorForIndex(i) }));
+}
+
+// Kullanıcının yazdığı ismi (ya da Vikipedi linkini) gerçek bir kişiye çözer.
+export async function resolveGuestByName(query: string): Promise<Guest | null> {
+  const q = query.trim();
+  if (!q) return null;
+
+  let candidates: string[] = [];
+  const urlMatch = q.match(/wikipedia\.org\/wiki\/([^?#]+)/i);
+  if (urlMatch) {
+    candidates = [decodeURIComponent(urlMatch[1]).replace(/_/g, " ")];
+  } else {
+    try {
+      const res = await fetch(
+        `https://tr.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
+          q,
+        )}&limit=5&namespace=0&format=json&origin=*`,
+      );
+      if (res.ok) {
+        const data = (await res.json()) as [string, string[]];
+        candidates = Array.isArray(data?.[1]) ? data[1] : [];
+      }
+    } catch {
+      /* yoksay */
+    }
+    if (candidates.length === 0) candidates = [q];
+  }
+
+  for (const title of candidates) {
+    const s = await fetchSummary(title);
+    if (!s || (s.type && s.type !== "standard")) continue;
+    if (!(await verifyPerson(s))) continue;
+    const name = (s.title ?? title).replace(/_/g, " ");
+    return {
+      name,
+      title: name,
+      era: s.description ?? "",
+      blurb: s.extract && s.extract.length > 40 ? s.extract : name,
+      thumbnail: s.thumbnail?.source,
+      color: colorForIndex(0),
+    };
+  }
+  return null;
 }
 
 function recentDateParts(daysAgo: number): [string, string, string] {

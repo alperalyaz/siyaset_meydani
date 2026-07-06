@@ -1,10 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Guest } from "../types";
-import { pickCuratedGuests, buildGuestsFromNames } from "../lib/wikipedia";
-import { suggestGuestNames, suggestDeepTopics, fetchEksiContext } from "../lib/engine";
+import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
+import { suggestGuestNames, suggestTopicIdeas, fetchEksiContext } from "../lib/engine";
 import { TOPIC_POOL } from "../lib/pool";
-
-type Mode = "topic" | "random";
 
 interface Props {
   onStart: (guests: Guest[], topic: string, context?: string | null) => void;
@@ -16,33 +14,32 @@ interface Props {
   checking: boolean;
 }
 
-function isEksiUrl(s: string): boolean {
-  return /^https?:\/\/(www\.)?eksisozluk\.com\//i.test(s.trim());
-}
+const MAX_GUESTS = 4;
 
 function initials(name: string): string {
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
+function isEksiUrl(s: string): boolean {
+  return /^https?:\/\/(www\.)?eksisozluk\.com\//i.test(s.trim());
+}
+
 export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>("topic");
-  const [count, setCount] = useState<2 | 3>(2);
+  const [count, setCount] = useState<2 | 3>(3);
   const [topic, setTopic] = useState("");
   const [context, setContext] = useState<string>(""); // (Ekşi linki) grounding metni
+
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
 
-  const drawRandom = useCallback(async (cnt: number) => {
-    setLoading(true);
-    setGuests(null);
-    try {
-      setGuests(await pickCuratedGuests(cnt));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [addName, setAddName] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addMsg, setAddMsg] = useState<string | null>(null);
+
+  // Daha önce önerilmiş isimler — "Yeniden"de tekrar gelmesinler (çeşitlilik).
+  const shownNamesRef = useRef<string[]>([]);
 
   const drawForTopic = useCallback(
     async (t: string, cnt: number, ctx: string) => {
@@ -50,17 +47,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       if (!q) return;
       setLoading(true);
       setGuests(null);
+      setAddMsg(null);
       try {
-        const names = await suggestGuestNames(q, ctx || null, apiKey);
-        setGuests(await buildGuestsFromNames(names, cnt));
+        const names = await suggestGuestNames(q, ctx || null, shownNamesRef.current, apiKey);
+        shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
+        const g = await buildGuestsFromNames(names, cnt);
+        shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
+        setGuests(g);
       } catch (e) {
         onError(e);
-        // Konuya göre başarısızsa küratörlü havuza düş.
-        try {
-          setGuests(await pickCuratedGuests(cnt));
-        } catch {
-          /* yoksay */
-        }
       } finally {
         setLoading(false);
       }
@@ -71,19 +66,44 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const pickTopic = useCallback(
     (t: string) => {
       setTopic(t);
-      setContext(""); // hazır/küratörlü konu: grounding yok
-      if (mode === "topic") void drawForTopic(t, count, "");
+      setContext("");
+      shownNamesRef.current = []; // yeni konu: geçmişi sıfırla
+      void drawForTopic(t, count, "");
     },
-    [mode, drawForTopic, count],
+    [drawForTopic, count],
   );
 
-  // Derin, zaman-ötesi tartışma konuları üret (magazinsel gündem yerine).
-  const loadDeepTopics = useCallback(async () => {
+  // Kendi konunuz / Ekşi linki → (link ise entry'ler grounding olarak yüklenir)
+  const fetchGuestsForInput = useCallback(async () => {
+    let ctx = "";
+    const t = topic.trim();
+    if (isEksiUrl(t)) {
+      const entries = await fetchEksiContext(t).catch(() => "");
+      if (entries) ctx = entries;
+    }
+    setContext(ctx);
+    shownNamesRef.current = [];
+    void drawForTopic(t, count, ctx);
+  }, [topic, count, drawForTopic]);
+
+  const reshuffle = useCallback(() => {
+    if (topic.trim()) void drawForTopic(topic, count, context);
+  }, [topic, count, context, drawForTopic]);
+
+  const changeCount = useCallback(
+    (c: 2 | 3) => {
+      setCount(c);
+      if (topic.trim()) void drawForTopic(topic, c, context);
+    },
+    [topic, context, drawForTopic],
+  );
+
+  const loadTopics = useCallback(async () => {
     setLoadingTopics(true);
     try {
       const avoid = [...TOPIC_POOL, ...extraTopics];
-      const fresh = await suggestDeepTopics(avoid, apiKey);
-      if (fresh.length) setExtraTopics((prev) => [...fresh, ...prev].slice(0, 16));
+      const fresh = await suggestTopicIdeas(avoid, apiKey);
+      if (fresh.length) setExtraTopics((prev) => [...fresh, ...prev].slice(0, 24));
     } catch (e) {
       onError(e);
     } finally {
@@ -91,43 +111,36 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     }
   }, [apiKey, onError, extraTopics]);
 
-  // "Konukları getir": Ekşi linki ise entry'leri grounding olarak çeker.
-  const fetchGuestsForInput = useCallback(async () => {
-    let ctx = context;
-    let t = topic.trim();
-    if (isEksiUrl(t)) {
-      const entries = await fetchEksiContext(t).catch(() => "");
-      if (entries) {
-        ctx = entries;
-        setContext(entries);
+  const addGuest = useCallback(async () => {
+    const q = addName.trim();
+    if (!q) return;
+    setAdding(true);
+    setAddMsg(null);
+    try {
+      const g = await resolveGuestByName(q);
+      if (!g) {
+        setAddMsg(`"${q}" Vikipedi'de bir kişi olarak bulunamadı. İsmi tam yazmayı ya da linkini yapıştırmayı deneyin.`);
+        return;
       }
+      setGuests((prev) => {
+        const cur = prev ?? [];
+        if (cur.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return cur;
+        return [...cur, g].slice(0, MAX_GUESTS).map((x, i) => ({ ...x, color: colorAt(i) }));
+      });
+      shownNamesRef.current.push(g.name);
+      setAddName("");
+    } catch (e) {
+      onError(e);
+    } finally {
+      setAdding(false);
     }
-    void drawForTopic(t, count, ctx);
-  }, [context, topic, count, drawForTopic]);
+  }, [addName, onError]);
 
-  const reshuffle = useCallback(() => {
-    if (mode === "random") void drawRandom(count);
-    else void drawForTopic(topic, count, context);
-  }, [mode, drawRandom, drawForTopic, topic, count, context]);
-
-  const switchMode = useCallback(
-    (m: Mode) => {
-      setMode(m);
-      setGuests(null);
-      if (m === "random") void drawRandom(count);
-    },
-    [drawRandom, count],
-  );
-
-  const changeCount = useCallback(
-    (c: 2 | 3) => {
-      setCount(c);
-      setGuests(null);
-      if (mode === "random") void drawRandom(c);
-      else if (topic.trim()) void drawForTopic(topic, c, context);
-    },
-    [mode, topic, drawRandom, drawForTopic, context],
-  );
+  const removeGuest = useCallback((name: string) => {
+    setGuests((prev) =>
+      (prev ?? []).filter((g) => g.name !== name).map((x, i) => ({ ...x, color: colorAt(i) })),
+    );
+  }, []);
 
   const canStart = !!guests && guests.length >= 2 && topic.trim().length > 0 && !loading;
 
@@ -136,7 +149,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       <header className="setup__hero">
         <h1>Siyaset Meydanı</h1>
         <p className="setup__tag">
-          Bir konu seçin; o konunun ünlülerini aynı masada tartıştıralım. Siz spikersiniz.
+          Sokaktaki adamın konularını, çağlar ötesi şahsiyetlere tartıştırın. Siz spikersiniz.
         </p>
       </header>
 
@@ -144,8 +157,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       <section className="setup__block">
         <div className="setup__block-head">
           <h2>1 · Bugünün Konusu</h2>
-          <button className="btn btn--ghost" onClick={() => loadDeepTopics()} disabled={loadingTopics}>
-            {loadingTopics ? "Konu üretiliyor…" : "💭 Başka konular öner"}
+          <button className="btn btn--ghost" onClick={() => loadTopics()} disabled={loadingTopics}>
+            {loadingTopics ? "Konu üretiliyor…" : "🎲 Başka konular öner"}
           </button>
         </div>
 
@@ -178,17 +191,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               setTopic(e.target.value);
               setContext("");
             }}
-            onKeyDown={(e) => e.key === "Enter" && mode === "topic" && fetchGuestsForInput()}
+            onKeyDown={(e) => e.key === "Enter" && fetchGuestsForInput()}
           />
-          {mode === "topic" && (
-            <button
-              className="btn btn--primary"
-              disabled={!topic.trim() || loading}
-              onClick={() => fetchGuestsForInput()}
-            >
-              Konukları getir
-            </button>
-          )}
+          <button
+            className="btn btn--primary"
+            disabled={!topic.trim() || loading}
+            onClick={() => fetchGuestsForInput()}
+          >
+            Konukları getir
+          </button>
         </div>
         {context && (
           <p className="context-hint">🧭 Güncel bağlam yüklendi — konuklar bu olaya göre konuşacak.</p>
@@ -200,20 +211,6 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="setup__block-head">
           <h2>2 · Sayın Konuklar</h2>
           <div className="setup__draw-controls">
-            <div className="modetabs">
-              <button
-                className={`modetab ${mode === "topic" ? "modetab--on" : ""}`}
-                onClick={() => switchMode("topic")}
-              >
-                Konuya göre
-              </button>
-              <button
-                className={`modetab ${mode === "random" ? "modetab--on" : ""}`}
-                onClick={() => switchMode("random")}
-              >
-                🎲 Rastgele sürpriz
-              </button>
-            </div>
             <div className="modetabs" title="Konuk sayısı">
               <button
                 className={`modetab ${count === 2 ? "modetab--on" : ""}`}
@@ -228,9 +225,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                 3 konuk
               </button>
             </div>
-            {guests && (
+            {guests && guests.length > 0 && (
               <button className="btn btn--ghost" onClick={reshuffle} disabled={loading}>
-                ↻ Yeniden
+                ↻ Başkaları
               </button>
             )}
           </div>
@@ -241,16 +238,22 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             Array.from({ length: count }, (_, i) => (
               <div key={i} className="guest-card guest-card--skeleton" />
             ))}
-          {!loading && !guests && (
+          {!loading && (!guests || guests.length === 0) && (
             <div className="guest-empty">
-              {mode === "topic"
-                ? "Bir konu seçin ya da yazıp “Konukları getir”e basın; o konunun isimlerini masaya davet edeyim."
-                : "“🎲 Rastgele sürpriz” ile çağlar arası konukları çekelim."}
+              Bir konu seçin ya da yazıp “Konukları getir”e basın; o konunun çağlar-ötesi isimlerini
+              masaya davet edeyim. Dilerseniz aşağıdan kendi konuğunuzu da ekleyebilirsiniz.
             </div>
           )}
           {!loading &&
             guests?.map((g) => (
               <div key={g.name} className="guest-card" style={{ borderColor: g.color }}>
+                <button
+                  className="guest-card__remove"
+                  onClick={() => removeGuest(g.name)}
+                  title="Çıkar"
+                >
+                  ×
+                </button>
                 <div className="guest-card__avatar" style={{ background: g.color }}>
                   {g.thumbnail ? <img src={g.thumbnail} alt={g.name} /> : <span>{initials(g.name)}</span>}
                 </div>
@@ -260,6 +263,26 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               </div>
             ))}
         </div>
+
+        {/* Kendi konuğunu ekle */}
+        <div className="topic-row addguest-row">
+          <input
+            className="topic-input"
+            placeholder="Kendi konuğunuzu ekleyin: bir isim yazın (ör. Sun Tzu) ya da Vikipedi linki"
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addGuest()}
+            disabled={(guests?.length ?? 0) >= MAX_GUESTS}
+          />
+          <button
+            className="btn btn--ghost"
+            onClick={() => addGuest()}
+            disabled={!addName.trim() || adding || (guests?.length ?? 0) >= MAX_GUESTS}
+          >
+            {adding ? "Aranıyor…" : "＋ Ekle"}
+          </button>
+        </div>
+        {addMsg && <p className="context-hint" style={{ color: "var(--danger)" }}>{addMsg}</p>}
       </section>
 
       <div className="setup__footer">
@@ -291,4 +314,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       </div>
     </div>
   );
+}
+
+const COLORS = ["#e94b6b", "#3fb6c9", "#f2b134", "#8b7bd8"];
+function colorAt(i: number): string {
+  return COLORS[i % COLORS.length];
 }

@@ -158,12 +158,36 @@ a {
   gap: 1rem;
 }
 .guest-card {
+  position: relative;
   background: var(--bg-3);
   border: 1px solid var(--line);
   border-top: 3px solid var(--line);
   border-radius: 12px;
   padding: 1.1rem;
   text-align: center;
+}
+.guest-card__remove {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.guest-card__remove:hover {
+  background: var(--danger);
+  color: #fff;
+}
+.addguest-row {
+  margin-top: 1rem;
 }
 .guest-card--skeleton {
   height: 230px;

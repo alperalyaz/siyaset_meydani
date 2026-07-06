@@ -10,19 +10,19 @@ import {
   castingMessages,
   moderationMessages,
   trendTopicsMessages,
-  deepTopicsMessages,
+  topicIdeasMessages,
   type GuestRole,
 } from "./prompts";
 
-// "Siyaset Meydanı" ruhuna uygun derin, zaman-ötesi tartışma konuları üretir.
-export async function suggestDeepTopics(
+// Açık oturum konu fikirleri üretir (çoğu polemik-gündelik, azı derin).
+export async function suggestTopicIdeas(
   avoid: string[],
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  const { content } = await chat(deepTopicsMessages(avoid), apiKey, {
+  const { content } = await chat(topicIdeasMessages(avoid), apiKey, {
     json: true,
-    temperature: 1,
+    temperature: 1.1,
     max_tokens: 400,
     signal,
   });
@@ -139,13 +139,14 @@ export async function moderateTopic(
 export async function suggestGuestNames(
   topic: string,
   context: string | null,
+  avoid: string[],
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  const { content } = await chat(guestSuggestMessages(topic, context), apiKey, {
+  const { content } = await chat(guestSuggestMessages(topic, context, avoid), apiKey, {
     json: true,
-    temperature: 0.95,
-    max_tokens: 200,
+    temperature: 1.05,
+    max_tokens: 220,
     signal,
   });
   const parsed = parseJsonLoose<{ names?: string[] }>(content);

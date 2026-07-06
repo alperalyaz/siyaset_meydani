@@ -245,20 +245,30 @@ Sadece şu JSON:
   ];
 }
 
-// "Siyaset Meydanı" ruhuna uygun DERİN, zaman-ötesi tartışma konuları üretir.
-export function deepTopicsMessages(avoid: string[]) {
+// Açık oturum konu fikirleri üretir — ÇOĞU gündelik/eğlenceli, azı derin.
+export function topicIdeasMessages(avoid: string[]) {
   const avoidLine = avoid.length
-    ? `\nŞu konuları TEKRARLAMA (farklılarını üret): ${avoid.slice(0, 20).join("; ")}`
+    ? `\nŞunları TEKRARLAMA (yenilerini üret): ${avoid.slice(0, 24).join("; ")}`
     : "";
   return [
     {
       role: "system" as const,
       content:
-        "Sen 'Siyaset Meydanı' adlı DERİN bir açık oturum programının editörüsün. Tarih, felsefe, ahlak, din, bilim, sanat, toplum, siyaset ve insan doğası üzerine; çağlar boyu tartışılabilecek, iki güçlü tarafı olan, kışkırtıcı ve DÜŞÜNDÜRÜCÜ konular üretirsin. Güncel/magazin/spor/popüler değil — zaman ötesi ve felsefi derinliği olan konular.",
+        "Sen bir açık oturum programının editörüsün. Amacın SOKAKTAKİ İNSANIN bile fikir sahibi olabileceği, polemik yaratan ama tarihî şahsiyetlerin de derinlemesine kapışabileceği konular üretmek. Ne fildişi kule akademik felsefesi (ör. 'ahlak epistemolojik olarak nesnel midir' YASAK), ne de sıradan dedikodu.",
     },
     {
       role: "user" as const,
-      content: `Farklı alanlardan (tarih, felsefe, ahlak, din, bilim, sanat, toplum, siyaset) 8 özgün, birbirinden farklı, kışkırtıcı açık oturum konusu üret. Her biri NET bir tartışma cümlesi ya da sorusu olsun; iki tarafı da savunulabilsin. Kısa ve çarpıcı yaz.${avoidLine}
+      content: `8 tane birbirinden FARKLI açık oturum konusu üret. Aradığımız kayıt (register) tam olarak şu örnekler gibi olsun:
+- "İyi bir lider sevilmeli mi, korkulmalı mı?"
+- "Devlet otoritesi bireysel özgürlüklerin karşısında nereye kadar meşrudur?"
+- "Bir toplumu ileri taşıyan bilim mi, inanç mı?"
+- "İK mı adalet mi daha öncelikli bir toplumsal değerdir?"
+- "Tarihi yazan galipler haklı mıdır?"
+- "Sanat iktidara hizmet etmeli mi, ona karşı mı durmalı?"
+- "Para mı yoksa itibar mı insanı daha çok bozar?"
+- "Cesaret mi akıl mı zor zamanda yol gösterir?"
+
+Yani: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, polemik ve heyecan yaratan ama düşündüren konular. Toplum, ahlak, adalet, iktidar, para, aşk, cesaret, gelenek, ilerleme, kader gibi eksenler. Bazıları biraz daha gündelik/hafif olabilir ama asla sığ dedikodu değil. Kısa, çarpıcı, Türkçe cümleler; klişe ve ders kitabı havası olmasın.${avoidLine}
 
 Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },
@@ -298,24 +308,34 @@ Sadece şu JSON: {"topics":[{"i":<ham index>,"konu":"<tartışma konusu>"}]}  �
 }
 
 // Konuya göre, o alanla ilgili gerçek ve Vikipedi'de maddesi olan kişiler önerir.
-export function guestSuggestMessages(topic: string, context?: string | null) {
+export function guestSuggestMessages(topic: string, context?: string | null, avoid?: string[]) {
   const ctx =
     context && context.trim()
       ? `\nGüncel bağlam (konuyu anlaman için): ${context.trim().slice(0, 500)}\n`
+      : "";
+  const avoidLine =
+    avoid && avoid.length
+      ? `\nŞU İSİMLERİ ÖNERME (zaten geldiler, tamamen farklılarını bul): ${avoid.slice(0, 30).join(", ")}`
       : "";
   return [
     {
       role: "system" as const,
       content:
-        "Sen bir açık oturum yapımcısısın. Verilen konuyla İLGİLİ, gerçek ve Türkçe Vikipedi'de maddesi olan ünlü KİŞİLER önerirsin. Sadece insan öner; ülke, film, kavram, kurum önerme.",
+        "Sen bir açık oturum yapımcısısın. Verilen konuyla İLGİLİ, gerçek ve Türkçe Vikipedi'de maddesi olan ünlü KİŞİLER önerirsin. Sadece insan öner; ülke, film, kavram, kurum önerme. Zaman ötesi, çağlar arası, beklenmedik eşleşmeler senin imzandır.",
     },
     {
       role: "user" as const,
       content: `Konu: "${topic}"${ctx}
 
-Bu konuyla ilgili, o alandan/dönemden gerçek ve Türkçe Vikipedi'de maddesi bulunan 6 farklı ünlü KİŞİ öner. Farklı çağlardan ve farklı bakış açılarından, hatta beklenmedik eşleşmeler tercih edilir (aralarında iyi tartışma çıkacak kişiler). İsimleri Türkçe Vikipedi başlığıyla tam yaz.
+Bu konuyla ilgili, gerçek ve Türkçe Vikipedi'de maddesi bulunan 8 farklı ünlü KİŞİ öner.
+ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
+- FARKLI ÇAĞLARDAN seç: en az biri antik/orta çağ, en az biri son 200 yıl. Hepsi aynı dönemden/aynı ekolden OLMASIN.
+- Birbirine çok benzeyen (aynı okul, aynı görüş) 3 kişi seçme. Beklenmedik, ilk bakışta alakasız görünen ama konuya farklı bir açıdan dokunan isimleri tercih et.
+- Örnek çeşitlilik (konu 'devlet otoritesi' olsaydı): Sun Tzu, Machiavelli, İbn Haldun, Napolyon, Gandhi, Hannah Arendt gibi çok farklı çağ ve cepheler.
+- Farklı milletlerden ve farklı mesleklerden olabilirler; yeter ki konuya güçlü bir sözleri olsun.
+İsimleri Türkçe Vikipedi başlığıyla tam yaz.${avoidLine}
 
-Sadece şu JSON: {"names": ["...", "...", "...", "...", "...", "..."]}`,
+Sadece şu JSON: {"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },
   ];
 }
