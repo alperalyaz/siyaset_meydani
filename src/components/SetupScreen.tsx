@@ -121,11 +121,16 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     setAdding(true);
     setAddMsg(null);
     try {
-      const g = await resolveGuestByName(q);
-      if (!g) {
+      const res = await resolveGuestByName(q);
+      if (res.status === "blocked") {
+        setAddMsg("Peygamberler ve bir dinin kutsal saydığı figürler konuk olarak eklenemez. Lütfen başka bir isim seçin.");
+        return;
+      }
+      if (res.status === "notfound") {
         setAddMsg(`"${q}" Vikipedi'de bir kişi olarak bulunamadı. İsmi tam yazmayı ya da linkini yapıştırmayı deneyin.`);
         return;
       }
+      const g = res.guest;
       setGuests((prev) => {
         const cur = prev ?? [];
         if (cur.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return cur;

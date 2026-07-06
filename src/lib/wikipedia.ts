@@ -13,15 +13,26 @@ interface Summary {
   type?: string;
 }
 
-// Bir Vikipedi başlığının canlı özetini çeker (persona'yı gerçek maddeyle besler).
-async function fetchSummary(title: string): Promise<Summary | null> {
+// Bir Vikipedi başlığının canlı özetini çeker. Rate-limit'e (429/503) karşı
+// bir kez kısa beklemeyle yeniden dener.
+async function fetchSummary(title: string, retry = true): Promise<Summary | null> {
   try {
     const res = await fetch(TR_SUMMARY(title), {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", "Api-User-Agent": "SiyasetMeydani/1.0" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (retry && (res.status === 429 || res.status >= 500)) {
+        await new Promise((r) => setTimeout(r, 900));
+        return fetchSummary(title, false);
+      }
+      return null;
+    }
     return (await res.json()) as Summary;
   } catch {
+    if (retry) {
+      await new Promise((r) => setTimeout(r, 900));
+      return fetchSummary(title, false);
+    }
     return null;
   }
 }
@@ -107,6 +118,53 @@ async function fetchPersonInfo(
   }
 }
 
+// Tartışma masasına konuk olarak oturtulması saygısızlık olacak, dinlerin
+// kutsal saydığı figürler. HARDCODED liste (kelime filtresi değil): yalnızca
+// çözümlenen Vikipedi başlığı bu isimlerden biriyle TAM eşleşirse elenir.
+// Gerçek kişilerin ayırt edici başlıkları vardır (Kanuni = "I. Süleyman",
+// Yunus Emre = "Yunus Emre"), bu yüzden tam eşleşme güvenlidir.
+const SACRED_TITLES = new Set([
+  // İslam'da anılan peygamberler (ve yaygın yazımları)
+  "muhammed", "muhammad", "muhamed", "hz. muhammed",
+  "isa", "îsâ", "isa mesih", "mesih",
+  "musa", "mûsâ",
+  "ibrahim", "i̇brahim",
+  "nuh", "nûh",
+  "adem", "âdem",
+  "davud", "dâvûd",
+  "yûsuf",
+  "yakup", "yâkub",
+  "ishak", "i̇shak",
+  "ismail", "i̇smail", "ismâil",
+  "harun", "hârûn",
+  "ilyas", "i̇lyas", "elyesa",
+  "zekeriya", "zekeriyya",
+  "yahya", "yahyâ",
+  "eyyub", "eyyûb",
+  "idris", "i̇dris",
+  "hud", "hûd",
+  "lut", "lût",
+  "şuayb", "zülkifl", "üzeyir",
+  // Diğer dinlerin merkezî/kutsal figürleri
+  "buda", "buddha", "gautama buda", "siddhartha gautama",
+  "krishna", "krişna", "zerdüşt", "zarathustra",
+  "allah", "meryem", "aziz meryem",
+]);
+
+function normTitle(t: string): string {
+  return t
+    .toLocaleLowerCase("tr")
+    .replace(/\s*\(.*?\)\s*$/, "") // "Süleyman (peygamber)" -> "süleyman"
+    .trim();
+}
+
+export function isSacredFigure(s: Summary): boolean {
+  const title = normTitle(s.title ?? "");
+  if (SACRED_TITLES.has(title)) return true;
+  if (SACRED_TITLES.has(title.replace(/^hz\.?\s+/, ""))) return true;
+  return false;
+}
+
 // Bir maddenin gerçekten bir KİŞİ olduğunu doğrular + cinsiyetini döndürür.
 async function classifyPerson(s: Summary): Promise<{ isPerson: boolean; gender: Gender }> {
   if (s.wikibase_item) {
@@ -126,6 +184,7 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     if (guests.length >= count) break;
     const s = await fetchSummary(name);
     if (!s || (s.type && s.type !== "standard")) continue;
+    if (isSacredFigure(s)) continue; // peygamber/kutsal figür konuk olamaz
     const cls = await classifyPerson(s);
     if (!cls.isPerson) continue;
     const title = (s.title ?? name).replace(/_/g, " ");
@@ -151,10 +210,15 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
   return guests.map((g, i) => ({ ...g, color: colorForIndex(i) }));
 }
 
+export type ResolveResult =
+  | { status: "ok"; guest: Guest }
+  | { status: "blocked" } // peygamber/kutsal figür
+  | { status: "notfound" };
+
 // Kullanıcının yazdığı ismi (ya da Vikipedi linkini) gerçek bir kişiye çözer.
-export async function resolveGuestByName(query: string): Promise<Guest | null> {
+export async function resolveGuestByName(query: string): Promise<ResolveResult> {
   const q = query.trim();
-  if (!q) return null;
+  if (!q) return { status: "notfound" };
 
   let candidates: string[] = [];
   const urlMatch = q.match(/wikipedia\.org\/wiki\/([^?#]+)/i);
@@ -180,20 +244,27 @@ export async function resolveGuestByName(query: string): Promise<Guest | null> {
   for (const title of candidates) {
     const s = await fetchSummary(title);
     if (!s || (s.type && s.type !== "standard")) continue;
-    const cls = await classifyPerson(s);
-    if (!cls.isPerson) continue;
+    if (isSacredFigure(s)) return { status: "blocked" };
+    // Kullanıcı bu ismi bilerek seçti: kişi doğrulamasını ZORUNLU tutma (rate-limit'e
+    // dayanıklılık). Cinsiyeti en iyi çabayla al; alınamazsa boş geç.
+    const gender = await classifyPerson(s)
+      .then((c) => c.gender)
+      .catch(() => undefined);
     const name = (s.title ?? title).replace(/_/g, " ");
     return {
-      name,
-      title: name,
-      era: s.description ?? "",
-      blurb: s.extract && s.extract.length > 40 ? s.extract : name,
-      thumbnail: s.thumbnail?.source,
-      color: colorForIndex(0),
-      gender: cls.gender,
+      status: "ok",
+      guest: {
+        name,
+        title: name,
+        era: s.description ?? "",
+        blurb: s.extract && s.extract.length > 40 ? s.extract : name,
+        thumbnail: s.thumbnail?.source,
+        color: colorForIndex(0),
+        gender,
+      },
     };
   }
-  return null;
+  return { status: "notfound" };
 }
 
 function recentDateParts(daysAgo: number): [string, string, string] {
@@ -230,6 +301,7 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
       if (guests.length >= count) break;
       const s = await fetchSummary(title);
       if (!s || (s.type && s.type !== "standard")) continue;
+      if (isSacredFigure(s)) continue;
       const cls = await classifyPerson(s);
       if (!cls.isPerson) continue;
       const name = (s.title ?? title).replace(/_/g, " ");
