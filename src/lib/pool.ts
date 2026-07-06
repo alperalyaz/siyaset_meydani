@@ -1,6 +1,7 @@
 import type { Guest } from "../types";
 
 // Konu havuzları: kullanıcı yazmak istemezse hazır, kışkırtıcı başlıklar.
+// Her açılışta buradan rastgele bir alt küme gösterilir.
 export const TOPIC_POOL: string[] = [
   "Yeniçeri Ocağı'nın kapatılması doğru muydu?",
   "İstanbul'un fethi bir zafer mi yoksa bir medeniyetin sonu mu?",
@@ -12,6 +13,18 @@ export const TOPIC_POOL: string[] = [
   "Tarihi yazan galipler haklı mıdır?",
   "Matematik keşfedilir mi, icat mı edilir?",
   "İyi bir lider sevilmeli mi, korkulmalı mı?",
+  "Para insanı özgürleştirir mi, köleleştirir mi?",
+  "Adalet mi merhamet mi bir toplumu ayakta tutar?",
+  "Devlet otoritesi bireysel özgürlüğün karşısında nereye kadar meşrudur?",
+  "Aşkın sırrı akılda mı, kalpte mi?",
+  "İnsanı bozan güç müdür, para mıdır?",
+  "Gelenekler korunmalı mı, yıkılmalı mı?",
+  "Cesaret mi akıl mı zor zamanda yol gösterir?",
+  "Kader mi vardır, yoksa insan kendi yolunu mu çizer?",
+  "Başarı çalışmanın mı yoksa şansın mı eseridir?",
+  "İyi niyetli bir diktatör mü, kararsız bir demokrasi mi?",
+  "Bir milleti millet yapan dili midir, tarihi midir?",
+  "Vicdan mı kanun mu üstündür?",
 ];
 
 // Küratörlü kişi havuzu: çağlar arası çarpışmayı garantilemek için

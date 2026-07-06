@@ -151,6 +151,10 @@ const SACRED_TITLES = new Set([
   "allah", "meryem", "aziz meryem",
 ]);
 
+// Özel engel listesi (genel bir kural değil, isme özel): tartışma masasına
+// konuk olarak alınmayacak belirli kişiler.
+const BLOCKED_TITLES = new Set(["recep tayyip erdoğan", "recep tayyip erdogan"]);
+
 function normTitle(t: string): string {
   return t
     .toLocaleLowerCase("tr")
@@ -158,8 +162,10 @@ function normTitle(t: string): string {
     .trim();
 }
 
-export function isSacredFigure(s: Summary): boolean {
+// Konuk olarak eklenemeyecek kişi mi? (peygamber/kutsal figür + özel engel listesi)
+export function isBlockedGuest(s: Summary): boolean {
   const title = normTitle(s.title ?? "");
+  if (BLOCKED_TITLES.has(title)) return true;
   if (SACRED_TITLES.has(title)) return true;
   if (SACRED_TITLES.has(title.replace(/^hz\.?\s+/, ""))) return true;
   return false;
@@ -184,7 +190,7 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     if (guests.length >= count) break;
     const s = await fetchSummary(name);
     if (!s || (s.type && s.type !== "standard")) continue;
-    if (isSacredFigure(s)) continue; // peygamber/kutsal figür konuk olamaz
+    if (isBlockedGuest(s)) continue; // peygamber/kutsal figür ya da engelli kişi
     const cls = await classifyPerson(s);
     if (!cls.isPerson) continue;
     const title = (s.title ?? name).replace(/_/g, " ");
@@ -244,7 +250,7 @@ export async function resolveGuestByName(query: string): Promise<ResolveResult> 
   for (const title of candidates) {
     const s = await fetchSummary(title);
     if (!s || (s.type && s.type !== "standard")) continue;
-    if (isSacredFigure(s)) return { status: "blocked" };
+    if (isBlockedGuest(s)) return { status: "blocked" };
     // Kullanıcı bu ismi bilerek seçti: kişi doğrulamasını ZORUNLU tutma (rate-limit'e
     // dayanıklılık). Cinsiyeti en iyi çabayla al; alınamazsa boş geç.
     const gender = await classifyPerson(s)
@@ -301,7 +307,7 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
       if (guests.length >= count) break;
       const s = await fetchSummary(title);
       if (!s || (s.type && s.type !== "standard")) continue;
-      if (isSacredFigure(s)) continue;
+      if (isBlockedGuest(s)) continue;
       const cls = await classifyPerson(s);
       if (!cls.isPerson) continue;
       const name = (s.title ?? title).replace(/_/g, " ");
