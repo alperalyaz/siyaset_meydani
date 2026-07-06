@@ -98,18 +98,22 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     [topic, context, drawForTopic],
   );
 
+  // Önceden gösterilmiş tüm konular (tekrar üretmemek için).
+  const seenTopicsRef = useRef<string[]>([...TOPIC_POOL]);
   const loadTopics = useCallback(async () => {
     setLoadingTopics(true);
     try {
-      const avoid = [...TOPIC_POOL, ...extraTopics];
-      const fresh = await suggestTopicIdeas(avoid, apiKey);
-      if (fresh.length) setExtraTopics((prev) => [...fresh, ...prev].slice(0, 24));
+      const fresh = await suggestTopicIdeas(seenTopicsRef.current, apiKey);
+      if (fresh.length) {
+        seenTopicsRef.current = [...seenTopicsRef.current, ...fresh].slice(-60);
+        setExtraTopics(fresh.slice(0, 6)); // en fazla 6 göster
+      }
     } catch (e) {
       onError(e);
     } finally {
       setLoadingTopics(false);
     }
-  }, [apiKey, onError, extraTopics]);
+  }, [apiKey, onError]);
 
   const addGuest = useCallback(async () => {
     const q = addName.trim();
@@ -158,24 +162,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="setup__block-head">
           <h2>1 · Bugünün Konusu</h2>
           <button className="btn btn--ghost" onClick={() => loadTopics()} disabled={loadingTopics}>
-            {loadingTopics ? "Konu üretiliyor…" : "🎲 Başka konular öner"}
+            {loadingTopics ? "Konu üretiliyor…" : "Başka konular öner"}
           </button>
         </div>
 
         <div className="topic-chips">
-          {extraTopics.map((t) => (
+          {(extraTopics.length ? extraTopics : TOPIC_POOL.slice(0, 6)).map((t) => (
             <button
               key={t}
-              className={`chip chip--fresh ${topic === t ? "chip--active" : ""}`}
-              onClick={() => pickTopic(t)}
-            >
-              {t}
-            </button>
-          ))}
-          {TOPIC_POOL.map((t) => (
-            <button
-              key={t}
-              className={`chip ${topic === t ? "chip--active" : ""}`}
+              className={`chip ${extraTopics.length ? "chip--fresh" : ""} ${topic === t ? "chip--active" : ""}`}
               onClick={() => pickTopic(t)}
             >
               {t}

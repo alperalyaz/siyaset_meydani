@@ -8,6 +8,9 @@ interface Props {
   onSend: (text: string) => void;
   onPauseToggle: () => void;
   onSuggest: () => void;
+  ttsOn: boolean;
+  ttsSupported: boolean;
+  onToggleTts: () => void;
 }
 
 // Spiker kontrol çubuğu: müdahale, duraklat/devam, hazır soru önerileri.
@@ -19,6 +22,9 @@ export function ModeratorBar({
   onSend,
   onPauseToggle,
   onSuggest,
+  ttsOn,
+  ttsSupported,
+  onToggleTts,
 }: Props) {
   const [text, setText] = useState("");
 
@@ -57,6 +63,16 @@ export function ModeratorBar({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
         />
+
+        {ttsSupported && (
+          <button
+            className={`btn btn--ghost btn--icon ${ttsOn ? "btn--on" : ""}`}
+            onClick={onToggleTts}
+            title={ttsOn ? "Seslendirme açık" : "Seslendirme kapalı"}
+          >
+            {ttsOn ? "🔊" : "🔇"}
+          </button>
+        )}
 
         <button
           className="btn btn--ghost btn--icon"

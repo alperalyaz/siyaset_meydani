@@ -11,6 +11,8 @@ export interface Guest {
   thumbnail?: string;
   /** Renk teması (avatar/isim) */
   color: string;
+  /** Seslendirmede erkek/kadın sesi seçimi için (Wikidata P21) */
+  gender?: "male" | "female";
 }
 
 export type Speaker = "moderator" | number; // number = guests[i]

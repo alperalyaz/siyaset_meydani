@@ -18,6 +18,7 @@ import {
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey } from "./lib/store";
+import { speak, cancelSpeech, voiceForGuest, ttsSupported } from "./lib/tts";
 
 type Phase = "setup" | "panel";
 type SessionPhase = "intro" | "opening" | "debate";
@@ -45,9 +46,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-// Replik uzunluğuna göre okuma süresi — akışı sakinleştirir.
+// Replik uzunluğuna göre okuma süresi — akışı sakinleştirir (ses kapalıyken).
 function readingDelay(text: string): number {
-  return Math.min(6000, Math.max(2200, 1400 + text.length * 18));
+  return Math.min(11000, Math.max(3200, 1800 + text.length * 26));
 }
 
 function isAbort(e: unknown): boolean {
@@ -76,6 +77,13 @@ export function App() {
 
   const [checking, setChecking] = useState(false);
   const [blockedMsg, setBlockedMsg] = useState<string | null>(null);
+
+  const [ttsOn, setTtsOn] = useState(ttsSupported());
+  const ttsRef = useRef(ttsOn);
+  useEffect(() => {
+    ttsRef.current = ttsOn;
+    if (!ttsOn) cancelSpeech();
+  }, [ttsOn]);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
@@ -123,8 +131,27 @@ export function App() {
     runningRef.current = false;
     setRunning(false);
     abortRef.current?.abort();
+    cancelSpeech();
     setThinking(null);
   }, []);
+
+  // Tempo: ses açıksa replik seslendirilir ve bitene kadar beklenir; kapalıysa
+  // okuma süresi kadar beklenir. Böylece akış okunabilir/dinlenebilir hızda.
+  const pace = useCallback(
+    async (
+      text: string,
+      voiceIdx: number,
+      gender: "male" | "female" | undefined,
+      signal: AbortSignal,
+    ) => {
+      if (ttsRef.current && text.trim()) {
+        await speak(text, { ...voiceForGuest(voiceIdx, gender), signal });
+      } else {
+        await delay(readingDelay(text), signal);
+      }
+    },
+    [],
+  );
 
   const lastGuestSpeaker = useCallback((): number | null => {
     for (let i = utterRef.current.length - 1; i >= 0; i--) {
@@ -264,7 +291,7 @@ export function App() {
           progressRef.current = { phase: "opening", i: 0 };
           const ctrl = new AbortController();
           abortRef.current = ctrl;
-          await delay(1600, ctrl.signal);
+          await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
           continue;
         }
         const ctrl = new AbortController();
@@ -276,7 +303,7 @@ export function App() {
         if (!runningRef.current) return;
         append({ id: uid(), speaker: i, text, mode: "normal" });
         progressRef.current = { phase: "intro", i: i + 1 };
-        await delay(readingDelay(text), ctrl.signal);
+        await pace(text, i, g[i].gender, ctrl.signal);
       }
 
       // --- GÖRÜŞ TURU ---
@@ -317,7 +344,7 @@ export function App() {
         append({ id: uid(), speaker: i, text, mode: "normal" });
         if (hasStance && !activeRef.current.includes(i)) activeRef.current.push(i);
         progressRef.current = { phase: "opening", i: i + 1 };
-        await delay(readingDelay(text), ctrl.signal);
+        await pace(text, i, g[i].gender, ctrl.signal);
       }
 
       // --- SERBEST TARTIŞMA ---
@@ -368,7 +395,8 @@ export function App() {
           });
         }
         advanceThread(speaker, role);
-        await delay(text.trim() ? readingDelay(text) : 500, ctrl.signal);
+        if (text.trim()) await pace(text, speaker, g[speaker].gender, ctrl.signal);
+        else await delay(500, ctrl.signal);
       }
     } catch (e) {
       setThinking(null);
@@ -376,7 +404,7 @@ export function App() {
       handleError(e);
       pause();
     }
-  }, [append, syncMeta, nextSpeaker, advanceThread, mostOpposedPair, handleError, pause]);
+  }, [append, syncMeta, nextSpeaker, advanceThread, mostOpposedPair, handleError, pause, pace]);
 
   // Oturumu sürdür (boot / devam / müdahale sonrası tek giriş noktası).
   const drive = useCallback(() => {
@@ -490,6 +518,7 @@ export function App() {
 
   const leave = useCallback(() => {
     pause();
+    cancelSpeech();
     setPhase("setup");
     setUtterances([]);
     utterRef.current = [];
@@ -602,6 +631,9 @@ export function App() {
         onSend={moderate}
         onPauseToggle={pauseToggle}
         onSuggest={doSuggest}
+        ttsOn={ttsOn}
+        ttsSupported={ttsSupported()}
+        onToggleTts={() => setTtsOn((v) => !v)}
       />
 
       <ApiKeyModal

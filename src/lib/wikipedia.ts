@@ -44,6 +44,7 @@ async function enrich(seed: Seed, colorIndex: number): Promise<Guest> {
   if (s?.thumbnail?.source) {
     base.thumbnail = s.thumbnail.source;
   }
+  if (s) base.gender = (await classifyPerson(s)).gender;
   return base;
 }
 
@@ -71,33 +72,48 @@ function looksLikePerson(s: Summary): boolean {
   return OCCUPATION.test(hay) || BIRTH.test(hay);
 }
 
-// Wikidata'da "instance of (P31) = insan (Q5)" mı? Kesin kişi doğrulaması.
-// null = doğrulanamadı (ağ hatası vb.).
-async function isHumanWikidata(qid: string): Promise<boolean | null> {
+type Gender = "male" | "female" | undefined;
+
+// Wikidata'dan tek çağrıda hem "insan mı (P31=Q5)" hem "cinsiyet (P21)" bilgisi.
+// isHuman null = doğrulanamadı (ağ hatası vb.).
+async function fetchPersonInfo(
+  qid: string,
+): Promise<{ isHuman: boolean | null; gender: Gender }> {
   try {
     const url = `https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${encodeURIComponent(
       qid,
-    )}&property=P31&format=json&origin=*`;
+    )}&property=P31|P21&format=json&origin=*`;
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) return { isHuman: null, gender: undefined };
     const data = (await res.json()) as {
-      claims?: { P31?: { mainsnak?: { datavalue?: { value?: { id?: string } } } }[] };
+      claims?: {
+        P31?: { mainsnak?: { datavalue?: { value?: { id?: string } } } }[];
+        P21?: { mainsnak?: { datavalue?: { value?: { id?: string } } } }[];
+      };
     };
-    const claims = data.claims?.P31;
-    if (!claims) return false;
-    return claims.some((c) => c.mainsnak?.datavalue?.value?.id === "Q5");
+    const p31 = data.claims?.P31;
+    const isHuman = p31 ? p31.some((c) => c.mainsnak?.datavalue?.value?.id === "Q5") : false;
+    const g = data.claims?.P21?.[0]?.mainsnak?.datavalue?.value?.id;
+    // Q6581097 = erkek, Q6581072 = kadın (trans erkek/kadın da erkek/kadın sesine map'lenir)
+    const gender: Gender =
+      g === "Q6581097" || g === "Q2449503"
+        ? "male"
+        : g === "Q6581072" || g === "Q1052281"
+          ? "female"
+          : undefined;
+    return { isHuman, gender };
   } catch {
-    return null;
+    return { isHuman: null, gender: undefined };
   }
 }
 
-// Bir maddenin gerçekten bir KİŞİ olduğunu doğrular (ülke/film/kavram elenir).
-async function verifyPerson(s: Summary): Promise<boolean> {
+// Bir maddenin gerçekten bir KİŞİ olduğunu doğrular + cinsiyetini döndürür.
+async function classifyPerson(s: Summary): Promise<{ isPerson: boolean; gender: Gender }> {
   if (s.wikibase_item) {
-    const human = await isHumanWikidata(s.wikibase_item);
-    if (human !== null) return human;
+    const info = await fetchPersonInfo(s.wikibase_item);
+    if (info.isHuman !== null) return { isPerson: info.isHuman, gender: info.gender };
   }
-  return looksLikePerson(s);
+  return { isPerson: looksLikePerson(s), gender: undefined };
 }
 
 // Bir isim listesinden (LLM önerisi) gerçek kişileri seçip Vikipedi ile zenginleştirir.
@@ -110,7 +126,8 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     if (guests.length >= count) break;
     const s = await fetchSummary(name);
     if (!s || (s.type && s.type !== "standard")) continue;
-    if (!(await verifyPerson(s))) continue;
+    const cls = await classifyPerson(s);
+    if (!cls.isPerson) continue;
     const title = (s.title ?? name).replace(/_/g, " ");
     if (used.has(title.toLowerCase())) continue;
     used.add(title.toLowerCase());
@@ -121,6 +138,7 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
       blurb: s.extract && s.extract.length > 40 ? s.extract : `${title} hakkında konuk.`,
       thumbnail: s.thumbnail?.source,
       color: colorForIndex(guests.length),
+      gender: cls.gender,
     });
   }
   // Eksik kaldıysa küratörlü havuzdan tamamla.
@@ -162,7 +180,8 @@ export async function resolveGuestByName(query: string): Promise<Guest | null> {
   for (const title of candidates) {
     const s = await fetchSummary(title);
     if (!s || (s.type && s.type !== "standard")) continue;
-    if (!(await verifyPerson(s))) continue;
+    const cls = await classifyPerson(s);
+    if (!cls.isPerson) continue;
     const name = (s.title ?? title).replace(/_/g, " ");
     return {
       name,
@@ -171,6 +190,7 @@ export async function resolveGuestByName(query: string): Promise<Guest | null> {
       blurb: s.extract && s.extract.length > 40 ? s.extract : name,
       thumbnail: s.thumbnail?.source,
       color: colorForIndex(0),
+      gender: cls.gender,
     };
   }
   return null;
@@ -210,7 +230,8 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
       if (guests.length >= count) break;
       const s = await fetchSummary(title);
       if (!s || (s.type && s.type !== "standard")) continue;
-      if (!(await verifyPerson(s))) continue;
+      const cls = await classifyPerson(s);
+      if (!cls.isPerson) continue;
       const name = (s.title ?? title).replace(/_/g, " ");
       guests.push({
         name,
@@ -219,6 +240,7 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
         blurb: s.extract ?? name,
         thumbnail: s.thumbnail?.source,
         color: colorForIndex(guests.length),
+        gender: cls.gender,
       });
     }
     if (guests.length >= count) return guests;
