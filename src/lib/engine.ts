@@ -1,5 +1,5 @@
 import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
-import { chat, parseJsonLoose } from "./deepseek";
+import { chat, parseJsonLoose, ApiError } from "./deepseek";
 import {
   introMessages,
   openingMessages,
@@ -8,8 +8,41 @@ import {
   suggestQuestionsMessages,
   guestSuggestMessages,
   castingMessages,
+  moderationMessages,
   type GuestRole,
 } from "./prompts";
+
+export interface ModerationVerdict {
+  allowed: boolean;
+  category: string;
+}
+
+// İçerik güvenliği kapısı. Auth hatasını yukarı iletir; başka hatada güvenli
+// tarafta değil, akışı kırmamak için izin verir (persona içindeki hakaret
+// sınırı ikincil koruma sağlar).
+export async function moderateTopic(
+  topic: string,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<ModerationVerdict> {
+  try {
+    const { content } = await chat(moderationMessages(topic), apiKey, {
+      json: true,
+      temperature: 0,
+      max_tokens: 120,
+      signal,
+    });
+    const p = parseJsonLoose<{ allowed?: boolean; category?: string }>(content);
+    if (p && typeof p.allowed === "boolean") {
+      return { allowed: p.allowed, category: p.category ?? "" };
+    }
+    return { allowed: true, category: "" };
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) throw e;
+    return { allowed: true, category: "" };
+  }
+}
 
 // Konuya göre ilgili kişi isimleri önerir (Vikipedi doğrulaması ayrı yapılır).
 export async function suggestGuestNames(

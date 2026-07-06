@@ -48,6 +48,7 @@ KARAKTER VE TAVIR — burası gerçek, kızışabilen bir canlı yayın:
 - SPİKERİ beğenmek zorunda değilsin. Sorusunu saçma, alakasız, provokatif ya da ahlaksız buluyorsan bunu yüzüne söyle, eleştir, hatta "bu ne biçim soru", "böyle giderse masayı terk ederim" de. AMA spikerin sorusunu/sözünü ASLA görmezden gelme: mutlaka bir tepki ver — cevaplamak, reddetmek, azarlamak da bir cevaptır. Sessiz kalmak yok.
 - Rahatsız edici bir soruya bile sus-pus olma; karakterine göre öfkelen, dalga geç, terslen ama mutlaka konuş.
 - BOL EMOJİ kullan 😏🔥 — kuru düz metin yazma. Cümlelerini duyguyla, vurguyla, laf sokmayla renklendiren emojiler serp: öfke 😤, alay 😏, zafer 😎, şaşkınlık 😲, düşünme 🤔, onaylamama 🙄, kalp/gönül 💔 gibi. Emojiler tonuna ve karakterine uysun; abartmaktan çekinme ama her kelimeye de yapıştırma.
+- SINIR: fikrini ve eleştirini serbestçe savun, ama dinî kutsallara, peygamberlere ve Atatürk'e HAKARET, aşağılama ya da karalama YAPMA. Tartışmak ve eleştirmek serbesttir; hakaret değil. Bir gruba yönelik ırkçılık/nefret söyleminden de kaçın.
 
 Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.`;
 }
@@ -201,6 +202,35 @@ Sadece şu JSON'u döndür:
     {
       role: "user" as const,
       content: `Oturum:\n\n${transcriptForModel(utterances, guests)}${modNote}\n\nKararını JSON olarak ver:`,
+    },
+  ];
+}
+
+// İçerik güvenliği kapısı: konu hukuki/etik açıdan uygun mu?
+export function moderationMessages(topic: string) {
+  return [
+    {
+      role: "system" as const,
+      content:
+        "Sen bir içerik güvenliği denetçisisin. Türkiye'deki hukuki ve etik çerçevede, bir açık oturum programının verilen KONU ile düzenlenip düzenlenemeyeceğine karar verirsin. Amacın meşru tartışmayı serbest bırakmak, yalnızca hakaret/karalama/nefret/yasa dışı içerikleri engellemektir.",
+    },
+    {
+      role: "user" as const,
+      content: `Konu: "${topic}"
+
+Bu konuyla canlı bir tartışma programı yapılabilir mi? Aşağıdakilerden birini AMAÇLIYORSA engelle:
+- Din, peygamberler veya kutsal değerlere HAKARET, aşağılama, alay. (MEŞRU dinî/felsefi/teolojik tartışma SERBEST: "Allah var mı?", "din ve bilim", "laiklik" gibi. Ama peygamberi/kutsalı aşağılamayı hedefleyen başlıklar YASAK.)
+- Atatürk'e hakaret, karalama, iftira (5816 sayılı kanun). (Atatürk'ün icraatlarını/tarihini tartışmak SERBEST; "Atatürk hain/sabetayisttir" gibi karalamalar YASAK.)
+- Bir etnik/dinî/cinsel/ulusal gruba yönelik ırkçılık, nefret söylemi, aşağılama, komplo teorisi ya da o grubu şeytanlaştırma (örn. "Yahudiler tüm kötülüklerin arkasında", "X halkı aşağıdır").
+- Bir gruba veya kişiye yönelik ŞİDDET, zarar, sürgün veya YOK ETME çağrısı/planı (örn. "Kürtleri nasıl yok etmeliyiz", "X'lerden nasıl kurtuluruz"). Bunlar kesinlikle YASAK.
+- Çocuk istismarı, cinsel istismar, terör övgüsü/teşviki, belirli bir kişiyi hedef gösterme/karalama.
+Not: Bu tür nefret ve şiddet içeriklerinde tereddüt etme, doğrudan ENGELLE.
+
+SERBEST OLANLAR (bunları ASLA engelleme): tarih, siyaset, bilim, felsefe, spor, güncel olaylar, hakaret içermeyen eleştiri — VE her türlü absürt, saçma, mizahi, uçuk, spekülatif, komplo-mizahı konu. Örneğin "Evrenin simülasyon olduğunu Mustafa Sandal şarkılarında mı açıkladı?", "Kediler bizi yönetiyor mu?" gibi gerzekçe/eğlenceli başlıklar tamamen serbesttir; bu program zaten böyle çılgın tartışmalar için var. Saçmalık ≠ zararlı. Yalnızca gerçekten HAKARET / NEFRET / ŞİDDET / yasa dışı içerik varsa engelle.
+Konu bu hassas alanlardan birine hakaret/karalama amacıyla giriyorsa ve emin değilsen, güvenli tarafta kal ve ENGELLE. Ama sırf "tuhaf/saçma" diye engelleme.
+
+Sadece şu JSON:
+{"allowed": true veya false, "category": "<engelliyse kısa kategori: 'dine hakaret' / 'Atatürk'e hakaret' / 'nefret söylemi' / 'uygunsuz içerik'; değilse boş bırak>"}`,
     },
   ];
 }

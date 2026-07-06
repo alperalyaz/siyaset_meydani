@@ -13,6 +13,7 @@ import {
   runGuest,
   suggestQuestions,
   assignStances,
+  moderateTopic,
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
@@ -72,6 +73,9 @@ export function App() {
 
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  const [checking, setChecking] = useState(false);
+  const [blockedMsg, setBlockedMsg] = useState<string | null>(null);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
@@ -427,6 +431,30 @@ export function App() {
     loopActiveRef.current = false;
   }, []);
 
+  // Oturum başlamadan önce içerik güvenliği kapısı: hassas konularda durdur.
+  const beginSession = useCallback(
+    async (g: Guest[], t: string) => {
+      setBlockedMsg(null);
+      setChecking(true);
+      try {
+        const verdict = await moderateTopic(t, apiKeyRef.current);
+        syncMeta();
+        if (!verdict.allowed) {
+          setBlockedMsg(
+            "Bu konuyla ilgili açık oturum düzenlenemiyor 🌱 Lütfen farklı bir konu seçin.",
+          );
+          return;
+        }
+        startSession(g, t);
+      } catch (e) {
+        handleError(e);
+      } finally {
+        setChecking(false);
+      }
+    },
+    [startSession, syncMeta, handleError],
+  );
+
   // Panel'e geçince oturumu başlat (guests/topic state'i güncellendikten sonra).
   useEffect(() => {
     if (phase === "panel" && runningRef.current && !loopActiveRef.current) {
@@ -475,12 +503,13 @@ export function App() {
     return (
       <>
         <SetupScreen
-          onStart={startSession}
+          onStart={beginSession}
           onOpenKey={() => setKeyModal(true)}
           onError={handleError}
           apiKey={apiKey}
           demoRemaining={demoRemaining}
           hasKey={!!apiKey}
+          checking={checking}
         />
         <ApiKeyModal
           open={keyModal}
@@ -490,6 +519,20 @@ export function App() {
           onClear={removeKey}
           onClose={() => setKeyModal(false)}
         />
+        {blockedMsg && (
+          <div className="modal__backdrop" onClick={() => setBlockedMsg(null)}>
+            <div className="modal modal--block" onClick={(e) => e.stopPropagation()}>
+              <div className="modal--block__icon">🕊️</div>
+              <h2>Bu konu uygun değil</h2>
+              <p>{blockedMsg}</p>
+              <div className="modal__actions">
+                <button className="btn btn--primary" onClick={() => setBlockedMsg(null)}>
+                  Tamam, başka konu seçeyim
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <footer className="credits">DeepSeek / Groq ile çalışır · Vikipedi verileriyle beslenir</footer>
       </>
     );

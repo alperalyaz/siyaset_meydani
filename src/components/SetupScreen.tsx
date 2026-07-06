@@ -13,13 +13,14 @@ interface Props {
   apiKey: string | null;
   demoRemaining: number | null;
   hasKey: boolean;
+  checking: boolean;
 }
 
 function initials(name: string): string {
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
-export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey }: Props) {
+export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<Mode>("topic");
@@ -205,8 +206,12 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       </section>
 
       <div className="setup__footer">
-        <button className="btn btn--primary btn--big" disabled={!canStart} onClick={() => onStart(guests!, topic.trim())}>
-          Oturumu Aç ▶
+        <button
+          className="btn btn--primary btn--big"
+          disabled={!canStart || checking}
+          onClick={() => onStart(guests!, topic.trim())}
+        >
+          {checking ? "Konu kontrol ediliyor…" : "Oturumu Aç ▶"}
         </button>
         <div className="setup__meta">
           {hasKey ? (
