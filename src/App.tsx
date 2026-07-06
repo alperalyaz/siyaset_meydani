@@ -138,16 +138,67 @@ export function App() {
     return [...active].sort((x, y) => (lastSeen.get(x) ?? -1) - (lastSeen.get(y) ?? -1))[0];
   }, []);
 
+  // Pozisyon kutbu: Lehte=+1, Aleyhte=-1, Kısmen/yok=0.
+  const polarity = useCallback((i: number): number => {
+    const p = stancesRef.current[i]?.position?.toLocaleLowerCase("tr") ?? "";
+    if (p.includes("lehte")) return 1;
+    if (p.includes("aleyhte")) return -1;
+    return 0;
+  }, []);
+
+  // Bir konuğa en zıt görüşteki aktif konuk (didişme için doğru rakip).
+  const opponentOf = useCallback(
+    (i: number, pool: number[]): number => {
+      let best = pool.find((j) => j !== i) ?? i;
+      let bestDiff = -1;
+      for (const j of pool) {
+        if (j === i) continue;
+        const d = Math.abs(polarity(i) - polarity(j));
+        if (d > bestDiff) {
+          bestDiff = d;
+          best = j;
+        }
+      }
+      return best;
+    },
+    [polarity],
+  );
+
+  // En zıt görüşteki iki aktif konuk — tartışmanın ana eksenini kurar.
+  const mostOpposedPair = useCallback(
+    (pool: number[]): Thread => {
+      let a = pool[0];
+      let b = pool[1] ?? pool[0];
+      let diff = -1;
+      for (let x = 0; x < pool.length; x++) {
+        for (let y = x + 1; y < pool.length; y++) {
+          const d = Math.abs(polarity(pool[x]) - polarity(pool[y]));
+          if (d > diff) {
+            diff = d;
+            a = pool[x];
+            b = pool[y];
+          }
+        }
+      }
+      return { a, b, turns: 0 };
+    },
+    [polarity],
+  );
+
   // Kod-tabanlı ritim: ikili atışma sürer, tıkanınca üçüncü girip yönlendirir.
   const nextSpeaker = useCallback((): { speaker: number; role: GuestRole } => {
     const active = activeRef.current;
     const th = threadRef.current!;
 
-    // Spiker yön verdiyse: adı geçen konuk, yoksa en uzun susan aktif konuk.
+    // Spiker yön verdiyse: adı geçen konuk (herhangi bir isim parçası eşleşirse),
+    // yoksa en uzun susan aktif konuk.
     if (modNoteRef.current) {
-      const note = modNoteRef.current.toLowerCase();
+      const note = modNoteRef.current.toLocaleLowerCase("tr");
       const named = active.find((i) =>
-        note.includes(guestsRef.current[i].name.toLowerCase().split(" ")[0]),
+        guestsRef.current[i].name
+          .toLocaleLowerCase("tr")
+          .split(/\s+/)
+          .some((tok) => tok.length > 3 && note.includes(tok)),
       );
       return { speaker: named ?? leastRecentActive(), role: "answerHost" };
     }
@@ -165,14 +216,15 @@ export function App() {
   const advanceThread = useCallback((speaker: number, role: GuestRole) => {
     const th = threadRef.current!;
     if (role === "redirect") {
-      threadRef.current = { a: speaker, b: th.a, turns: 0 };
+      // Üçüncü söz aldı: onu en zıt görüşteki aktif konukla eşleştir.
+      threadRef.current = { a: speaker, b: opponentOf(speaker, activeRef.current), turns: 0 };
     } else if (role === "answerHost") {
       const other = activeRef.current.find((i) => i !== speaker) ?? speaker;
       threadRef.current = { a: speaker, b: other, turns: 0 };
     } else {
       th.turns += 1;
     }
-  }, []);
+  }, [opponentOf]);
 
   // Üç fazlı, duraklatılıp devam edebilen oturum sürücüsü.
   const runSession = useCallback(async () => {
@@ -232,9 +284,7 @@ export function App() {
           }
           const act = activeRef.current;
           threadRef.current =
-            act.length >= 2
-              ? { a: act[0], b: act[1], turns: 0 }
-              : { a: act[0], b: act[0], turns: 0 };
+            act.length >= 2 ? mostOpposedPair(act) : { a: act[0], b: act[0], turns: 0 };
           progressRef.current = { phase: "debate", i: 0 };
           continue;
         }
@@ -295,15 +345,17 @@ export function App() {
         syncMeta();
         if (!runningRef.current) return;
 
-        modNoteRef.current = undefined;
-        append({
-          id: uid(),
-          speaker,
-          text,
-          mode: role === "redirect" ? "redirect" : "normal",
-        });
+        modNoteRef.current = undefined; // tüket ki döngü kilitlenmesin
+        if (text.trim()) {
+          append({
+            id: uid(),
+            speaker,
+            text,
+            mode: role === "redirect" ? "redirect" : "normal",
+          });
+        }
         advanceThread(speaker, role);
-        await delay(readingDelay(text), ctrl.signal);
+        await delay(text.trim() ? readingDelay(text) : 500, ctrl.signal);
       }
     } catch (e) {
       setThinking(null);
@@ -311,7 +363,7 @@ export function App() {
       handleError(e);
       pause();
     }
-  }, [append, syncMeta, nextSpeaker, advanceThread, handleError, pause]);
+  }, [append, syncMeta, nextSpeaker, advanceThread, mostOpposedPair, handleError, pause]);
 
   // Oturumu sürdür (boot / devam / müdahale sonrası tek giriş noktası).
   const drive = useCallback(() => {

@@ -23,32 +23,33 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<Mode>("topic");
+  const [count, setCount] = useState<2 | 3>(2);
   const [topic, setTopic] = useState("");
 
-  const drawRandom = useCallback(async () => {
+  const drawRandom = useCallback(async (cnt: number) => {
     setLoading(true);
     setGuests(null);
     try {
-      setGuests(await pickCuratedGuests(3));
+      setGuests(await pickCuratedGuests(cnt));
     } finally {
       setLoading(false);
     }
   }, []);
 
   const drawForTopic = useCallback(
-    async (t: string) => {
+    async (t: string, cnt: number) => {
       const q = t.trim();
       if (!q) return;
       setLoading(true);
       setGuests(null);
       try {
         const names = await suggestGuestNames(q, apiKey);
-        setGuests(await buildGuestsFromNames(names, 3));
+        setGuests(await buildGuestsFromNames(names, cnt));
       } catch (e) {
         onError(e);
         // Konuya göre başarısızsa küratörlü havuza düş.
         try {
-          setGuests(await pickCuratedGuests(3));
+          setGuests(await pickCuratedGuests(cnt));
         } catch {
           /* yoksay */
         }
@@ -62,26 +63,36 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const pickTopic = useCallback(
     (t: string) => {
       setTopic(t);
-      if (mode === "topic") void drawForTopic(t);
+      if (mode === "topic") void drawForTopic(t, count);
     },
-    [mode, drawForTopic],
+    [mode, drawForTopic, count],
   );
 
   const reshuffle = useCallback(() => {
-    if (mode === "random") void drawRandom();
-    else void drawForTopic(topic);
-  }, [mode, drawRandom, drawForTopic, topic]);
+    if (mode === "random") void drawRandom(count);
+    else void drawForTopic(topic, count);
+  }, [mode, drawRandom, drawForTopic, topic, count]);
 
   const switchMode = useCallback(
     (m: Mode) => {
       setMode(m);
       setGuests(null);
-      if (m === "random") void drawRandom();
+      if (m === "random") void drawRandom(count);
     },
-    [drawRandom],
+    [drawRandom, count],
   );
 
-  const canStart = !!guests && guests.length === 3 && topic.trim().length > 0 && !loading;
+  const changeCount = useCallback(
+    (c: 2 | 3) => {
+      setCount(c);
+      setGuests(null);
+      if (mode === "random") void drawRandom(c);
+      else if (topic.trim()) void drawForTopic(topic, c);
+    },
+    [mode, topic, drawRandom, drawForTopic],
+  );
+
+  const canStart = !!guests && guests.length >= 2 && topic.trim().length > 0 && !loading;
 
   return (
     <div className="setup">
@@ -112,13 +123,13 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             placeholder="…ya da kendi konunuzu yazın (futbol, uzay, felsefe…)"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && mode === "topic" && drawForTopic(topic)}
+            onKeyDown={(e) => e.key === "Enter" && mode === "topic" && drawForTopic(topic, count)}
           />
           {mode === "topic" && (
             <button
               className="btn btn--primary"
               disabled={!topic.trim() || loading}
-              onClick={() => drawForTopic(topic)}
+              onClick={() => drawForTopic(topic, count)}
             >
               Konukları getir
             </button>
@@ -145,6 +156,20 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                 🎲 Rastgele sürpriz
               </button>
             </div>
+            <div className="modetabs" title="Konuk sayısı">
+              <button
+                className={`modetab ${count === 2 ? "modetab--on" : ""}`}
+                onClick={() => changeCount(2)}
+              >
+                2 konuk
+              </button>
+              <button
+                className={`modetab ${count === 3 ? "modetab--on" : ""}`}
+                onClick={() => changeCount(3)}
+              >
+                3 konuk
+              </button>
+            </div>
             {guests && (
               <button className="btn btn--ghost" onClick={reshuffle} disabled={loading}>
                 ↻ Yeniden
@@ -155,12 +180,14 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
 
         <div className="guest-cards">
           {loading &&
-            [0, 1, 2].map((i) => <div key={i} className="guest-card guest-card--skeleton" />)}
+            Array.from({ length: count }, (_, i) => (
+              <div key={i} className="guest-card guest-card--skeleton" />
+            ))}
           {!loading && !guests && (
             <div className="guest-empty">
               {mode === "topic"
                 ? "Bir konu seçin ya da yazıp “Konukları getir”e basın; o konunun isimlerini masaya davet edeyim."
-                : "“🎲 Rastgele sürpriz” ile çağlar arası üç konuk çekelim."}
+                : "“🎲 Rastgele sürpriz” ile çağlar arası konukları çekelim."}
             </div>
           )}
           {!loading &&
