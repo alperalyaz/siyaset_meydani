@@ -9,6 +9,8 @@ interface Summary {
   description?: string;
   thumbnail?: { source?: string };
   title?: string;
+  wikibase_item?: string; // Wikidata Q-id
+  type?: string;
 }
 
 // Bir Vikipedi başlığının canlı özetini çeker (persona'yı gerçek maddeyle besler).
@@ -69,6 +71,67 @@ function looksLikePerson(s: Summary): boolean {
   return OCCUPATION.test(hay) || BIRTH.test(hay);
 }
 
+// Wikidata'da "instance of (P31) = insan (Q5)" mı? Kesin kişi doğrulaması.
+// null = doğrulanamadı (ağ hatası vb.).
+async function isHumanWikidata(qid: string): Promise<boolean | null> {
+  try {
+    const url = `https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${encodeURIComponent(
+      qid,
+    )}&property=P31&format=json&origin=*`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      claims?: { P31?: { mainsnak?: { datavalue?: { value?: { id?: string } } } }[] };
+    };
+    const claims = data.claims?.P31;
+    if (!claims) return false;
+    return claims.some((c) => c.mainsnak?.datavalue?.value?.id === "Q5");
+  } catch {
+    return null;
+  }
+}
+
+// Bir maddenin gerçekten bir KİŞİ olduğunu doğrular (ülke/film/kavram elenir).
+async function verifyPerson(s: Summary): Promise<boolean> {
+  if (s.wikibase_item) {
+    const human = await isHumanWikidata(s.wikibase_item);
+    if (human !== null) return human;
+  }
+  return looksLikePerson(s);
+}
+
+// Bir isim listesinden (LLM önerisi) gerçek kişileri seçip Vikipedi ile zenginleştirir.
+// Yeterli kişi bulunamazsa küratörlü havuzdan tamamlar.
+export async function buildGuestsFromNames(names: string[], count = 3): Promise<Guest[]> {
+  const guests: Guest[] = [];
+  const used = new Set<string>();
+  for (const name of names) {
+    if (guests.length >= count) break;
+    const s = await fetchSummary(name);
+    if (!s || (s.type && s.type !== "standard")) continue;
+    if (!(await verifyPerson(s))) continue;
+    const title = (s.title ?? name).replace(/_/g, " ");
+    if (used.has(title.toLowerCase())) continue;
+    used.add(title.toLowerCase());
+    guests.push({
+      name: title,
+      title,
+      era: s.description ?? "",
+      blurb: s.extract && s.extract.length > 40 ? s.extract : `${title} hakkında konuk.`,
+      thumbnail: s.thumbnail?.source,
+      color: colorForIndex(guests.length),
+    });
+  }
+  // Eksik kaldıysa küratörlü havuzdan tamamla.
+  for (const seed of shuffle(PERSON_POOL)) {
+    if (guests.length >= count) break;
+    if (used.has(seed.name.toLowerCase())) continue;
+    used.add(seed.name.toLowerCase());
+    guests.push(await enrich(seed, guests.length));
+  }
+  return guests.map((g, i) => ({ ...g, color: colorForIndex(i) }));
+}
+
 function recentDateParts(daysAgo: number): [string, string, string] {
   const dt = new Date(Date.now() - daysAgo * 86400000);
   const y = String(dt.getUTCFullYear());
@@ -102,7 +165,8 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
     for (const title of candidates) {
       if (guests.length >= count) break;
       const s = await fetchSummary(title);
-      if (!s || !looksLikePerson(s)) continue;
+      if (!s || (s.type && s.type !== "standard")) continue;
+      if (!(await verifyPerson(s))) continue;
       const name = (s.title ?? title).replace(/_/g, " ");
       guests.push({
         name,

@@ -19,19 +19,28 @@ export interface Utterance {
   id: string;
   speaker: Speaker;
   text: string;
-  /** "interrupt" = araya girme, "normal" = sırayla söz */
-  mode: "normal" | "interrupt" | "system";
+  /** "redirect" = sözü alıp yönlendirme, "system" = sahne notu, "normal" = sıradan */
+  mode: "normal" | "redirect" | "system";
 }
 
-export interface DirectorDecision {
+// Yönetmen artık sadece reyting + koçluk üretir; sırayı kod belirler.
+export interface RatingDecision {
   /** 0-100 anlık heyecan/reyting */
   rating: number;
   /** Reyting neden bu seviyede (kullanıcıya ipucu) */
   note: string;
-  /** Sıradaki konuşmacı guest index'i */
-  next: number;
-  /** Araya mı giriyor yoksa sırayla mı söz alıyor */
-  mode: "normal" | "interrupt";
-  /** Yönetmenin sahne yönergesi (ör. "ortamı ger") */
+  /** Konuşacak konuğa kısa yönerge */
   cue?: string;
+}
+
+export interface OpeningResult {
+  text: string;
+  /** Konuk bu konuda net bir fikir beyan etti mi? Etmediyse pasif kalır. */
+  hasStance: boolean;
+}
+
+// Yapımcının konuğa atadığı tartışma pozisyonu (karşıt görüşleri garantiler).
+export interface Stance {
+  position: string; // "Lehte" | "Aleyhte" | "Kısmen"
+  angle: string; // savunacağı özgün açı
 }

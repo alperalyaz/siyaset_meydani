@@ -222,6 +222,42 @@ a {
   gap: 0.6rem;
   margin-bottom: 1rem;
 }
+.topic-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+.topic-row .btn {
+  white-space: nowrap;
+}
+.modetabs {
+  display: inline-flex;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+}
+.modetab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+.modetab--on {
+  background: var(--accent);
+  color: #201400;
+}
+.guest-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 2rem 1rem;
+  line-height: 1.5;
+}
 .chip {
   background: var(--bg-3);
   border: 1px solid var(--line);
@@ -460,6 +496,17 @@ a {
 .turn--mod p {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.turn--sys {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+  text-align: center;
+}
+.turn--sys p {
+  margin: 0;
 }
 
 .typing {

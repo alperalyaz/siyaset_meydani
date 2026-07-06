@@ -1,15 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Guest, Utterance } from "./types";
+import type { GuestRole } from "./lib/prompts";
 import { SetupScreen } from "./components/SetupScreen";
 import { ChatStream } from "./components/ChatStream";
 import { RatingMeter } from "./components/RatingMeter";
 import { ModeratorBar } from "./components/ModeratorBar";
 import { ApiKeyModal } from "./components/ApiKeyModal";
-import { runDirector, runGuest, suggestQuestions } from "./lib/engine";
+import {
+  runIntro,
+  runOpeningStatement,
+  runRatingDirector,
+  runGuest,
+  suggestQuestions,
+  assignStances,
+} from "./lib/engine";
+import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey } from "./lib/store";
 
 type Phase = "setup" | "panel";
+type SessionPhase = "intro" | "opening" | "debate";
+interface Progress {
+  phase: SessionPhase;
+  i: number;
+}
+interface Thread {
+  a: number;
+  b: number;
+  turns: number;
+}
 
 function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -23,6 +42,15 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new DOMException("aborted", "AbortError"));
     });
   });
+}
+
+// Replik uzunluğuna göre okuma süresi — akışı sakinleştirir.
+function readingDelay(text: string): number {
+  return Math.min(6000, Math.max(2200, 1400 + text.length * 18));
+}
+
+function isAbort(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "AbortError";
 }
 
 export function App() {
@@ -45,13 +73,20 @@ export function App() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
-  // Döngü, kapanışlardan kaçınmak için ref'ler üzerinden yürür.
+  // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
+  const guestsRef = useRef<Guest[]>([]);
+  const topicRef = useRef("");
   const runningRef = useRef(false);
   const loopActiveRef = useRef(false);
-  const modNoteRef = useRef<string | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
   const apiKeyRef = useRef<string | null>(apiKey);
+
+  const progressRef = useRef<Progress>({ phase: "intro", i: 0 });
+  const activeRef = useRef<number[]>([]); // net fikri olan konuklar
+  const threadRef = useRef<Thread | null>(null);
+  const modNoteRef = useRef<string | undefined>(undefined);
+  const stancesRef = useRef<(Stance | null)[]>([]); // yapımcının atadığı pozisyonlar
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -61,89 +96,23 @@ export function App() {
     utterRef.current = next;
     setUtterances(next);
   }, []);
-
-  const syncMeta = useCallback(() => {
-    const m = getLastMeta();
-    setDemoRemaining(m.remaining);
-  }, []);
+  const append = useCallback(
+    (u: Utterance) => commit([...utterRef.current, u]),
+    [commit],
+  );
+  const syncMeta = useCallback(() => setDemoRemaining(getLastMeta().remaining), []);
 
   const handleError = useCallback((e: unknown) => {
-    if (e instanceof DOMException && e.name === "AbortError") return;
-    if (e instanceof ApiError) {
-      if (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY") {
-        setKeyReason(e.message);
-        setKeyModal(true);
-      } else {
-        setError(e.message);
-      }
+    if (isAbort(e)) return;
+    if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) {
+      setKeyReason(e.message);
+      setKeyModal(true);
+    } else if (e instanceof ApiError) {
+      setError(e.message);
     } else {
       setError("Beklenmedik bir hata oluştu. Tekrar deneyin.");
     }
   }, []);
-
-  // Ana tur döngüsü: yönetmen → reyting → konuk repliği → tekrar.
-  const turnLoop = useCallback(async () => {
-    while (runningRef.current) {
-      const controller = new AbortController();
-      abortRef.current = controller;
-      try {
-        const decision = await runDirector(
-          guests,
-          topic,
-          utterRef.current,
-          modNoteRef.current,
-          apiKeyRef.current,
-          controller.signal,
-        );
-        modNoteRef.current = undefined;
-        syncMeta();
-        setRating(decision.rating);
-        setRatingNote(decision.note);
-
-        if (!runningRef.current) break;
-
-        const gi = decision.next;
-        setThinking(gi);
-        const text = await runGuest(
-          guests[gi],
-          guests,
-          topic,
-          utterRef.current,
-          decision.cue,
-          decision.mode,
-          apiKeyRef.current,
-          controller.signal,
-        );
-        setThinking(null);
-        syncMeta();
-
-        if (!runningRef.current) break;
-        commit([...utterRef.current, { id: uid(), speaker: gi, text, mode: decision.mode }]);
-
-        await delay(1300, controller.signal);
-      } catch (e) {
-        setThinking(null);
-        if (e instanceof DOMException && e.name === "AbortError") {
-          // Duraklatma ya da müdahale: sessizce çık.
-          if (!runningRef.current) break;
-          continue;
-        }
-        handleError(e);
-        runningRef.current = false;
-        setRunning(false);
-        break;
-      }
-    }
-    loopActiveRef.current = false;
-  }, [guests, topic, commit, syncMeta, handleError]);
-
-  const ensureLoop = useCallback(() => {
-    runningRef.current = true;
-    setRunning(true);
-    if (loopActiveRef.current) return;
-    loopActiveRef.current = true;
-    void turnLoop();
-  }, [turnLoop]);
 
   const pause = useCallback(() => {
     runningRef.current = false;
@@ -152,61 +121,274 @@ export function App() {
     setThinking(null);
   }, []);
 
+  const lastGuestSpeaker = useCallback((): number | null => {
+    for (let i = utterRef.current.length - 1; i >= 0; i--) {
+      const s = utterRef.current[i].speaker;
+      if (typeof s === "number") return s;
+    }
+    return null;
+  }, []);
+
+  const leastRecentActive = useCallback((): number => {
+    const active = activeRef.current;
+    const lastSeen = new Map<number, number>();
+    utterRef.current.forEach((u, idx) => {
+      if (typeof u.speaker === "number") lastSeen.set(u.speaker, idx);
+    });
+    return [...active].sort((x, y) => (lastSeen.get(x) ?? -1) - (lastSeen.get(y) ?? -1))[0];
+  }, []);
+
+  // Kod-tabanlı ritim: ikili atışma sürer, tıkanınca üçüncü girip yönlendirir.
+  const nextSpeaker = useCallback((): { speaker: number; role: GuestRole } => {
+    const active = activeRef.current;
+    const th = threadRef.current!;
+
+    // Spiker yön verdiyse: adı geçen konuk, yoksa en uzun susan aktif konuk.
+    if (modNoteRef.current) {
+      const note = modNoteRef.current.toLowerCase();
+      const named = active.find((i) =>
+        note.includes(guestsRef.current[i].name.toLowerCase().split(" ")[0]),
+      );
+      return { speaker: named ?? leastRecentActive(), role: "answerHost" };
+    }
+
+    const third = active.find((i) => i !== th.a && i !== th.b);
+    if (third !== undefined && th.turns >= 3) {
+      return { speaker: third, role: "redirect" };
+    }
+
+    const last = lastGuestSpeaker();
+    const speaker = last === th.a ? th.b : th.a;
+    return { speaker, role: "continue" };
+  }, [lastGuestSpeaker, leastRecentActive]);
+
+  const advanceThread = useCallback((speaker: number, role: GuestRole) => {
+    const th = threadRef.current!;
+    if (role === "redirect") {
+      threadRef.current = { a: speaker, b: th.a, turns: 0 };
+    } else if (role === "answerHost") {
+      const other = activeRef.current.find((i) => i !== speaker) ?? speaker;
+      threadRef.current = { a: speaker, b: other, turns: 0 };
+    } else {
+      th.turns += 1;
+    }
+  }, []);
+
+  // Üç fazlı, duraklatılıp devam edebilen oturum sürücüsü.
+  const runSession = useCallback(async () => {
+    const g = guestsRef.current;
+    const t = topicRef.current;
+
+    try {
+      // --- KADROLAMA (karşıt pozisyonlar) ---
+      if (stancesRef.current.length === 0) {
+        const ctrl = new AbortController();
+        abortRef.current = ctrl;
+        stancesRef.current = await assignStances(g, t, apiKeyRef.current, ctrl.signal);
+        syncMeta();
+      }
+
+      // --- TANIŞMA TURU ---
+      while (runningRef.current && progressRef.current.phase === "intro") {
+        const i = progressRef.current.i;
+        if (i >= g.length) {
+          append({
+            id: uid(),
+            speaker: "moderator",
+            text: `Teşekkür ederim. Şimdi asıl meselemize gelelim: ${t} Bu konudaki görüşlerinizi sırayla alalım, buyurun.`,
+            mode: "normal",
+          });
+          progressRef.current = { phase: "opening", i: 0 };
+          const ctrl = new AbortController();
+          abortRef.current = ctrl;
+          await delay(1600, ctrl.signal);
+          continue;
+        }
+        const ctrl = new AbortController();
+        abortRef.current = ctrl;
+        setThinking(i);
+        const text = await runIntro(g[i], g, t, apiKeyRef.current, ctrl.signal);
+        setThinking(null);
+        syncMeta();
+        if (!runningRef.current) return;
+        append({ id: uid(), speaker: i, text, mode: "normal" });
+        progressRef.current = { phase: "intro", i: i + 1 };
+        await delay(readingDelay(text), ctrl.signal);
+      }
+
+      // --- GÖRÜŞ TURU ---
+      while (runningRef.current && progressRef.current.phase === "opening") {
+        const i = progressRef.current.i;
+        if (i >= g.length) {
+          if (activeRef.current.length === 0) {
+            append({
+              id: uid(),
+              speaker: "moderator",
+              text: "Konuklar bu konuda net bir fikir beyan etmedi; oturum burada duruyor.",
+              mode: "system",
+            });
+            pause();
+            return;
+          }
+          const act = activeRef.current;
+          threadRef.current =
+            act.length >= 2
+              ? { a: act[0], b: act[1], turns: 0 }
+              : { a: act[0], b: act[0], turns: 0 };
+          progressRef.current = { phase: "debate", i: 0 };
+          continue;
+        }
+        const ctrl = new AbortController();
+        abortRef.current = ctrl;
+        setThinking(i);
+        const { text, hasStance } = await runOpeningStatement(
+          g[i],
+          g,
+          t,
+          stancesRef.current[i] ?? null,
+          apiKeyRef.current,
+          ctrl.signal,
+        );
+        setThinking(null);
+        syncMeta();
+        if (!runningRef.current) return;
+        append({ id: uid(), speaker: i, text, mode: "normal" });
+        if (hasStance && !activeRef.current.includes(i)) activeRef.current.push(i);
+        progressRef.current = { phase: "opening", i: i + 1 };
+        await delay(readingDelay(text), ctrl.signal);
+      }
+
+      // --- SERBEST TARTIŞMA ---
+      while (runningRef.current && progressRef.current.phase === "debate") {
+        const { speaker, role } = nextSpeaker();
+        const ctrl = new AbortController();
+        abortRef.current = ctrl;
+        setThinking(speaker);
+
+        const dec = await runRatingDirector(
+          g,
+          t,
+          utterRef.current,
+          g[speaker].name,
+          role,
+          modNoteRef.current,
+          apiKeyRef.current,
+          ctrl.signal,
+        );
+        syncMeta();
+        setRating(dec.rating);
+        setRatingNote(dec.note);
+        if (!runningRef.current) return;
+
+        const text = await runGuest(
+          g[speaker],
+          g,
+          t,
+          utterRef.current,
+          dec.cue,
+          role,
+          stancesRef.current[speaker] ?? null,
+          apiKeyRef.current,
+          ctrl.signal,
+        );
+        setThinking(null);
+        syncMeta();
+        if (!runningRef.current) return;
+
+        modNoteRef.current = undefined;
+        append({
+          id: uid(),
+          speaker,
+          text,
+          mode: role === "redirect" ? "redirect" : "normal",
+        });
+        advanceThread(speaker, role);
+        await delay(readingDelay(text), ctrl.signal);
+      }
+    } catch (e) {
+      setThinking(null);
+      if (isAbort(e)) return; // duraklatma/müdahale: durum korunur, sonra devam
+      handleError(e);
+      pause();
+    }
+  }, [append, syncMeta, nextSpeaker, advanceThread, handleError, pause]);
+
+  // Oturumu sürdür (boot / devam / müdahale sonrası tek giriş noktası).
+  const drive = useCallback(() => {
+    runningRef.current = true;
+    setRunning(true);
+    if (loopActiveRef.current) return;
+    loopActiveRef.current = true;
+    void runSession().finally(() => {
+      loopActiveRef.current = false;
+    });
+  }, [runSession]);
+
   const pauseToggle = useCallback(() => {
     if (runningRef.current) pause();
-    else ensureLoop();
-  }, [pause, ensureLoop]);
+    else drive();
+  }, [pause, drive]);
 
-  // Spiker müdahalesi: sözü kes, mesajı ekle, konuklar buna göre şekillensin.
+  // Spiker müdahalesi: sürmekte olan repliği kes, mesajı ekle, akış şekillensin.
   const moderate = useCallback(
     (text: string) => {
       setError(null);
-      abortRef.current?.abort(); // sürmekte olan repliği düşür
+      abortRef.current?.abort();
       setThinking(null);
-      commit([...utterRef.current, { id: uid(), speaker: "moderator", text, mode: "normal" }]);
+      append({ id: uid(), speaker: "moderator", text, mode: "normal" });
       modNoteRef.current = text;
       setSuggestions([]);
-      ensureLoop();
+      // Görüş turu bitmemişse spiker sözü akışı bozmasın; tartışmadaysa yönlendirsin.
+      drive();
     },
-    [commit, ensureLoop],
+    [append, drive],
   );
 
-  const startSession = useCallback(
-    (g: Guest[], t: string) => {
-      setGuests(g);
-      setTopic(t);
-      setPhase("panel");
-      const opening: Utterance = {
-        id: uid(),
-        speaker: "moderator",
-        text: `Sayın konuklar, hoş geldiniz. Bugünkü konumuz: ${t}. Buyurun.`,
-        mode: "normal",
-      };
-      utterRef.current = [opening];
-      setUtterances([opening]);
-      modNoteRef.current = t;
-      setRating(50);
-      setRatingNote("");
-      // guests/topic state güncellemesinin ardından döngüyü başlat.
-      runningRef.current = true;
-      setRunning(true);
-      loopActiveRef.current = false;
-    },
-    [],
-  );
+  const startSession = useCallback((g: Guest[], t: string) => {
+    setGuests(g);
+    setTopic(t);
+    setPhase("panel");
+    guestsRef.current = g;
+    topicRef.current = t;
 
-  // guests/topic güncellendikten sonra panel açıldıysa döngüyü tetikle.
+    const welcome: Utterance = {
+      id: uid(),
+      speaker: "moderator",
+      text: "Merhaba, oturumumuza hoş geldiniz. Öncelikle sizleri tanıyalım — buyurun, sırayla kısaca kendinizi tanıtın.",
+      mode: "normal",
+    };
+    utterRef.current = [welcome];
+    setUtterances([welcome]);
+
+    progressRef.current = { phase: "intro", i: 0 };
+    activeRef.current = [];
+    threadRef.current = null;
+    modNoteRef.current = undefined;
+    stancesRef.current = [];
+    setRating(50);
+    setRatingNote("");
+    setSuggestions([]);
+    setError(null);
+
+    runningRef.current = true;
+    setRunning(true);
+    loopActiveRef.current = false;
+  }, []);
+
+  // Panel'e geçince oturumu başlat (guests/topic state'i güncellendikten sonra).
   useEffect(() => {
     if (phase === "panel" && runningRef.current && !loopActiveRef.current) {
       loopActiveRef.current = true;
-      void turnLoop();
+      void runSession().finally(() => {
+        loopActiveRef.current = false;
+      });
     }
-  }, [phase, turnLoop]);
+  }, [phase, runSession]);
 
   const doSuggest = useCallback(async () => {
     setLoadingSuggestions(true);
     try {
-      const qs = await suggestQuestions(topic, guests, apiKeyRef.current);
+      const qs = await suggestQuestions(topicRef.current, guestsRef.current, apiKeyRef.current);
       syncMeta();
       setSuggestions(qs);
     } catch (e) {
@@ -214,7 +396,7 @@ export function App() {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [topic, guests, syncMeta, handleError]);
+  }, [syncMeta, handleError]);
 
   const leave = useCallback(() => {
     pause();
@@ -231,7 +413,6 @@ export function App() {
     setKeyModal(false);
     setKeyReason(undefined);
   }, []);
-
   const removeKey = useCallback(() => {
     clearApiKey();
     setApiKey(null);
@@ -244,6 +425,8 @@ export function App() {
         <SetupScreen
           onStart={startSession}
           onOpenKey={() => setKeyModal(true)}
+          onError={handleError}
+          apiKey={apiKey}
           demoRemaining={demoRemaining}
           hasKey={!!apiKey}
         />
@@ -255,7 +438,7 @@ export function App() {
           onClear={removeKey}
           onClose={() => setKeyModal(false)}
         />
-        <footer className="credits">DeepSeek ile çalışır · Vikipedi verileriyle beslenir</footer>
+        <footer className="credits">DeepSeek / Groq ile çalışır · Vikipedi verileriyle beslenir</footer>
       </>
     );
   }

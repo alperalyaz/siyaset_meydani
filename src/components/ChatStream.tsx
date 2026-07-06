@@ -25,6 +25,13 @@ export function ChatStream({ utterances, guests, thinking }: Props) {
   return (
     <div className="stream">
       {utterances.map((u) => {
+        if (u.mode === "system") {
+          return (
+            <div key={u.id} className="turn turn--sys">
+              <p>{u.text}</p>
+            </div>
+          );
+        }
         if (u.speaker === "moderator") {
           return (
             <div key={u.id} className="turn turn--mod">
@@ -36,7 +43,7 @@ export function ChatStream({ utterances, guests, thinking }: Props) {
         const g = guests[u.speaker as number];
         if (!g) return null;
         return (
-          <div key={u.id} className={`turn ${u.mode === "interrupt" ? "turn--cut" : ""}`}>
+          <div key={u.id} className={`turn ${u.mode === "redirect" ? "turn--cut" : ""}`}>
             <div className="turn__avatar" style={{ background: g.color }}>
               {g.thumbnail ? (
                 <img src={g.thumbnail} alt={g.name} />
@@ -47,7 +54,7 @@ export function ChatStream({ utterances, guests, thinking }: Props) {
             <div className="turn__body">
               <div className="turn__name" style={{ color: g.color }}>
                 {g.name}
-                {u.mode === "interrupt" && <span className="turn__cut">— araya girer</span>}
+                {u.mode === "redirect" && <span className="turn__cut">— sözü alır</span>}
               </div>
               <p className="turn__text">{u.text}</p>
             </div>
