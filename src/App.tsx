@@ -551,8 +551,8 @@ export function App() {
             İçerik hatalı, eksik ya da yanıltıcı olabilir; kaynak veya danışmanlık niteliği taşımaz.
           </p>
           <p className="credits__by">
-            Alper Alyaz'ın kişisel projesidir · DeepSeek / Groq ile çalışır · Vikipedi ve Google
-            Trends verileriyle beslenir
+            Alper Alyaz'ın kişisel projesidir · DeepSeek / Groq ile çalışır · Vikipedi verileriyle
+            beslenir
           </p>
         </footer>
       </>

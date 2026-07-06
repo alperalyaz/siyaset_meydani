@@ -266,6 +266,9 @@ a {
 .chip--trend {
   border-color: rgba(255, 140, 90, 0.5);
 }
+.chip--fresh {
+  border-color: rgba(139, 123, 216, 0.6);
+}
 .chip__traffic {
   margin-left: 0.4rem;
   font-size: 0.68rem;

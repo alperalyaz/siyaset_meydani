@@ -10,8 +10,27 @@ import {
   castingMessages,
   moderationMessages,
   trendTopicsMessages,
+  deepTopicsMessages,
   type GuestRole,
 } from "./prompts";
+
+// "Siyaset Meydanı" ruhuna uygun derin, zaman-ötesi tartışma konuları üretir.
+export async function suggestDeepTopics(
+  avoid: string[],
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const { content } = await chat(deepTopicsMessages(avoid), apiKey, {
+    json: true,
+    temperature: 1,
+    max_tokens: 400,
+    signal,
+  });
+  const parsed = parseJsonLoose<{ topics?: string[] }>(content);
+  return Array.isArray(parsed?.topics)
+    ? parsed!.topics!.filter((t) => typeof t === "string" && t.trim()).slice(0, 8)
+    : [];
+}
 
 export interface ModerationVerdict {
   allowed: boolean;

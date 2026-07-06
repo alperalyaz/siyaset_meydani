@@ -1,13 +1,7 @@
 import { useCallback, useState } from "react";
 import type { Guest } from "../types";
 import { pickCuratedGuests, buildGuestsFromNames } from "../lib/wikipedia";
-import {
-  suggestGuestNames,
-  fetchTrends,
-  curateTrendTopics,
-  fetchEksiContext,
-  type TrendTopic,
-} from "../lib/engine";
+import { suggestGuestNames, suggestDeepTopics, fetchEksiContext } from "../lib/engine";
 import { TOPIC_POOL } from "../lib/pool";
 
 type Mode = "topic" | "random";
@@ -36,9 +30,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [mode, setMode] = useState<Mode>("topic");
   const [count, setCount] = useState<2 | 3>(2);
   const [topic, setTopic] = useState("");
-  const [context, setContext] = useState<string>(""); // güncel olay grounding metni
-  const [trends, setTrends] = useState<TrendTopic[] | null>(null);
-  const [loadingTrends, setLoadingTrends] = useState(false);
+  const [context, setContext] = useState<string>(""); // (Ekşi linki) grounding metni
+  const [extraTopics, setExtraTopics] = useState<string[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
 
   const drawRandom = useCallback(async (cnt: number) => {
     setLoading(true);
@@ -83,31 +77,19 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     [mode, drawForTopic, count],
   );
 
-  const loadTrends = useCallback(async () => {
-    setLoadingTrends(true);
+  // Derin, zaman-ötesi tartışma konuları üret (magazinsel gündem yerine).
+  const loadDeepTopics = useCallback(async () => {
+    setLoadingTopics(true);
     try {
-      const raw = await fetchTrends();
-      // Ham arama terimlerini tartışmaya hazır konulara çevir (haber bağlamıyla).
-      const curated = await curateTrendTopics(raw, apiKey);
-      setTrends(curated);
+      const avoid = [...TOPIC_POOL, ...extraTopics];
+      const fresh = await suggestDeepTopics(avoid, apiKey);
+      if (fresh.length) setExtraTopics((prev) => [...fresh, ...prev].slice(0, 16));
     } catch (e) {
       onError(e);
-      setTrends([]);
     } finally {
-      setLoadingTrends(false);
+      setLoadingTopics(false);
     }
-  }, [apiKey, onError]);
-
-  // Gündemden hazır bir konu seçildi: konu cümlesi + haber snippet'leri grounding.
-  const pickTrend = useCallback(
-    (tt: TrendTopic) => {
-      setTopic(tt.topic);
-      setContext(tt.context);
-      setMode("topic");
-      void drawForTopic(tt.topic, count, tt.context);
-    },
-    [drawForTopic, count],
-  );
+  }, [apiKey, onError, extraTopics]);
 
   // "Konukları getir": Ekşi linki ise entry'leri grounding olarak çeker.
   const fetchGuestsForInput = useCallback(async () => {
@@ -162,39 +144,21 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       <section className="setup__block">
         <div className="setup__block-head">
           <h2>1 · Bugünün Konusu</h2>
-          <button
-            className="btn btn--ghost"
-            onClick={() => {
-              if (!trends) void loadTrends();
-              else setTrends(null);
-            }}
-            disabled={loadingTrends}
-          >
-            {loadingTrends ? "…" : trends ? "Gündemi gizle" : "🔥 Bugünün gündemi"}
+          <button className="btn btn--ghost" onClick={() => loadDeepTopics()} disabled={loadingTopics}>
+            {loadingTopics ? "Konu üretiliyor…" : "💭 Başka konular öner"}
           </button>
         </div>
 
-        {trends && (
-          <div className="topic-chips trend-chips">
-            {trends.length === 0 && (
-              <span className="guest-empty" style={{ padding: "0.5rem" }}>
-                Bugünün gündeminden tartışmalık bir konu çıkmadı, birazdan tekrar deneyin.
-              </span>
-            )}
-            {trends.map((tt) => (
-              <button
-                key={tt.topic}
-                className={`chip chip--trend ${topic === tt.topic ? "chip--active" : ""}`}
-                onClick={() => pickTrend(tt)}
-                title={`Gündem: ${tt.source}`}
-              >
-                🔥 {tt.topic}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="topic-chips">
+          {extraTopics.map((t) => (
+            <button
+              key={t}
+              className={`chip chip--fresh ${topic === t ? "chip--active" : ""}`}
+              onClick={() => pickTopic(t)}
+            >
+              {t}
+            </button>
+          ))}
           {TOPIC_POOL.map((t) => (
             <button
               key={t}

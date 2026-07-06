@@ -245,6 +245,26 @@ Sadece şu JSON:
   ];
 }
 
+// "Siyaset Meydanı" ruhuna uygun DERİN, zaman-ötesi tartışma konuları üretir.
+export function deepTopicsMessages(avoid: string[]) {
+  const avoidLine = avoid.length
+    ? `\nŞu konuları TEKRARLAMA (farklılarını üret): ${avoid.slice(0, 20).join("; ")}`
+    : "";
+  return [
+    {
+      role: "system" as const,
+      content:
+        "Sen 'Siyaset Meydanı' adlı DERİN bir açık oturum programının editörüsün. Tarih, felsefe, ahlak, din, bilim, sanat, toplum, siyaset ve insan doğası üzerine; çağlar boyu tartışılabilecek, iki güçlü tarafı olan, kışkırtıcı ve DÜŞÜNDÜRÜCÜ konular üretirsin. Güncel/magazin/spor/popüler değil — zaman ötesi ve felsefi derinliği olan konular.",
+    },
+    {
+      role: "user" as const,
+      content: `Farklı alanlardan (tarih, felsefe, ahlak, din, bilim, sanat, toplum, siyaset) 8 özgün, birbirinden farklı, kışkırtıcı açık oturum konusu üret. Her biri NET bir tartışma cümlesi ya da sorusu olsun; iki tarafı da savunulabilsin. Kısa ve çarpıcı yaz.${avoidLine}
+
+Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
+    },
+  ];
+}
+
 // Google Trends'ten gelen HAM arama terimlerini, haber bağlamını kullanarak
 // izlenir açık oturum KONULARINA çevirir. Uygun olmayanları eler.
 export function trendTopicsMessages(trends: { title: string; snippets: string[] }[]) {
