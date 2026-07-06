@@ -1,7 +1,13 @@
 import { useCallback, useState } from "react";
 import type { Guest } from "../types";
 import { pickCuratedGuests, buildGuestsFromNames } from "../lib/wikipedia";
-import { suggestGuestNames, fetchTrends, fetchEksiContext, type TrendItem } from "../lib/engine";
+import {
+  suggestGuestNames,
+  fetchTrends,
+  curateTrendTopics,
+  fetchEksiContext,
+  type TrendTopic,
+} from "../lib/engine";
 import { TOPIC_POOL } from "../lib/pool";
 
 type Mode = "topic" | "random";
@@ -31,7 +37,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [count, setCount] = useState<2 | 3>(2);
   const [topic, setTopic] = useState("");
   const [context, setContext] = useState<string>(""); // güncel olay grounding metni
-  const [trends, setTrends] = useState<TrendItem[] | null>(null);
+  const [trends, setTrends] = useState<TrendTopic[] | null>(null);
   const [loadingTrends, setLoadingTrends] = useState(false);
 
   const drawRandom = useCallback(async (cnt: number) => {
@@ -80,20 +86,25 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const loadTrends = useCallback(async () => {
     setLoadingTrends(true);
     try {
-      setTrends(await fetchTrends());
+      const raw = await fetchTrends();
+      // Ham arama terimlerini tartışmaya hazır konulara çevir (haber bağlamıyla).
+      const curated = await curateTrendTopics(raw, apiKey);
+      setTrends(curated);
+    } catch (e) {
+      onError(e);
+      setTrends([]);
     } finally {
       setLoadingTrends(false);
     }
-  }, []);
+  }, [apiKey, onError]);
 
-  // Gündemden bir başlık seçildi: konu + haber snippet'leri grounding olarak.
+  // Gündemden hazır bir konu seçildi: konu cümlesi + haber snippet'leri grounding.
   const pickTrend = useCallback(
-    (tr: TrendItem) => {
-      const ctx = tr.snippets.join(" • ");
-      setTopic(tr.title);
-      setContext(ctx);
+    (tt: TrendTopic) => {
+      setTopic(tt.topic);
+      setContext(tt.context);
       setMode("topic");
-      void drawForTopic(tr.title, count, ctx);
+      void drawForTopic(tt.topic, count, tt.context);
     },
     [drawForTopic, count],
   );
@@ -167,18 +178,17 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           <div className="topic-chips trend-chips">
             {trends.length === 0 && (
               <span className="guest-empty" style={{ padding: "0.5rem" }}>
-                Gündem alınamadı, birazdan tekrar deneyin.
+                Bugünün gündeminden tartışmalık bir konu çıkmadı, birazdan tekrar deneyin.
               </span>
             )}
-            {trends.map((tr) => (
+            {trends.map((tt) => (
               <button
-                key={tr.title}
-                className={`chip chip--trend ${topic === tr.title ? "chip--active" : ""}`}
-                onClick={() => pickTrend(tr)}
-                title={tr.snippets.join(" • ")}
+                key={tt.topic}
+                className={`chip chip--trend ${topic === tt.topic ? "chip--active" : ""}`}
+                onClick={() => pickTrend(tt)}
+                title={`Gündem: ${tt.source}`}
               >
-                🔥 {tr.title}
-                {tr.traffic && <span className="chip__traffic">{tr.traffic}</span>}
+                🔥 {tt.topic}
               </button>
             ))}
           </div>

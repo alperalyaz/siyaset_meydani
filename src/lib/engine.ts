@@ -9,6 +9,7 @@ import {
   guestSuggestMessages,
   castingMessages,
   moderationMessages,
+  trendTopicsMessages,
   type GuestRole,
 } from "./prompts";
 
@@ -23,6 +24,14 @@ export interface TrendItem {
   snippets: string[];
 }
 
+// Ham gündemden türetilmiş, tartışmaya hazır konu (grounding bağlamıyla).
+export interface TrendTopic {
+  topic: string; // açık oturum konusu (cümle)
+  context: string; // grounding metni (haber snippet'leri)
+  source: string; // kaynak ham gündem başlığı
+  traffic: string;
+}
+
 // Google Trends TR gündemini çeker (/api/context proxy'si üzerinden).
 export async function fetchTrends(signal?: AbortSignal): Promise<TrendItem[]> {
   try {
@@ -30,6 +39,40 @@ export async function fetchTrends(signal?: AbortSignal): Promise<TrendItem[]> {
     const d = (await res.json()) as { trends?: TrendItem[] };
     return Array.isArray(d.trends) ? d.trends : [];
   } catch {
+    return [];
+  }
+}
+
+// Ham gündem terimlerini, haber bağlamıyla tartışmaya hazır konulara çevirir.
+export async function curateTrendTopics(
+  trends: TrendItem[],
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<TrendTopic[]> {
+  if (trends.length === 0) return [];
+  try {
+    const { content } = await chat(trendTopicsMessages(trends), apiKey, {
+      json: true,
+      temperature: 0.8,
+      max_tokens: 600,
+      signal,
+    });
+    const parsed = parseJsonLoose<{ topics?: { i: number; konu: string }[] }>(content);
+    const out: TrendTopic[] = [];
+    for (const t of parsed?.topics ?? []) {
+      const src = trends[t.i];
+      if (!src || !t.konu?.trim()) continue;
+      out.push({
+        topic: t.konu.trim(),
+        context: src.snippets.join(" • "),
+        source: src.title,
+        traffic: src.traffic,
+      });
+    }
+    return out;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) throw e;
     return [];
   }
 }

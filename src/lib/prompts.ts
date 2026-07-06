@@ -245,6 +245,38 @@ Sadece şu JSON:
   ];
 }
 
+// Google Trends'ten gelen HAM arama terimlerini, haber bağlamını kullanarak
+// izlenir açık oturum KONULARINA çevirir. Uygun olmayanları eler.
+export function trendTopicsMessages(trends: { title: string; snippets: string[] }[]) {
+  const list = trends
+    .map(
+      (t, i) =>
+        `${i}) "${t.title}"${t.snippets.length ? ` — haberler: ${t.snippets.join(" | ").slice(0, 320)}` : ""}`,
+    )
+    .join("\n");
+  return [
+    {
+      role: "system" as const,
+      content:
+        "Sen bir açık oturum (tartışma programı) editörüsün. Google Trends'ten gelen HAM arama terimlerini, haber bağlamını kullanarak izleyiciyi çekecek TARTIŞMA KONULARINA çevirirsin. Ham terim tek başına anlamsızsa haberlerden bağlamı çıkarırsın.",
+    },
+    {
+      role: "user" as const,
+      content: `Bugünün gündeminden ham başlıklar (haber özetleriyle):
+${list}
+
+Her biri için, GÜZEL bir açık oturum tartışması çıkarılabiliyorsa kışkırtıcı ve NET bir konu (soru ya da iddia) yaz.
+Kurallar:
+- Konu iki tarafı olan, tartışılabilir bir cümle olsun. Örnek: ham "fransa fas" + Dünya Kupası haberi → "Dünya Kupası'nı Fransa mı Fas mı kazanır?" veya "Fransa-Fas maçı sadece futbol mu, tarihî bir hesaplaşma mı?".
+- Haberden bağlam çıkmıyor, tekil/anlamsız ya da iyi tartışma çıkmayacaksa o başlığı ATLA (listeye koyma).
+- Kişi adıysa ve neden gündemde olduğu haberden belliyse onu bir tartışmaya çevir; belli değilse atla.
+- Konu cümlesi Türkçe, kısa ve çarpıcı olsun.
+
+Sadece şu JSON: {"topics":[{"i":<ham index>,"konu":"<tartışma konusu>"}]}  — yalnızca uygun olanları koy.`,
+    },
+  ];
+}
+
 // Konuya göre, o alanla ilgili gerçek ve Vikipedi'de maddesi olan kişiler önerir.
 export function guestSuggestMessages(topic: string, context?: string | null) {
   const ctx =
