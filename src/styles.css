@@ -258,6 +258,25 @@ a {
   padding: 2rem 1rem;
   line-height: 1.5;
 }
+.trend-chips {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px dashed var(--line);
+}
+.chip--trend {
+  border-color: rgba(255, 140, 90, 0.5);
+}
+.chip__traffic {
+  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.context-hint {
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ok);
+}
 .chip {
   background: var(--bg-3);
   border: 1px solid var(--line);
@@ -314,10 +333,21 @@ a {
   font-size: 0.85rem;
 }
 .credits {
+  max-width: 720px;
+  margin: 0 auto;
   text-align: center;
   color: var(--muted);
   font-size: 0.78rem;
-  padding: 1.5rem;
+  padding: 1.5rem 1.2rem 2.5rem;
+}
+.credits__disclaimer {
+  line-height: 1.5;
+  opacity: 0.85;
+  margin: 0 0 0.7rem;
+}
+.credits__by {
+  margin: 0;
+  opacity: 0.7;
 }
 
 /* ---------- Panel ---------- */

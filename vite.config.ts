@@ -1,6 +1,7 @@
 import { defineConfig, type Connect } from "vite";
 import react from "@vitejs/plugin-react";
 import { handleChat, type ChatRequestBody } from "./api/_lib/handler";
+import { handleContext } from "./api/_lib/context";
 
 // Yerel geliştirmede /api/chat isteklerini Vercel serverless fonksiyonunun
 // aynısı olan ortak handler'a bağlar. Böylece `npm run dev` tek başına yeter.
@@ -30,6 +31,17 @@ function devApi() {
         const ip =
           (typeof fwd === "string" ? fwd.split(",")[0] : req.socket?.remoteAddress) || "local";
         const result = await handleChat(body, key, ip);
+        res.statusCode = result.status;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(result.body));
+      });
+
+      server.middlewares.use("/api/context", async (req, res) => {
+        const u = new URL(req.url || "", "http://x");
+        const result = await handleContext(
+          u.searchParams.get("action") ?? undefined,
+          u.searchParams.get("url") ?? undefined,
+        );
         res.statusCode = result.status;
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify(result.body));

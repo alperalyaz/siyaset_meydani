@@ -9,6 +9,7 @@ export function guestSystemPrompt(
   allGuests: Guest[],
   topic: string,
   stance?: Stance | null,
+  context?: string | null,
 ): string {
   const others = allGuests
     .filter((g) => g.name !== guest.name)
@@ -20,13 +21,18 @@ export function guestSystemPrompt(
 Bu pozisyonu net biçimde TUT ve SAVUN. Ortalama, "hem şu hem bu" tarzı uzlaşmacı görüşe KAÇMA. Diğerleri ne derse desin kendi tarafını koru; onlarla aynı şeyi söyleme, gerektiğinde açıkça itiraz et. Bu bir tartışma; herkesin anlaşması sıkıcıdır.\n`
     : "";
 
+  const contextBlock =
+    context && context.trim()
+      ? `\nGÜNCEL BAĞLAM — bu güncel/gerçek bir konu. Aşağıdakiler şu an bu konuda bilinen gerçekler ve halkın yorumları. Konuşurken BUNLARA dayan; olmayan skor/olay/isim UYDURMA, sadece verilene ve genel bilgine sadık kal:\n"""\n${context.trim().slice(0, 900)}\n"""\n`
+      : "";
+
   return `Sen ${guest.name}'sın. ${guest.era}.
 
 Kim olduğun (Vikipedi): ${guest.blurb}
 
 2026 yılında bir televizyon açık oturumundasın. Diğer konuklar: ${others}.
 Oturumun konusu: "${topic}"
-${stanceBlock}
+${stanceBlock}${contextBlock}
 KİMLİĞİN ve SESİN:
 - Vikipedi metni seni TANIMLAR: değerlerin, mizacın, geldiğin çağ, bakış açın. Bunlara sadık kal ve KENDİ SESİNLE konuş — nüktedansan nükteli, buyurgan bir hükümdarsan sert, gönül adamıysan yumuşak olabilirsin. Karakterini düzleştirme.
 - Genel dilin bugünün panel konuğu gibi anlaşılır olsun; ama karakterin gereği ara sıra espri, benzetme, laf sokma yapman gayet doğal. Renk katmak serbest.
@@ -54,10 +60,12 @@ Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.`;
 }
 
 // Yapımcı: izlenir bir tartışma için konukları karşıt pozisyonlara yerleştirir.
-export function castingMessages(guests: Guest[], topic: string) {
+export function castingMessages(guests: Guest[], topic: string, context?: string | null) {
   const roster = guests
     .map((g, i) => `${i}: ${g.name} (${g.era}) — ${g.blurb.slice(0, 160)}`)
     .join("\n");
+  const ctx =
+    context && context.trim() ? `\nGüncel bağlam: ${context.trim().slice(0, 500)}\n` : "";
   return [
     {
       role: "system" as const,
@@ -66,7 +74,7 @@ export function castingMessages(guests: Guest[], topic: string) {
     },
     {
       role: "user" as const,
-      content: `Konu: "${topic}"
+      content: `Konu: "${topic}"${ctx}
 Konuklar:
 ${roster}
 
@@ -114,9 +122,10 @@ export function openingMessages(
   allGuests: Guest[],
   topic: string,
   stance?: Stance | null,
+  context?: string | null,
 ) {
   return [
-    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance) },
+    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
       role: "user" as const,
       content: `Oturum yeni açıldı, spiker ilk sözü sana verdi. Konu: "${topic}".
@@ -142,6 +151,7 @@ export function guestMessages(
   cue: string | undefined,
   role: GuestRole,
   stance?: Stance | null,
+  context?: string | null,
 ) {
   const transcript = transcriptForModel(utterances, allGuests);
 
@@ -155,7 +165,7 @@ export function guestMessages(
   const cueHint = cue ? `\nYönetmen notu: ${cue}` : "";
 
   return [
-    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance) },
+    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
       role: "user" as const,
       content: `Şu ana kadarki oturum:\n\n${transcript}\n\n${roleHint}${cueHint}\n\nSenin (${guest.name}) repliğin (2-4 cümle, net fikir):`,
@@ -236,7 +246,11 @@ Sadece şu JSON:
 }
 
 // Konuya göre, o alanla ilgili gerçek ve Vikipedi'de maddesi olan kişiler önerir.
-export function guestSuggestMessages(topic: string) {
+export function guestSuggestMessages(topic: string, context?: string | null) {
+  const ctx =
+    context && context.trim()
+      ? `\nGüncel bağlam (konuyu anlaman için): ${context.trim().slice(0, 500)}\n`
+      : "";
   return [
     {
       role: "system" as const,
@@ -245,7 +259,7 @@ export function guestSuggestMessages(topic: string) {
     },
     {
       role: "user" as const,
-      content: `Konu: "${topic}"
+      content: `Konu: "${topic}"${ctx}
 
 Bu konuyla ilgili, o alandan/dönemden gerçek ve Türkçe Vikipedi'de maddesi bulunan 6 farklı ünlü KİŞİ öner. Farklı çağlardan ve farklı bakış açılarından, hatta beklenmedik eşleşmeler tercih edilir (aralarında iyi tartışma çıkacak kişiler). İsimleri Türkçe Vikipedi başlığıyla tam yaz.
 

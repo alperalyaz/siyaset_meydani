@@ -91,6 +91,7 @@ export function App() {
   const threadRef = useRef<Thread | null>(null);
   const modNoteRef = useRef<string | undefined>(undefined);
   const stancesRef = useRef<(Stance | null)[]>([]); // yapımcının atadığı pozisyonlar
+  const topicContextRef = useRef<string | null>(null); // güncel olay grounding metni
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -240,7 +241,13 @@ export function App() {
       if (stancesRef.current.length === 0) {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
-        stancesRef.current = await assignStances(g, t, apiKeyRef.current, ctrl.signal);
+        stancesRef.current = await assignStances(
+          g,
+          t,
+          topicContextRef.current,
+          apiKeyRef.current,
+          ctrl.signal,
+        );
         syncMeta();
       }
 
@@ -300,6 +307,7 @@ export function App() {
           g,
           t,
           stancesRef.current[i] ?? null,
+          topicContextRef.current,
           apiKeyRef.current,
           ctrl.signal,
         );
@@ -342,6 +350,7 @@ export function App() {
           dec.cue,
           role,
           stancesRef.current[speaker] ?? null,
+          topicContextRef.current,
           apiKeyRef.current,
           ctrl.signal,
         );
@@ -400,12 +409,13 @@ export function App() {
     [append, drive],
   );
 
-  const startSession = useCallback((g: Guest[], t: string) => {
+  const startSession = useCallback((g: Guest[], t: string, context?: string | null) => {
     setGuests(g);
     setTopic(t);
     setPhase("panel");
     guestsRef.current = g;
     topicRef.current = t;
+    topicContextRef.current = context ?? null;
 
     const welcome: Utterance = {
       id: uid(),
@@ -433,7 +443,7 @@ export function App() {
 
   // Oturum başlamadan önce içerik güvenliği kapısı: hassas konularda durdur.
   const beginSession = useCallback(
-    async (g: Guest[], t: string) => {
+    async (g: Guest[], t: string, context?: string | null) => {
       setBlockedMsg(null);
       setChecking(true);
       try {
@@ -445,7 +455,7 @@ export function App() {
           );
           return;
         }
-        startSession(g, t);
+        startSession(g, t, context);
       } catch (e) {
         handleError(e);
       } finally {
@@ -533,7 +543,18 @@ export function App() {
             </div>
           </div>
         )}
-        <footer className="credits">DeepSeek / Groq ile çalışır · Vikipedi verileriyle beslenir</footer>
+        <footer className="credits">
+          <p className="credits__disclaimer">
+            <strong>Sorumluluk reddi:</strong> Bu deneysel bir eğlence ve mizah projesidir.
+            Oturumdaki konuşmalar yapay zeka tarafından üretilir; kurgusaldır ve adı geçen gerçek
+            ya da tarihî kişilerin gerçek görüşlerini, sözlerini veya kişiliğini yansıtmaz.
+            İçerik hatalı, eksik ya da yanıltıcı olabilir; kaynak veya danışmanlık niteliği taşımaz.
+          </p>
+          <p className="credits__by">
+            Alper Alyaz'ın kişisel projesidir · DeepSeek / Groq ile çalışır · Vikipedi ve Google
+            Trends verileriyle beslenir
+          </p>
+        </footer>
       </>
     );
   }

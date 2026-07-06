@@ -17,6 +17,35 @@ export interface ModerationVerdict {
   category: string;
 }
 
+export interface TrendItem {
+  title: string;
+  traffic: string;
+  snippets: string[];
+}
+
+// Google Trends TR gündemini çeker (/api/context proxy'si üzerinden).
+export async function fetchTrends(signal?: AbortSignal): Promise<TrendItem[]> {
+  try {
+    const res = await fetch("/api/context?action=trends", { signal });
+    const d = (await res.json()) as { trends?: TrendItem[] };
+    return Array.isArray(d.trends) ? d.trends : [];
+  } catch {
+    return [];
+  }
+}
+
+// Bir Ekşi Sözlük başlığının entry'lerini grounding metni olarak çeker.
+export async function fetchEksiContext(url: string, signal?: AbortSignal): Promise<string> {
+  try {
+    const res = await fetch(`/api/context?action=eksi&url=${encodeURIComponent(url)}`, { signal });
+    const d = (await res.json()) as { entries?: string[]; title?: string };
+    if (!res.ok || !Array.isArray(d.entries)) return "";
+    return d.entries.map((e) => `• ${e}`).join("\n");
+  } catch {
+    return "";
+  }
+}
+
 // İçerik güvenliği kapısı. Auth hatasını yukarı iletir; başka hatada güvenli
 // tarafta değil, akışı kırmamak için izin verir (persona içindeki hakaret
 // sınırı ikincil koruma sağlar).
@@ -47,10 +76,11 @@ export async function moderateTopic(
 // Konuya göre ilgili kişi isimleri önerir (Vikipedi doğrulaması ayrı yapılır).
 export async function suggestGuestNames(
   topic: string,
+  context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  const { content } = await chat(guestSuggestMessages(topic), apiKey, {
+  const { content } = await chat(guestSuggestMessages(topic, context), apiKey, {
     json: true,
     temperature: 0.95,
     max_tokens: 200,
@@ -64,12 +94,13 @@ export async function suggestGuestNames(
 export async function assignStances(
   guests: Guest[],
   topic: string,
+  context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<(Stance | null)[]> {
   const result: (Stance | null)[] = guests.map(() => null);
   try {
-    const { content } = await chat(castingMessages(guests, topic), apiKey, {
+    const { content } = await chat(castingMessages(guests, topic, context), apiKey, {
       json: true,
       temperature: 0.8,
       max_tokens: 450,
@@ -112,10 +143,11 @@ export async function runOpeningStatement(
   guests: Guest[],
   topic: string,
   stance: Stance | null,
+  context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<OpeningResult> {
-  const { content } = await chat(openingMessages(guest, guests, topic, stance), apiKey, {
+  const { content } = await chat(openingMessages(guest, guests, topic, stance, context), apiKey, {
     json: true,
     temperature: 0.85,
     max_tokens: 240,
@@ -162,11 +194,12 @@ export async function runGuest(
   cue: string | undefined,
   role: GuestRole,
   stance: Stance | null,
+  context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<string> {
   const { content } = await chat(
-    guestMessages(guest, guests, topic, utterances, cue, role, stance),
+    guestMessages(guest, guests, topic, utterances, cue, role, stance, context),
     apiKey,
     { temperature: 0.9, max_tokens: 230, signal },
   );

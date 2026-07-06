@@ -1,19 +1,23 @@
 import { useCallback, useState } from "react";
 import type { Guest } from "../types";
 import { pickCuratedGuests, buildGuestsFromNames } from "../lib/wikipedia";
-import { suggestGuestNames } from "../lib/engine";
+import { suggestGuestNames, fetchTrends, fetchEksiContext, type TrendItem } from "../lib/engine";
 import { TOPIC_POOL } from "../lib/pool";
 
 type Mode = "topic" | "random";
 
 interface Props {
-  onStart: (guests: Guest[], topic: string) => void;
+  onStart: (guests: Guest[], topic: string, context?: string | null) => void;
   onOpenKey: () => void;
   onError: (e: unknown) => void;
   apiKey: string | null;
   demoRemaining: number | null;
   hasKey: boolean;
   checking: boolean;
+}
+
+function isEksiUrl(s: string): boolean {
+  return /^https?:\/\/(www\.)?eksisozluk\.com\//i.test(s.trim());
 }
 
 function initials(name: string): string {
@@ -26,6 +30,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [mode, setMode] = useState<Mode>("topic");
   const [count, setCount] = useState<2 | 3>(2);
   const [topic, setTopic] = useState("");
+  const [context, setContext] = useState<string>(""); // güncel olay grounding metni
+  const [trends, setTrends] = useState<TrendItem[] | null>(null);
+  const [loadingTrends, setLoadingTrends] = useState(false);
 
   const drawRandom = useCallback(async (cnt: number) => {
     setLoading(true);
@@ -38,13 +45,13 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   }, []);
 
   const drawForTopic = useCallback(
-    async (t: string, cnt: number) => {
+    async (t: string, cnt: number, ctx: string) => {
       const q = t.trim();
       if (!q) return;
       setLoading(true);
       setGuests(null);
       try {
-        const names = await suggestGuestNames(q, apiKey);
+        const names = await suggestGuestNames(q, ctx || null, apiKey);
         setGuests(await buildGuestsFromNames(names, cnt));
       } catch (e) {
         onError(e);
@@ -64,15 +71,51 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const pickTopic = useCallback(
     (t: string) => {
       setTopic(t);
-      if (mode === "topic") void drawForTopic(t, count);
+      setContext(""); // hazır/küratörlü konu: grounding yok
+      if (mode === "topic") void drawForTopic(t, count, "");
     },
     [mode, drawForTopic, count],
   );
 
+  const loadTrends = useCallback(async () => {
+    setLoadingTrends(true);
+    try {
+      setTrends(await fetchTrends());
+    } finally {
+      setLoadingTrends(false);
+    }
+  }, []);
+
+  // Gündemden bir başlık seçildi: konu + haber snippet'leri grounding olarak.
+  const pickTrend = useCallback(
+    (tr: TrendItem) => {
+      const ctx = tr.snippets.join(" • ");
+      setTopic(tr.title);
+      setContext(ctx);
+      setMode("topic");
+      void drawForTopic(tr.title, count, ctx);
+    },
+    [drawForTopic, count],
+  );
+
+  // "Konukları getir": Ekşi linki ise entry'leri grounding olarak çeker.
+  const fetchGuestsForInput = useCallback(async () => {
+    let ctx = context;
+    let t = topic.trim();
+    if (isEksiUrl(t)) {
+      const entries = await fetchEksiContext(t).catch(() => "");
+      if (entries) {
+        ctx = entries;
+        setContext(entries);
+      }
+    }
+    void drawForTopic(t, count, ctx);
+  }, [context, topic, count, drawForTopic]);
+
   const reshuffle = useCallback(() => {
     if (mode === "random") void drawRandom(count);
-    else void drawForTopic(topic, count);
-  }, [mode, drawRandom, drawForTopic, topic, count]);
+    else void drawForTopic(topic, count, context);
+  }, [mode, drawRandom, drawForTopic, topic, count, context]);
 
   const switchMode = useCallback(
     (m: Mode) => {
@@ -88,9 +131,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       setCount(c);
       setGuests(null);
       if (mode === "random") void drawRandom(c);
-      else if (topic.trim()) void drawForTopic(topic, c);
+      else if (topic.trim()) void drawForTopic(topic, c, context);
     },
-    [mode, topic, drawRandom, drawForTopic],
+    [mode, topic, drawRandom, drawForTopic, context],
   );
 
   const canStart = !!guests && guests.length >= 2 && topic.trim().length > 0 && !loading;
@@ -106,7 +149,41 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
 
       {/* 1) KONU */}
       <section className="setup__block">
-        <h2>1 · Bugünün Konusu</h2>
+        <div className="setup__block-head">
+          <h2>1 · Bugünün Konusu</h2>
+          <button
+            className="btn btn--ghost"
+            onClick={() => {
+              if (!trends) void loadTrends();
+              else setTrends(null);
+            }}
+            disabled={loadingTrends}
+          >
+            {loadingTrends ? "…" : trends ? "Gündemi gizle" : "🔥 Bugünün gündemi"}
+          </button>
+        </div>
+
+        {trends && (
+          <div className="topic-chips trend-chips">
+            {trends.length === 0 && (
+              <span className="guest-empty" style={{ padding: "0.5rem" }}>
+                Gündem alınamadı, birazdan tekrar deneyin.
+              </span>
+            )}
+            {trends.map((tr) => (
+              <button
+                key={tr.title}
+                className={`chip chip--trend ${topic === tr.title ? "chip--active" : ""}`}
+                onClick={() => pickTrend(tr)}
+                title={tr.snippets.join(" • ")}
+              >
+                🔥 {tr.title}
+                {tr.traffic && <span className="chip__traffic">{tr.traffic}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="topic-chips">
           {TOPIC_POOL.map((t) => (
             <button
@@ -121,21 +198,27 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="topic-row">
           <input
             className="topic-input"
-            placeholder="…ya da kendi konunuzu yazın (futbol, uzay, felsefe…)"
+            placeholder="…kendi konunuz ya da bir Ekşi başlık linki yapıştırın"
             value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && mode === "topic" && drawForTopic(topic, count)}
+            onChange={(e) => {
+              setTopic(e.target.value);
+              setContext("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && mode === "topic" && fetchGuestsForInput()}
           />
           {mode === "topic" && (
             <button
               className="btn btn--primary"
               disabled={!topic.trim() || loading}
-              onClick={() => drawForTopic(topic, count)}
+              onClick={() => fetchGuestsForInput()}
             >
               Konukları getir
             </button>
           )}
         </div>
+        {context && (
+          <p className="context-hint">🧭 Güncel bağlam yüklendi — konuklar bu olaya göre konuşacak.</p>
+        )}
       </section>
 
       {/* 2) KONUKLAR */}
@@ -209,7 +292,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <button
           className="btn btn--primary btn--big"
           disabled={!canStart || checking}
-          onClick={() => onStart(guests!, topic.trim())}
+          onClick={() => onStart(guests!, topic.trim(), context || null)}
         >
           {checking ? "Konu kontrol ediliyor…" : "Oturumu Aç ▶"}
         </button>
