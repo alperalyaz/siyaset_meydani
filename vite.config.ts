@@ -1,6 +1,6 @@
 import { defineConfig, type Connect } from "vite";
 import react from "@vitejs/plugin-react";
-import { handleChat, type ChatRequestBody } from "./api/lib/handler";
+import { handleChat, type ChatRequestBody } from "./api/_lib/handler";
 
 // Yerel geliştirmede /api/chat isteklerini Vercel serverless fonksiyonunun
 // aynısı olan ortak handler'a bağlar. Böylece `npm run dev` tek başına yeter.

@@ -119,10 +119,10 @@ export function SetupScreen({ onStart, onOpenKey, demoRemaining, hasKey }: Props
               <span>
                 {demoRemaining !== null
                   ? `Demo hakkı: ~${demoRemaining} istek`
-                  : "Ücretsiz demo modu"}
+                  : "Kısa demo · sonra kendi anahtarınız"}
               </span>
               <button className="linklike" onClick={onOpenKey}>
-                🔑 API anahtarı gir
+                🔑 Ücretsiz anahtar (Groq) / API gir
               </button>
             </>
           )}

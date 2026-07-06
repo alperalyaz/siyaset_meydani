@@ -1,6 +1,6 @@
 // Vercel serverless giriş noktası. Yerel geliştirmede aynı mantık
 // vite.config.ts içindeki dev middleware üzerinden çalışır.
-import { handleChat, type ChatRequestBody } from "./lib/handler";
+import { handleChat, type ChatRequestBody } from "./_lib/handler.js";
 
 interface VercelLikeRequest {
   method?: string;

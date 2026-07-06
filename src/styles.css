@@ -658,12 +658,61 @@ a {
   color: var(--muted);
   line-height: 1.5;
 }
+.modal__providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+.modal__prov {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.78rem;
+}
+.modal__prov--free {
+  border-color: var(--ok);
+}
+.modal__prov-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+.modal__prov p {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.modal__prov a {
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+.badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--muted);
+}
+.badge--free {
+  background: rgba(76, 175, 125, 0.2);
+  color: var(--ok);
+}
 .modal__actions {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
   margin-top: 1.2rem;
   flex-wrap: wrap;
+}
+@media (max-width: 480px) {
+  .modal__providers {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---------- Mobil ---------- */

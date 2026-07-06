@@ -27,15 +27,22 @@ müdahaleye çağırır.
 
 ## Model / API
 
-Sağlayıcı **DeepSeek** (OpenAI uyumlu API, `deepseek-chat`). İki mod var:
+Proxy iki OpenAI uyumlu sağlayıcıyı destekler ve anahtarın önekinden otomatik seçer:
 
-1. **Demo modu:** Sunucudaki `DEEPSEEK_API_KEY` kullanılır, IP başına günlük limitle. Anahtarsız
-   deneme için.
-2. **BYOK:** Kullanıcı kendi DeepSeek anahtarını girer (🔑). Anahtar yalnızca tarayıcının
-   `localStorage`'ında saklanır, isteklerde header ile taşınır, hiçbir yerde kalıcı tutulmaz.
-   Sınırsız kullanım.
+- **DeepSeek** (`sk-...`) → `deepseek-chat`
+- **Groq** (`gsk_...`) → `llama-3.3-70b-versatile` (ücretsiz katman)
+
+İki mod var:
+
+1. **Demo modu:** Sunucudaki `DEEPSEEK_API_KEY` kullanılır, IP başına günlük limitle. Kısa süreli,
+   anahtarsız deneme için.
+2. **BYOK:** Kullanıcı kendi anahtarını girer (🔑). API'si olmayanlar **Groq'tan ücretsiz** anahtar
+   alabilir (kartsız, saniyeler içinde: <https://console.groq.com/keys>). Anahtar yalnızca
+   tarayıcının `localStorage`'ında saklanır, isteklerde header ile taşınır, hiçbir yerde kalıcı
+   tutulmaz. Sınırsız kullanım.
 
 İstekler `/api/chat` proxy'si üzerinden gider; anahtar tarayıcıdan doğrudan sağlayıcıya sızmaz.
+Varsayılan modeller `GROQ_MODEL` / `DEEPSEEK_MODEL` ortam değişkenleriyle değiştirilebilir.
 
 ## Çalıştırma
 
@@ -58,9 +65,9 @@ modunda çalışır.
 ## Notlar / geliştirilebilecekler
 
 - Demo limitleyici şu an **bellek içi** (serverless soğuk başlangıçta sıfırlanır). Gerçek üretimde
-  `api/lib/handler.ts` içindeki `rateLimitStatus`/`consume` fonksiyonlarını kalıcı bir depoyla
+  `api/_lib/handler.ts` içindeki `rateLimitStatus`/`consume` fonksiyonlarını kalıcı bir depoyla
   (Supabase, KV vb.) değiştirin.
-- Sağlayıcı `api/lib/handler.ts` içinde tek yerde tanımlı; başka bir OpenAI uyumlu sağlayıcıya
+- Sağlayıcı `api/_lib/handler.ts` içinde tek yerde tanımlı; başka bir OpenAI uyumlu sağlayıcıya
   geçiş kolaydır.
 - "Sign in with ChatGPT / Claude aboneliğiyle giriş" bugün üçüncü parti uygulamalara açık
   olmadığından demo + BYOK modeli tercih edildi.
@@ -70,7 +77,7 @@ modunda çalışır.
 ```
 api/
   chat.ts            Vercel serverless giriş noktası
-  lib/handler.ts     Sağlayıcı proxy + demo limitleyici (tek kaynak)
+  _lib/handler.ts    Sağlayıcı proxy + demo limitleyici (tek kaynak)
 src/
   lib/
     wikipedia.ts     Konuk seçimi + Vikipedi zenginleştirme

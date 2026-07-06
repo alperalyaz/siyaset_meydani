@@ -1,10 +1,31 @@
-// Sağlayıcıdan bağımsız sohbet proxy'si. Şu an DeepSeek (OpenAI uyumlu) kullanır.
+// Sağlayıcıdan bağımsız sohbet proxy'si. OpenAI uyumlu iki sağlayıcıyı
+// destekler ve anahtarın önekinden otomatik seçer:
+//   - DeepSeek ("sk-..."):  demo modunda sunucu anahtarı burada.
+//   - Groq ("gsk_..."):     kullanıcılar ücretsiz anahtar alabilir.
 // İki mod:
 //   - Demo modu: sunucudaki DEEPSEEK_API_KEY ile, IP başına günlük limitle.
-//   - BYOK modu: kullanıcının kendi anahtarıyla, limitsiz.
+//   - BYOK modu: kullanıcının kendi anahtarıyla (DeepSeek veya Groq), limitsiz.
 
-const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
-const DEFAULT_MODEL = "deepseek-chat";
+interface Provider {
+  name: "deepseek" | "groq";
+  url: string;
+  model: string;
+}
+
+function providerForKey(key: string): Provider {
+  if (key.startsWith("gsk_")) {
+    return {
+      name: "groq",
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    };
+  }
+  return {
+    name: "deepseek",
+    url: "https://api.deepseek.com/chat/completions",
+    model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
+  };
+}
 
 // Demo modunda IP başına günlük istek limiti. Ortam değişkeniyle ayarlanabilir.
 const DEMO_DAILY_LIMIT = Number(process.env.DEMO_DAILY_LIMIT ?? "40");
@@ -72,11 +93,13 @@ export async function handleChat(
       status: 503,
       body: {
         error:
-          "Demo anahtarı ayarlı değil. Kendi DeepSeek API anahtarınızı girerek devam edebilirsiniz.",
+          "Demo şu an kullanılamıyor. Kendi API anahtarınızı (Groq ücretsiz ya da DeepSeek) girerek devam edebilirsiniz.",
         code: "NO_DEMO_KEY",
       },
     };
   }
+
+  const provider = providerForKey(apiKey);
 
   // Demo modunda limit uygula.
   if (!byok) {
@@ -86,7 +109,7 @@ export async function handleChat(
         status: 429,
         body: {
           error:
-            "Bugünkü ücretsiz deneme hakkınız doldu. Kendi DeepSeek API anahtarınızı girerek sınırsız devam edebilirsiniz.",
+            "Ücretsiz deneme hakkınız doldu. Kendi API anahtarınızı (Groq ücretsiz ya da DeepSeek) girerek sınırsız devam edebilirsiniz.",
           code: "RATE_LIMITED",
           remaining,
         },
@@ -96,7 +119,7 @@ export async function handleChat(
   }
 
   const payload: Record<string, unknown> = {
-    model: body.model || DEFAULT_MODEL,
+    model: body.model || provider.model,
     messages: body.messages,
     temperature: body.temperature ?? 0.9,
     max_tokens: body.max_tokens ?? 400,
@@ -108,7 +131,7 @@ export async function handleChat(
 
   let upstream: Response;
   try {
-    upstream = await fetch(DEEPSEEK_URL, {
+    upstream = await fetch(provider.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
