@@ -48,8 +48,9 @@ export interface HandlerResult {
   body: unknown;
 }
 
-// En basit, en dürüst limitleyici: bellek içi sayaç. Serverless soğuk başlangıçta
-// sıfırlanır — gerçek üretimde Supabase/KV gibi kalıcı bir depoyla değiştirin.
+// Demo sayacı: kalıcı olması için Supabase RPC'si (SUPABASE_URL + SUPABASE_ANON_KEY
+// ayarlıysa). Ayarlı değilse bellek içi yedeğe düşer (serverless'ta sıfırlanır,
+// yani gerçek limit uygulamaz — sadece bozulmasın diye).
 type Bucket = { day: string; count: number };
 const buckets = new Map<string, Bucket>();
 
@@ -57,23 +58,42 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function rateLimitStatus(ip: string): { allowed: boolean; remaining: number } {
-  const day = today();
-  const b = buckets.get(ip);
-  if (!b || b.day !== day) {
-    return { allowed: DEMO_DAILY_LIMIT > 0, remaining: DEMO_DAILY_LIMIT };
-  }
-  return { allowed: b.count < DEMO_DAILY_LIMIT, remaining: Math.max(0, DEMO_DAILY_LIMIT - b.count) };
-}
-
-function consume(ip: string): void {
+function consumeMemory(ip: string): number {
   const day = today();
   const b = buckets.get(ip);
   if (!b || b.day !== day) {
     buckets.set(ip, { day, count: 1 });
-  } else {
-    b.count += 1;
+    return 1;
   }
+  b.count += 1;
+  return b.count;
+}
+
+// Bir demo isteğini işler ve o IP'nin bugünkü TOPLAM sayısını döndürür.
+async function consumeDemo(ip: string): Promise<number> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  if (url && key) {
+    try {
+      const res = await fetch(`${url}/rest/v1/rpc/siyaset_demo_touch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({ p_ip: ip }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const n = typeof data === "number" ? data : Number(data);
+        if (Number.isFinite(n)) return n;
+      }
+    } catch {
+      /* Supabase erişilemedi: yedeğe düş */
+    }
+  }
+  return consumeMemory(ip);
 }
 
 export async function handleChat(
@@ -101,21 +121,22 @@ export async function handleChat(
 
   const provider = providerForKey(apiKey);
 
-  // Demo modunda limit uygula.
+  // Demo modunda limit uygula (kalıcı Supabase sayacı).
+  let demoRemaining: number | null = null;
   if (!byok) {
-    const { allowed, remaining } = rateLimitStatus(ip);
-    if (!allowed) {
+    const used = await consumeDemo(ip);
+    demoRemaining = Math.max(0, DEMO_DAILY_LIMIT - used);
+    if (used > DEMO_DAILY_LIMIT) {
       return {
         status: 429,
         body: {
           error:
             "Ücretsiz deneme hakkınız doldu. Kendi API anahtarınızı (Groq ücretsiz ya da DeepSeek) girerek sınırsız devam edebilirsiniz.",
           code: "RATE_LIMITED",
-          remaining,
+          remaining: 0,
         },
       };
     }
-    consume(ip);
   }
 
   const payload: Record<string, unknown> = {
@@ -163,10 +184,8 @@ export async function handleChat(
   };
   const content = data.choices?.[0]?.message?.content ?? "";
 
-  const remaining = byok ? null : rateLimitStatus(ip).remaining;
-
   return {
     status: 200,
-    body: { content, remaining, byok },
+    body: { content, remaining: demoRemaining, byok },
   };
 }
