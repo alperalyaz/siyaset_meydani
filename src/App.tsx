@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Guest, Utterance } from "./types";
+import type { Guest, Utterance, SessionPhase, Difficulty, SessionResult, SessionEvent, Badge } from "./types";
 import type { GuestRole } from "./lib/prompts";
 import { SetupScreen } from "./components/SetupScreen";
 import { ChatStream } from "./components/ChatStream";
 import { RatingMeter } from "./components/RatingMeter";
 import { ModeratorBar } from "./components/ModeratorBar";
 import { ApiKeyModal } from "./components/ApiKeyModal";
+import { SessionResultScreen } from "./components/SessionResultScreen";
 import {
   runIntro,
   runOpeningStatement,
@@ -19,11 +20,20 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, type SavedSession, type SessionMeta } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported } from "./lib/tts";
+import {
+  DIFFICULTY_CONFIGS,
+  RatingTracker,
+  computeSessionResult,
+  evaluateBadges,
+  comboEvent,
+  phaseChangeEvent,
+  phaseLabel,
+} from "./lib/gamification";
 
-type Phase = "setup" | "panel" | "replay";
-type SessionPhase = "intro" | "opening" | "debate";
+type Phase = "setup" | "panel" | "replay" | "result";
+type ProgressPhase = "intro" | "opening" | "debate";
 interface Progress {
-  phase: SessionPhase;
+  phase: ProgressPhase;
   i: number;
 }
 interface Thread {
@@ -90,6 +100,11 @@ export function App() {
 
   const [replayData, setReplayData] = useState<ReplayData | null>(null);
 
+  // ── Gamification state ──
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("warmup");
+  const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
+  const [comboToast, setComboToast] = useState<SessionEvent | null>(null);
+
   const [ttsOn, setTtsOn] = useState(ttsSupported());
   const ttsRef = useRef(ttsOn);
   useEffect(() => {
@@ -112,6 +127,12 @@ export function App() {
   const modNoteRef = useRef<string | undefined>(undefined);
   const stancesRef = useRef<(Stance | null)[]>([]); // yapımcının atadığı pozisyonlar
   const topicContextRef = useRef<string | null>(null); // güncel olay grounding metni
+  const startTimeRef = useRef<number>(0); // oturum başlangıcı
+  const ratingTracker = useRef(new RatingTracker());
+  const eventQueueRef = useRef<SessionEvent[]>([]);
+  const earnedBadgesRef = useRef<Badge[]>([]);
+  const sessionPhaseRef = useRef<SessionPhase>("warmup");
+  const difficultyRef = useRef<Difficulty>("kolay");
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -294,6 +315,15 @@ export function App() {
     }
   }, [opponentOf]);
 
+  // ── Combo / event işleyici ──
+  const flushEvent = useCallback(() => {
+    const q = eventQueueRef.current;
+    if (q.length === 0) return;
+    const ev = q.shift()!;
+    setComboToast(ev);
+    setTimeout(() => setComboToast(null), 3500);
+  }, []);
+
   // Üç fazlı, duraklatılıp devam edebilen oturum sürücüsü.
   const runSession = useCallback(async () => {
     const g = guestsRef.current;
@@ -367,6 +397,11 @@ export function App() {
           threadRef.current =
             act.length >= 2 ? mostOpposedPair(act) : { a: act[0], b: act[0], turns: 0 };
           progressRef.current = { phase: "debate", i: 0 };
+          // Gamification: warming up is done, enter debate phase
+          sessionPhaseRef.current = "debate";
+          setSessionPhase("debate");
+          eventQueueRef.current.push(phaseChangeEvent("debate", Date.now()));
+          flushEvent();
           continue;
         }
         const ctrl = new AbortController();
@@ -416,6 +451,65 @@ export function App() {
         setRatingNote(dec.note);
         if (!runningRef.current) return;
 
+        // ── Gamification: rating tracking & combo ──
+        const now = Date.now();
+        ratingTracker.current.push(dec.rating, now);
+        const combos = ratingTracker.current.checkCombos(now);
+        if (combos.hot) eventQueueRef.current.push(comboEvent("crowd_hot", now));
+        if (combos.cold) eventQueueRef.current.push(comboEvent("crowd_cold", now));
+        flushEvent();
+
+        // ── Win condition ──
+        const cfg = DIFFICULTY_CONFIGS[difficultyRef.current];
+        const isFinal = sessionPhaseRef.current === "final";
+        const goal = isFinal ? cfg.finalGoal : cfg.goalRating;
+
+        if (ratingTracker.current.aboveFor(goal, cfg.holdSeconds, now)) {
+          // FİNAL BÖLÜMÜNE GEÇİŞ
+          if (!isFinal) {
+            sessionPhaseRef.current = "final";
+            setSessionPhase("final");
+            eventQueueRef.current.push(phaseChangeEvent("final", now));
+            flushEvent();
+            // Hedefe ulaşıldı— konuklara sürpriz final repliği fırsatı ver
+            append({
+              id: uid(),
+              speaker: "moderator",
+              text: `🎉 Tebrikler! Reytingler ${goal} üzerinde ${cfg.holdSeconds} saniyedir seyrediyor! Şimdi FİNAL bölümüne girdik — reytingi ${cfg.finalGoal} üzerine çıkarın, oturum şampiyon bitsin!`,
+              mode: "system",
+            });
+            continue;
+          }
+
+          // FİNALDE BAŞARI → OTURUM BİTER
+          sessionPhaseRef.current = "ended";
+          setSessionPhase("ended");
+          append({
+            id: uid(),
+            speaker: "moderator",
+            text: `Harika bir oturum oldu! Reytinglerimiz final hedefi olan ${cfg.finalGoal}'i aştı ve seyircimiz coştu. Değerli konuklarımıza ve siz sevgili spikerimize teşekkür ediyorum. Yayınımız burada sona eriyor — bir sonraki oturumda görüşmek üzere! 👋🎬`,
+            mode: "system",
+          });
+          runningRef.current = false;
+          setRunning(false);
+          setThinking(null);
+          // Compute result
+          const result = computeSessionResult(
+            utterRef.current,
+            g,
+            ratingTracker.current.allSnapshots(),
+            startTimeRef.current,
+            difficultyRef.current,
+            earnedBadgesRef.current,
+            true,
+          );
+          const newBadges = evaluateBadges(result, utterRef.current, g, ratingTracker.current.allSnapshots());
+          result.badges = newBadges;
+          setSessionResult(result);
+          setPhase("result");
+          return;
+        }
+
         const text = await runGuest(
           g[speaker],
           g,
@@ -447,13 +541,32 @@ export function App() {
         if (text.trim()) await pace(text, speaker, g[speaker].gender, ctrl.signal);
         else await delay(500, ctrl.signal);
       }
+
+      // ── Oturum durdurulduysa sonuçları hesapla ──
+      if (sessionPhaseRef.current !== "ended" && utterRef.current.length > 1) {
+        sessionPhaseRef.current = "ended";
+        setSessionPhase("ended");
+        const result = computeSessionResult(
+          utterRef.current,
+          g,
+          ratingTracker.current.allSnapshots(),
+          startTimeRef.current,
+          difficultyRef.current,
+          earnedBadgesRef.current,
+          false,
+        );
+        const newBadges = evaluateBadges(result, utterRef.current, g, ratingTracker.current.allSnapshots());
+        result.badges = newBadges;
+        setSessionResult(result);
+        setPhase("result");
+      }
     } catch (e) {
       setThinking(null);
       if (isAbort(e)) return; // duraklatma/müdahale: durum korunur, sonra devam
       handleError(e);
       pause();
     }
-  }, [append, syncMeta, nextSpeaker, advanceThread, mostOpposedPair, handleError, pause, pace]);
+  }, [append, syncMeta, nextSpeaker, advanceThread, mostOpposedPair, handleError, pause, pace, flushEvent]);
 
   // Oturumu sürdür (boot / devam / müdahale sonrası tek giriş noktası).
   const drive = useCallback(() => {
@@ -486,13 +599,23 @@ export function App() {
     [append, drive],
   );
 
-  const startSession = useCallback((g: Guest[], t: string, context?: string | null) => {
+  const startSession = useCallback((g: Guest[], t: string, diff: Difficulty, context?: string | null) => {
     setGuests(g);
     setTopic(t);
     setPhase("panel");
     guestsRef.current = g;
     topicRef.current = t;
     topicContextRef.current = context ?? null;
+    difficultyRef.current = diff;
+
+    ratingTracker.current = new RatingTracker();
+    eventQueueRef.current = [];
+    earnedBadgesRef.current = [];
+    startTimeRef.current = Date.now();
+    sessionPhaseRef.current = "warmup";
+    setSessionPhase("warmup");
+    setSessionResult(null);
+    setComboToast(null);
 
     const welcome: Utterance = {
       id: uid(),
@@ -520,7 +643,7 @@ export function App() {
 
   // Oturum başlamadan önce içerik güvenliği kapısı: hassas konularda durdur.
   const beginSession = useCallback(
-    async (g: Guest[], t: string, context?: string | null) => {
+    async (g: Guest[], t: string, diff: Difficulty, context?: string | null) => {
       setBlockedMsg(null);
       setChecking(true);
       try {
@@ -532,7 +655,7 @@ export function App() {
           );
           return;
         }
-        startSession(g, t, context);
+        startSession(g, t, diff, context);
       } catch (e) {
         handleError(e);
       } finally {
@@ -574,6 +697,8 @@ export function App() {
     setSuggestions([]);
     setError(null);
     setReplayData(null);
+    setSessionResult(null);
+    setComboToast(null);
   }, [pause]);
 
   const doSave = useCallback(() => {
@@ -660,6 +785,19 @@ export function App() {
     );
   }
 
+  if (phase === "result" && sessionResult) {
+    return (
+      <div className="panel">
+        <SessionResultScreen
+          result={sessionResult}
+          topic={topic}
+          guestNames={guests.map((g) => g.name)}
+          onBack={() => { leave(); }}
+        />
+      </div>
+    );
+  }
+
   if (phase === "setup") {
     return (
       <>
@@ -722,7 +860,9 @@ export function App() {
           ‹
         </button>
         <div className="panel__topic">
-          <span className="panel__live">● CANLI</span>
+          <span className="panel__live">
+            ● CANLI · <span className="panel__phase-badge">{phaseLabel(sessionPhase)}</span>
+          </span>
           <h1>{topic}</h1>
         </div>
         <div className="panel__guests">
@@ -739,6 +879,12 @@ export function App() {
           ))}
         </div>
       </header>
+
+      {comboToast && (
+        <div className={`combo-toast ${comboToast.type === "crowd_hot" ? "combo-toast--hot" : comboToast.type === "crowd_cold" ? "combo-toast--cold" : "combo-toast--info"}`}>
+          {comboToast.text}
+        </div>
+      )}
 
       <div className="panel__body">
         <main className="panel__stage">

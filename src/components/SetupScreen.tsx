@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from "react";
-import type { Guest } from "../types";
+import type { Guest, Difficulty } from "../types";
 import type { SessionMeta } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas } from "../lib/engine";
 import { TOPIC_POOL } from "../lib/pool";
 
 interface Props {
-  onStart: (guests: Guest[], topic: string, context?: string | null) => void;
+  onStart: (guests: Guest[], topic: string, difficulty: Difficulty, context?: string | null) => void;
   onOpenKey: () => void;
   onError: (e: unknown) => void;
   apiKey: string | null;
@@ -171,7 +171,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           </p>
           <button
             className="btn btn--primary"
-            onClick={() => onStart(savedSession.guests, savedSession.topic, null)}
+            onClick={() => onStart(savedSession.guests, savedSession.topic, "kolay", null)}
           >
             Kaldığın yerden devam et ▶
           </button>
@@ -302,7 +302,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <button
           className="btn btn--primary btn--big"
           disabled={!canStart || checking}
-          onClick={() => onStart(guests!, topic.trim(), null)}
+          onClick={() => onStart(guests!, topic.trim(), "kolay", null)}
         >
           {checking ? "Konu kontrol ediliyor…" : "Oturumu Aç ▶"}
         </button>

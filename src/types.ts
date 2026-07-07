@@ -62,3 +62,52 @@ export interface Stance {
   position: string; // "Lehte" | "Aleyhte" | "Kısmen"
   angle: string; // savunacağı özgün açı
 }
+
+// ── Gamification ──
+
+export type Difficulty = "kolay" | "orta" | "zor";
+
+export interface DifficultyConfig {
+  label: string;
+  guestCount: number;
+  goalRating: number;    // hedef reyting
+  holdSeconds: number;   // bu seviyede kaç saniye tutulmalı
+  finalGoal: number;     // final bölümünde hedef (debate goal'dan yüksek)
+}
+
+export type SessionPhase = "warmup" | "debate" | "final" | "ended";
+
+export interface RatingSnapshot {
+  rating: number;
+  at: number; // Date.now()
+}
+
+export interface SessionEvent {
+  id: string;
+  type: "crowd_hot" | "crowd_cold" | "phase_change" | "badge_earned";
+  text: string;
+  at: number;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+}
+
+export interface SessionResult {
+  ended: "win" | "quit";
+  averageRating: number;
+  peakRating: number;
+  troughRating: number;
+  totalSeconds: number;
+  utteranceCount: number;
+  moderatorInterventions: number;
+  mostTalkative: string | null;
+  mostTalkativeCount: number;
+  mostControversialMoment: string | null;
+  mostControversialRating: number;
+  badges: Badge[];
+  difficulty: Difficulty;
+}
