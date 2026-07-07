@@ -268,13 +268,18 @@ export function App() {
       if (stancesRef.current.length === 0) {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
-        stancesRef.current = await assignStances(
+        const cast = await assignStances(
           g,
           t,
           topicContextRef.current,
           apiKeyRef.current,
           ctrl.signal,
         );
+        stancesRef.current = cast.stances;
+        // Cinsiyeti LLM'den doldur (Wikidata boş/rate-limitliyse seslendirme için).
+        cast.genders.forEach((gd, idx) => {
+          if (gd && g[idx] && !g[idx].gender) g[idx].gender = gd;
+        });
         syncMeta();
       }
 

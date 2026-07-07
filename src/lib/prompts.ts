@@ -93,9 +93,10 @@ Her konuğa, aşağıdaki gerçek kimliğine bakarak bu konuda GERÇEKTE tutaca�
 - Konuklar zaten farklı dünya görüşlerinden geliyor; bırak DOĞAL olarak farklı yerlere düşsünler. Yapay bir "karşıtlık" uğruna kimseyi çarpıtma. (Gerçek kimliklerine sadık kalınca çatışma zaten çıkar.)
 - Şart değil ama mümkünse görüşler birbirinden ayrışsın; yine de sadakat her zaman önce gelir.
 - "aci": o kişinin kendi ağzından, karakterine uygun, tek cümlelik özgün ve iddialı savunma açısı.
+- "cinsiyet": her konuğun cinsiyeti — "erkek" ya da "kadın" (bilmiyorsan boş bırak).
 
 Sadece şu JSON'u döndür:
-{"roles":[{"i":0,"pozisyon":"Lehte/Aleyhte/Kısmen","aci":"..."},{"i":1,"pozisyon":"...","aci":"..."}]}`,
+{"roles":[{"i":0,"pozisyon":"Lehte/Aleyhte/Kısmen","aci":"...","cinsiyet":"erkek"},{"i":1,"pozisyon":"...","aci":"...","cinsiyet":"kadın"}]}`,
     },
   ];
 }

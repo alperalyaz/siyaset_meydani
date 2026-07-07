@@ -154,34 +154,43 @@ export async function suggestGuestNames(
 }
 
 // Yapımcı: konukları karşıt pozisyonlara yerleştirir (guest index'ine göre dizi).
+export interface CastResult {
+  stances: (Stance | null)[];
+  genders: ("male" | "female" | undefined)[];
+}
+
 export async function assignStances(
   guests: Guest[],
   topic: string,
   context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
-): Promise<(Stance | null)[]> {
-  const result: (Stance | null)[] = guests.map(() => null);
+): Promise<CastResult> {
+  const stances: (Stance | null)[] = guests.map(() => null);
+  const genders: ("male" | "female" | undefined)[] = guests.map(() => undefined);
   try {
     const { content } = await chat(castingMessages(guests, topic, context), apiKey, {
       json: true,
       temperature: 0.8,
-      max_tokens: 450,
+      max_tokens: 500,
       signal,
     });
     const parsed = parseJsonLoose<{
-      roles?: { i: number; pozisyon: string; aci: string }[];
+      roles?: { i: number; pozisyon: string; aci: string; cinsiyet?: string }[];
     }>(content);
     for (const r of parsed?.roles ?? []) {
       if (r.i >= 0 && r.i < guests.length) {
-        result[r.i] = { position: r.pozisyon || "Kısmen", angle: r.aci || "" };
+        stances[r.i] = { position: r.pozisyon || "Kısmen", angle: r.aci || "" };
+        const c = (r.cinsiyet || "").toLocaleLowerCase("tr");
+        if (c.startsWith("kad")) genders[r.i] = "female";
+        else if (c.startsWith("erk")) genders[r.i] = "male";
       }
     }
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     // Kadrolama başarısızsa pozisyonsuz devam (yine de fikir turu çalışır).
   }
-  return result;
+  return { stances, genders };
 }
 
 // Tanışma turu: konuk kendini kısaca tanıtır (konuya girmeden).

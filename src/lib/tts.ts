@@ -16,34 +16,43 @@ export function ttsSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
-// Türkçe sesleri önceliklendir; yoksa eldeki tüm sesler.
+// Türkçe sesler; YEREL sesler (pitch/rate'i onurlandırır) öne alınır. Yoksa hepsi.
 function turkishVoices(): SpeechSynthesisVoice[] {
-  const tr = cachedVoices.filter((v) => /tr(-|_|$)/i.test(v.lang));
-  return tr.length ? tr : cachedVoices;
+  const tr = cachedVoices.filter(
+    (v) => /^tr(-|_|$)/i.test(v.lang) || /turkish|türk/i.test(v.name),
+  );
+  const pool = tr.length ? tr : cachedVoices;
+  // Yerel (localService) sesler pitch/rate ayarını uygular; uzak (Google) sesler yok sayar.
+  return [...pool].sort((a, b) => Number(b.localService) - Number(a.localService));
 }
 
-const FEMALE_HINT = /female|kadın|woman|\b(yelda|filiz|aylin|zeynep|emel|seda|google türkçe)\b/i;
-const MALE_HINT = /\bmale\b|erkek|\bman\b|\b(tolga|cem|volkan|burak|onur|mehmet)\b/i;
+const FEMALE_HINT =
+  /female|kadın|woman|\b(yelda|filiz|aylin|zeynep|emel|seda|elif|defne|nilüfer|google türkçe)\b/i;
+const MALE_HINT = /\bmale\b|erkek|\bman\b|\b(tolga|cem|volkan|burak|onur|ahmet|mehmet|kaan)\b/i;
 
 // Konuk cinsiyetine ve index'ine göre ses seçimi.
-// Türkçe sesler kısıtlı olduğundan cinsiyet asıl PERDE (pitch) ile ayrılır:
-// kadın tiz, erkek pes. Platformda cinsiyetli ses varsa o da seçilir.
+// Türkçe sesler kısıtlıysa cinsiyet PERDE (pitch) ile ayrılır: kadın tiz, erkek
+// pes. Cinsiyetli/farklı ses varsa o da kullanılır. (Not: tek uzak ses varsa
+// tarayıcı perdeyi yok sayabilir; o zaman fark duyulmaz — platform sınırı.)
 export function voiceForGuest(
   i: number,
   gender?: "male" | "female",
 ): { voice?: SpeechSynthesisVoice; pitch: number; rate: number } {
   const voices = turkishVoices();
-  let voice: SpeechSynthesisVoice | undefined;
-  if (gender === "female") voice = voices.find((v) => FEMALE_HINT.test(v.name));
-  if (gender === "male") voice = voices.find((v) => MALE_HINT.test(v.name));
-  if (!voice && voices.length) voice = voices[i % voices.length];
+  const fem = voices.filter((v) => FEMALE_HINT.test(v.name));
+  const mal = voices.filter((v) => MALE_HINT.test(v.name));
 
-  // Aynı cinsiyetten konuklar da hafifçe farklılaşsın diye index'e göre küçük kayma.
-  const jitter = ((i % 3) - 1) * 0.06;
-  const pitch =
-    gender === "female" ? 1.35 + jitter : gender === "male" ? 0.75 + jitter : 1.0 + jitter;
-  const rate = 0.98 + ((i % 2) - 0.5) * 0.06;
-  return { voice, pitch: Math.max(0.5, Math.min(2, pitch)), rate };
+  let voice: SpeechSynthesisVoice | undefined;
+  if (gender === "female") voice = fem.length ? fem[i % fem.length] : voices[i % (voices.length || 1)];
+  else if (gender === "male") voice = mal.length ? mal[i % mal.length] : voices[i % (voices.length || 1)];
+  else voice = voices.length ? voices[i % voices.length] : undefined;
+
+  // Güçlü perde ayrımı + aynı cinsiyette bile index'e göre kayma (çeşitlilik).
+  const base = gender === "female" ? 1.5 : gender === "male" ? 0.6 : 1.0;
+  const jitter = ((i % 3) - 1) * 0.12;
+  const pitch = Math.max(0.3, Math.min(2, base + jitter));
+  const rate = 0.9 + (i % 3) * 0.07;
+  return { voice, pitch, rate };
 }
 
 // Emoji ve süsleri temizle (TTS emoji adlarını sesli okumasın).
