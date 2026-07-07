@@ -1,5 +1,9 @@
 import type { ChatMessage } from "./store";
 
+// Web'de "" (göreli /api). Mobil (Capacitor) derlemede VITE_API_BASE ile
+// mutlak Vercel adresi verilir, çünkü uygulama telefonda paketli çalışır.
+export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
 export interface ChatOptions {
   json?: boolean;
   temperature?: number;
@@ -46,7 +50,7 @@ export async function chat(
     headers["x-user-api-key"] = userApiKey.trim();
   }
 
-  const res = await fetch("/api/chat", {
+  const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
     headers,
     body: JSON.stringify({

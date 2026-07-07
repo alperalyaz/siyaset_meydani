@@ -10,6 +10,7 @@ interface Res {
   status: (c: number) => Res;
   json: (d: unknown) => void;
   setHeader: (n: string, v: string) => void;
+  end: () => void;
 }
 
 function param(req: Req, key: string): string | undefined {
@@ -29,6 +30,13 @@ function param(req: Req, key: string): string | undefined {
 }
 
 export default async function handler(req: Req, res: Res): Promise<void> {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
   const result = await handleContext(param(req, "action"), param(req, "url"));
   res.setHeader("Cache-Control", "public, max-age=300");
   res.status(result.status).json(result.body);

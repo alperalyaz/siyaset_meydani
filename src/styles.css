@@ -912,3 +912,17 @@ a {
     align-items: flex-start;
   }
 }
+
+/* Dar telefonlarda spiker çubuğu: input üstte tam genişlik, kontroller altında */
+@media (max-width: 520px) {
+  .modbar__row {
+    flex-wrap: wrap;
+  }
+  .modbar__input {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .panel__head h1 {
+    font-size: 0.92rem;
+  }
+}

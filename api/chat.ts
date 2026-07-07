@@ -23,10 +23,23 @@ function clientIp(req: VercelLikeRequest): string {
   return req.socket?.remoteAddress || "unknown";
 }
 
+// Mobil (Capacitor) uygulama farklı origin'den (localhost) çağırır -> CORS gerekir.
+function cors(res: VercelLikeResponse): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-api-key");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
 export default async function handler(
   req: VercelLikeRequest,
   res: VercelLikeResponse,
 ): Promise<void> {
+  cors(res);
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
   if (req.method !== "POST") {
     res.status(405).json({ error: "Yalnızca POST." });
     return;

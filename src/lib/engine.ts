@@ -1,5 +1,5 @@
 import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
-import { chat, parseJsonLoose, ApiError } from "./deepseek";
+import { chat, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
 import {
   introMessages,
   openingMessages,
@@ -54,7 +54,7 @@ export interface TrendTopic {
 // Google Trends TR gündemini çeker (/api/context proxy'si üzerinden).
 export async function fetchTrends(signal?: AbortSignal): Promise<TrendItem[]> {
   try {
-    const res = await fetch("/api/context?action=trends", { signal });
+    const res = await fetch(`${API_BASE}/api/context?action=trends`, { signal });
     const d = (await res.json()) as { trends?: TrendItem[] };
     return Array.isArray(d.trends) ? d.trends : [];
   } catch {
@@ -99,7 +99,9 @@ export async function curateTrendTopics(
 // Bir Ekşi Sözlük başlığının entry'lerini grounding metni olarak çeker.
 export async function fetchEksiContext(url: string, signal?: AbortSignal): Promise<string> {
   try {
-    const res = await fetch(`/api/context?action=eksi&url=${encodeURIComponent(url)}`, { signal });
+    const res = await fetch(`${API_BASE}/api/context?action=eksi&url=${encodeURIComponent(url)}`, {
+      signal,
+    });
     const d = (await res.json()) as { entries?: string[]; title?: string };
     if (!res.ok || !Array.isArray(d.entries)) return "";
     return d.entries.map((e) => `• ${e}`).join("\n");
