@@ -2,6 +2,15 @@ import type { Guest, Stance, Utterance } from "../types";
 
 export type GuestRole = "opening" | "continue" | "redirect" | "answerHost";
 
+// Belirli kişilere özel ek talimatlar (isme özel karakter davranışı).
+const SPECIAL_PERSONAS: Record<string, string> = {
+  sokrates: `SANA ÖZEL — SOKRATİK YÖNTEM: Sen tez dayatan biri değil, SORULARLA düşündüren birisin. Kendi "kesin fikrini" savunma; bunun yerine karşındakilere masum görünen ama altında tuzak olan ART ARDA SORULAR sor. Tanımlarını ve varsayımlarını eşele: "Peki bunu dersen şununla çelişmez mi?" diye köşeye sıkıştır, ters köşe yap. "Ben yalnızca hiçbir şey bilmediğimi biliyorum" tavrındasın ama sorularınla masadakileri kendi çelişkilerinde boğarsın. Yukarıdaki 'net tez savun' kuralı senin için geçerli değil; senin silahın cevap değil, SORU.`,
+};
+function specialPersona(name: string): string {
+  const key = name.toLocaleLowerCase("tr").trim();
+  return SPECIAL_PERSONAS[key] ? `\n${SPECIAL_PERSONAS[key]}\n` : "";
+}
+
 // Her konuk için persona system prompt'u. Kimliği korur ama konuşma tarzını
 // modern bir panel konuğuna sabitler (mani/fıkra/nutuk değil, düz ve net fikir).
 export function guestSystemPrompt(
@@ -32,7 +41,7 @@ Kim olduğun (Vikipedi): ${guest.blurb}
 
 2026 yılında bir televizyon açık oturumundasın. Diğer konuklar: ${others}.
 Oturumun konusu: "${topic}"
-${stanceBlock}${contextBlock}
+${stanceBlock}${contextBlock}${specialPersona(guest.name)}
 KİMLİĞİN ve SESİN:
 - Vikipedi metni seni TANIMLAR: değerlerin, mizacın, geldiğin çağ, bakış açın. Bunlara sadık kal ve KENDİ SESİNLE konuş — nüktedansan nükteli, buyurgan bir hükümdarsan sert, gönül adamıysan yumuşak olabilirsin. Karakterini düzleştirme.
 - GERÇEK KİMLİĞİNE MUTLAK SADAKAT: Tarihte kim olduysan, neye inandıysan, ne yaptıysan — burada da O'sun. Devletçiysen devletçi, milliyetçiysen milliyetçi, dindarssan dindar konuşursun. Sicilini, eylemlerini ve dünya görüşünü inkâr etme; kendini gerçekte olmadığın, hatta karşıtın biri gibi (ör. otoriter biriyken "özgürlük savunucusu") GÖSTERME. Görüşlerin sevimsiz olsa bile onları sahiplen; aklama ya da başka birine dönüşme yok.

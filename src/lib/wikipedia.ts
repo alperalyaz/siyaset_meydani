@@ -188,38 +188,64 @@ async function classifyPerson(s: Summary): Promise<{ isPerson: boolean; gender: 
   return { isPerson: looksLikePerson(s), gender: undefined };
 }
 
-// Bir isim listesinden (LLM önerisi) gerçek kişileri seçip Vikipedi ile zenginleştirir.
-// Yeterli kişi bulunamazsa küratörlü havuzdan tamamlar.
+// İsimden (özet olmadan) engel kontrolü: Wikipedia takılsa bile peygamber/
+// Atatürk/Erdoğan gibi isimler yakalanır.
+export function isBlockedName(name: string): boolean {
+  const t = normTitle(name);
+  if (BLOCKED_TITLES.has(t)) return true;
+  const bare = t.replace(/^hz\.?\s+/, "");
+  return SACRED_TITLES.has(t) || SACRED_TITLES.has(bare);
+}
+
+// Bir isim listesinden (LLM önerisi, konuya İLGİLİ) konuk kartları üretir.
+// Wikipedia özeti çekilebiliyorsa zenginleştirir; çekilemezse (rate-limit) ismi
+// yine de kullanır — çünkü LLM zaten konuya uygun önerdi. Alakasız küratörlü
+// havuza DÜŞMEK yalnızca hiç isim tutunamazsa (2'den az) son çaredir.
 export async function buildGuestsFromNames(names: string[], count = 3): Promise<Guest[]> {
   const guests: Guest[] = [];
   const used = new Set<string>();
-  // Önerilen isimleri karıştır: hep ilk "bariz" 3'ü değil, sürprizli kombinasyonlar.
+  const add = (g: Guest) => {
+    const k = g.name.toLowerCase();
+    if (used.has(k)) return;
+    used.add(k);
+    guests.push(g);
+  };
+
+  // Önerilen isimleri karıştır: sürprizli kombinasyonlar.
   for (const name of shuffle(names)) {
     if (guests.length >= count) break;
+    if (isBlockedName(name)) continue; // özet olmadan da engelle
     const s = await fetchSummary(name);
-    if (!s || (s.type && s.type !== "standard")) continue;
-    if (isBlockedGuest(s)) continue; // peygamber/kutsal figür ya da engelli kişi
-    const cls = await classifyPerson(s);
-    if (!cls.isPerson) continue;
-    const title = (s.title ?? name).replace(/_/g, " ");
-    if (used.has(title.toLowerCase())) continue;
-    used.add(title.toLowerCase());
-    guests.push({
-      name: title,
-      title,
-      era: s.description ?? "",
-      blurb: s.extract && s.extract.length > 40 ? s.extract : `${title} hakkında konuk.`,
-      thumbnail: s.thumbnail?.source,
-      color: colorForIndex(guests.length),
-      gender: cls.gender,
-    });
+    if (s && (!s.type || s.type === "standard")) {
+      if (isBlockedGuest(s)) continue;
+      const cls = await classifyPerson(s);
+      if (cls.isPerson === false && s.wikibase_item) continue; // Wikidata net "insan değil" dediyse ele
+      const title = (s.title ?? name).replace(/_/g, " ");
+      add({
+        name: title,
+        title,
+        era: s.description ?? "",
+        blurb: s.extract && s.extract.length > 40 ? s.extract : title,
+        thumbnail: s.thumbnail?.source,
+        color: colorForIndex(guests.length),
+        gender: cls.gender,
+      });
+    } else if (s === null) {
+      // Wikipedia hatası/rate-limit: konuya uygun ismi minimal bilgiyle kullan.
+      const nm = name.replace(/_/g, " ").trim();
+      if (nm) add({ name: nm, title: nm, era: "", blurb: nm, color: colorForIndex(guests.length) });
+    }
+    // s var ama standard değil (ayrım sayfası) -> atla.
   }
-  // Eksik kaldıysa küratörlü havuzdan tamamla.
-  for (const seed of shuffle(PERSON_POOL)) {
-    if (guests.length >= count) break;
-    if (used.has(seed.name.toLowerCase())) continue;
-    used.add(seed.name.toLowerCase());
-    guests.push(await enrich(seed, guests.length));
+
+  // SON ÇARE: en az 2 konuk yoksa küratörlü havuzdan tamamla (nadir).
+  if (guests.length < 2) {
+    for (const seed of shuffle(PERSON_POOL)) {
+      if (guests.length >= count) break;
+      if (used.has(seed.name.toLowerCase())) continue;
+      guests.push(await enrich(seed, guests.length));
+      used.add(seed.name.toLowerCase());
+    }
   }
   return guests.map((g, i) => ({ ...g, color: colorForIndex(i) }));
 }
