@@ -50,6 +50,7 @@ export function voiceForGuest(
 function cleanForSpeech(text: string): string {
   return text
     .replace(/[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}☀-➿️]/gu, "")
+    .replace(/[*_]/g, "") // markdown işaretleri sesli okunmasın
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -1,5 +1,23 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Guest, Utterance } from "../types";
+
+// Basit satır içi markdown: **kalın**, *italik*, _italik_.
+function renderRich(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\*\*([^*]+)\*\*|\*([^*]+)\*|_([^_]+)_/g;
+  let last = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[1]) out.push(<strong key={key++}>{m[1]}</strong>);
+    else if (m[2]) out.push(<em key={key++}>{m[2]}</em>);
+    else if (m[3]) out.push(<em key={key++}>{m[3]}</em>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
 
 interface Props {
   utterances: Utterance[];
@@ -56,7 +74,7 @@ export function ChatStream({ utterances, guests, thinking }: Props) {
                 {g.name}
                 {u.mode === "redirect" && <span className="turn__cut">— sözü alır</span>}
               </div>
-              <p className="turn__text">{u.text}</p>
+              <p className="turn__text">{renderRich(u.text)}</p>
             </div>
           </div>
         );
