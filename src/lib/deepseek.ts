@@ -1,7 +1,5 @@
 import type { ChatMessage } from "./store";
 
-// Web'de "" (göreli /api). Mobil (Capacitor) derlemede VITE_API_BASE ile
-// mutlak Vercel adresi verilir, çünkü uygulama telefonda paketli çalışır.
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export interface ChatOptions {
@@ -82,7 +80,6 @@ export async function chat(
   };
 }
 
-// JSON modunda güvenli ayrıştırma (model bazen fazladan metin ekleyebilir).
 export function parseJsonLoose<T>(text: string): T | null {
   try {
     return JSON.parse(text) as T;
@@ -98,4 +95,73 @@ export function parseJsonLoose<T>(text: string): T | null {
     }
     return null;
   }
+}
+
+// Token bazında yayın (streaming). OpenAI uyumlu SSE akışını okur,
+// her token için onToken callback'ini çağırır.
+export async function chatStream(
+  messages: ChatMessage[],
+  userApiKey: string | null,
+  onToken: (token: string) => void,
+  opts: ChatOptions = {},
+): Promise<{ remaining: number | null; byok: boolean }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (userApiKey && userApiKey.trim()) {
+    headers["x-user-api-key"] = userApiKey.trim();
+  }
+
+  const res = await fetch(`${API_BASE}/api/chat`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      messages,
+      stream: true,
+      temperature: opts.temperature,
+      max_tokens: opts.max_tokens,
+    }),
+    signal: opts.signal,
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiError(data.error || "Bilinmeyen hata.", res.status, data.code);
+  }
+
+  if (!res.body) {
+    throw new ApiError("Akış desteklenmiyor.", 0);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        const jsonStr = trimmed.slice(6);
+        if (jsonStr === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(jsonStr) as {
+            choices?: { delta?: { content?: string } }[];
+          };
+          const token = parsed.choices?.[0]?.delta?.content;
+          if (token) onToken(token);
+        } catch {
+          /* bozuk SSE satırını yoksay */
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  lastMeta = { remaining: null, byok: !!userApiKey };
+  return { remaining: null, byok: !!userApiKey };
 }

@@ -31,6 +31,21 @@ function devApi() {
         const ip =
           (typeof fwd === "string" ? fwd.split(",")[0] : req.socket?.remoteAddress) || "local";
         const result = await handleChat(body, key, ip);
+        if (result.stream) {
+          res.statusCode = result.status;
+          if (result.headers) {
+            Object.entries(result.headers).forEach(([k, v]) => res.setHeader(k, v));
+          }
+          const reader = result.stream.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) { res.end(); break; }
+              res.write(value);
+            }
+          } catch { res.end(); }
+          return;
+        }
         res.statusCode = result.status;
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify(result.body));

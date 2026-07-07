@@ -1,3 +1,15 @@
+export type DebateStyle =
+  | "agresif"
+  | "pasif-agresif"
+  | "alaycı"
+  | "bilgiç"
+  | "duygusal"
+  | "soğukkanlı"
+  | "provokatör"
+  | "arabulucu"
+  | "nükteli"
+  | "otoriter";
+
 export interface Guest {
   /** Görünen ad, ör. "Bilge Kağan" */
   name: string;
@@ -13,6 +25,10 @@ export interface Guest {
   color: string;
   /** Seslendirmede erkek/kadın sesi seçimi için (Wikidata P21) */
   gender?: "male" | "female";
+  /** Vikipedi özeti çekilemediyse uyarı göster */
+  summaryStatus?: "ok" | "minimal" | "blocked";
+  /** Tartışma üslubu: agresif, alaycı, bilgiç, duygusal, soğukkanlı vb. */
+  debateStyle?: DebateStyle;
 }
 
 export type Speaker = "moderator" | number; // number = guests[i]

@@ -1,5 +1,6 @@
 import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
-import { chat, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
+import { chat, chatStream, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
+import type { ChatMessage } from "./store";
 import {
   introMessages,
   openingMessages,
@@ -148,7 +149,7 @@ export async function suggestGuestNames(
   const { content } = await chat(guestSuggestMessages(topic, context, avoid), apiKey, {
     json: true,
     temperature: 1.05,
-    max_tokens: 220,
+    max_tokens: 350,
     signal,
   });
   const parsed = parseJsonLoose<{ names?: string[] }>(content);
@@ -195,15 +196,21 @@ export async function assignStances(
   return { stances, genders };
 }
 
-// Tanışma turu: konuk kendini kısaca tanıtır (konuya girmeden).
 export async function runIntro(
   guest: Guest,
   guests: Guest[],
   topic: string,
   apiKey: string | null,
   signal?: AbortSignal,
+  onToken?: (t: string) => void,
 ): Promise<string> {
-  const { content } = await chat(introMessages(guest, guests, topic), apiKey, {
+  const msgs = introMessages(guest, guests, topic);
+  if (onToken) {
+    let text = "";
+    await chatStream(msgs as ChatMessage[], apiKey, (t) => { text += t; onToken(t); }, { temperature: 0.85, max_tokens: 180, signal });
+    return cleanReply(text, guest.name);
+  }
+  const { content } = await chat(msgs as ChatMessage[], apiKey, {
     temperature: 0.85,
     max_tokens: 180,
     signal,
@@ -211,7 +218,6 @@ export async function runIntro(
   return cleanReply(content, guest.name);
 }
 
-// Görüş turu: konuk net tezini söyler ya da dürüstçe pas geçer.
 export async function runOpeningStatement(
   guest: Guest,
   guests: Guest[],
@@ -220,8 +226,19 @@ export async function runOpeningStatement(
   context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
+  onToken?: (t: string) => void,
 ): Promise<OpeningResult> {
-  const { content } = await chat(openingMessages(guest, guests, topic, stance, context), apiKey, {
+  const msgs = openingMessages(guest, guests, topic, stance, context);
+  if (onToken) {
+    let text = "";
+    await chatStream(msgs as ChatMessage[], apiKey, (t) => { text += t; onToken(t); }, { temperature: 0.85, max_tokens: 240, signal });
+    const parsed = parseJsonLoose<Partial<OpeningResult>>(text);
+    if (parsed && typeof parsed.text === "string" && parsed.text.trim()) {
+      return { text: cleanReply(parsed.text, guest.name), hasStance: parsed.hasStance !== false };
+    }
+    return { text: cleanReply(text, guest.name), hasStance: true };
+  }
+  const { content } = await chat(msgs as ChatMessage[], apiKey, {
     json: true,
     temperature: 0.85,
     max_tokens: 240,
@@ -231,7 +248,6 @@ export async function runOpeningStatement(
   if (parsed && typeof parsed.text === "string" && parsed.text.trim()) {
     return { text: cleanReply(parsed.text, guest.name), hasStance: parsed.hasStance !== false };
   }
-  // JSON bozuksa: içeriği düz metin kabul et, tez var say.
   return { text: cleanReply(content, guest.name), hasStance: true };
 }
 
@@ -259,7 +275,6 @@ export async function runRatingDirector(
   };
 }
 
-// Bir konuğun tartışma repliği.
 export async function runGuest(
   guest: Guest,
   guests: Guest[],
@@ -271,12 +286,17 @@ export async function runGuest(
   context: string | null,
   apiKey: string | null,
   signal?: AbortSignal,
+  onToken?: (t: string) => void,
 ): Promise<string> {
-  const { content } = await chat(
-    guestMessages(guest, guests, topic, utterances, cue, role, stance, context),
-    apiKey,
-    { temperature: 0.9, max_tokens: 230, signal },
-  );
+  const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context);
+  if (onToken) {
+    let text = "";
+    await chatStream(msgs as ChatMessage[], apiKey, (t) => { text += t; onToken(t); }, { temperature: 0.9, max_tokens: 230, signal });
+    return cleanReply(text, guest.name);
+  }
+  const { content } = await chat(msgs as ChatMessage[], apiKey, {
+    temperature: 0.9, max_tokens: 230, signal,
+  });
   return cleanReply(content, guest.name);
 }
 
@@ -284,13 +304,14 @@ export async function runGuest(
 export async function suggestQuestions(
   topic: string,
   guests: Guest[],
+  utterances: Utterance[],
   apiKey: string | null,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  const { content } = await chat(suggestQuestionsMessages(topic, guests), apiKey, {
+  const { content } = await chat(suggestQuestionsMessages(topic, guests, utterances), apiKey, {
     json: true,
     temperature: 0.9,
-    max_tokens: 300,
+    max_tokens: 400,
     signal,
   });
   const parsed = parseJsonLoose<{ questions?: string[] }>(content);

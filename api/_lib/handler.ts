@@ -41,11 +41,14 @@ export interface ChatRequestBody {
   temperature?: number;
   max_tokens?: number;
   model?: string;
+  stream?: boolean;
 }
 
 export interface HandlerResult {
   status: number;
   body: unknown;
+  headers?: Record<string, string>;
+  stream?: ReadableStream<Uint8Array>;
 }
 
 // Demo sayacı: kalıcı olması için Supabase RPC'si (SUPABASE_URL + SUPABASE_ANON_KEY
@@ -139,12 +142,13 @@ export async function handleChat(
     }
   }
 
+  const useStream = body.stream === true && !body.json;
   const payload: Record<string, unknown> = {
     model: body.model || provider.model,
     messages: body.messages,
     temperature: body.temperature ?? 0.9,
     max_tokens: body.max_tokens ?? 400,
-    stream: false,
+    stream: useStream,
   };
   if (body.json) {
     payload.response_format = { type: "json_object" };
@@ -176,6 +180,15 @@ export async function handleChat(
         status: upstream.status,
         detail: text.slice(0, 500),
       },
+    };
+  }
+
+  if (useStream && upstream.body) {
+    return {
+      status: 200,
+      body: { remaining: demoRemaining, byok },
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+      stream: upstream.body,
     };
   }
 

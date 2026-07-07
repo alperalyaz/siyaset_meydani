@@ -57,5 +57,23 @@ export default async function handler(
   }
 
   const result = await handleChat(body, key, clientIp(req));
+  if (result.stream) {
+    if (result.headers) {
+      Object.entries(result.headers).forEach(([k, v]) => res.setHeader(k, v));
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.status(result.status);
+    const textDecoder = new TextDecoder();
+    const reader = result.stream.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); return; }
+        // Vercel Node.js supports direct writes to the response
+        (res as unknown as { write: (chunk: string | Uint8Array) => void }).write?.(textDecoder.decode(value, { stream: true }));
+      }
+    } catch { res.end(); }
+    return;
+  }
   res.status(result.status).json(result.body);
 }

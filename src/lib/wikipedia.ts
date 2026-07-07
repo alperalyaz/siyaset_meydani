@@ -1,5 +1,6 @@
 import type { Guest } from "../types";
 import { PERSON_POOL, seedToGuest, colorForIndex, type Seed } from "./pool";
+import { getCached, setCache } from "./cache";
 
 const TR_SUMMARY = (title: string) =>
   `https://tr.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
@@ -16,6 +17,11 @@ interface Summary {
 // Bir Vikipedi başlığının canlı özetini çeker. Rate-limit'e (429/503) karşı
 // bir kez kısa beklemeyle yeniden dener.
 async function fetchSummary(title: string, retry = true): Promise<Summary | null> {
+  const cacheKey = `wp:summary:${title}`;
+  const cached = getCached<Summary>(cacheKey);
+  if (cached !== null) return cached;
+  if (getCached<boolean>(`${cacheKey}:neg`) === true) return null;
+
   try {
     const res = await fetch(TR_SUMMARY(title), {
       headers: { Accept: "application/json", "Api-User-Agent": "SiyasetMeydani/1.0" },
@@ -25,14 +31,18 @@ async function fetchSummary(title: string, retry = true): Promise<Summary | null
         await new Promise((r) => setTimeout(r, 900));
         return fetchSummary(title, false);
       }
+      setCache(`${cacheKey}:neg`, true, 30_000);
       return null;
     }
-    return (await res.json()) as Summary;
+    const result = (await res.json()) as Summary;
+    setCache(cacheKey, result, 5 * 60_000);
+    return result;
   } catch {
     if (retry) {
       await new Promise((r) => setTimeout(r, 900));
       return fetchSummary(title, false);
     }
+    setCache(`${cacheKey}:neg`, true, 30_000);
     return null;
   }
 }
@@ -56,6 +66,7 @@ async function enrich(seed: Seed, colorIndex: number): Promise<Guest> {
     base.thumbnail = s.thumbnail.source;
   }
   if (s) base.gender = (await classifyPerson(s)).gender;
+  base.summaryStatus = s ? "ok" : "minimal";
   return base;
 }
 
@@ -90,12 +101,20 @@ type Gender = "male" | "female" | undefined;
 async function fetchPersonInfo(
   qid: string,
 ): Promise<{ isHuman: boolean | null; gender: Gender }> {
+  const cacheKey = `wd:person:${qid}`;
+  const cached = getCached<{ isHuman: boolean | null; gender: Gender }>(cacheKey);
+  if (cached) return cached;
+
   try {
     const url = `https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${encodeURIComponent(
       qid,
     )}&property=P31|P21&format=json&origin=*`;
     const res = await fetch(url);
-    if (!res.ok) return { isHuman: null, gender: undefined };
+    if (!res.ok) {
+      const fallback = { isHuman: null, gender: undefined as Gender };
+      setCache(cacheKey, fallback, 60_000);
+      return fallback;
+    }
     const data = (await res.json()) as {
       claims?: {
         P31?: { mainsnak?: { datavalue?: { value?: { id?: string } } } }[];
@@ -105,16 +124,19 @@ async function fetchPersonInfo(
     const p31 = data.claims?.P31;
     const isHuman = p31 ? p31.some((c) => c.mainsnak?.datavalue?.value?.id === "Q5") : false;
     const g = data.claims?.P21?.[0]?.mainsnak?.datavalue?.value?.id;
-    // Q6581097 = erkek, Q6581072 = kadın (trans erkek/kadın da erkek/kadın sesine map'lenir)
     const gender: Gender =
       g === "Q6581097" || g === "Q2449503"
         ? "male"
         : g === "Q6581072" || g === "Q1052281"
           ? "female"
           : undefined;
-    return { isHuman, gender };
+    const result = { isHuman, gender };
+    setCache(cacheKey, result, 30 * 60_000);
+    return result;
   } catch {
-    return { isHuman: null, gender: undefined };
+    const fallback = { isHuman: null, gender: undefined as Gender };
+    setCache(cacheKey, fallback, 30_000);
+    return fallback;
   }
 }
 
@@ -219,7 +241,7 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     if (s && (!s.type || s.type === "standard")) {
       if (isBlockedGuest(s)) continue;
       const cls = await classifyPerson(s);
-      if (cls.isPerson === false && s.wikibase_item) continue; // Wikidata net "insan değil" dediyse ele
+      if (!cls.isPerson) continue;
       const title = (s.title ?? name).replace(/_/g, " ");
       add({
         name: title,
@@ -229,13 +251,16 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
         thumbnail: s.thumbnail?.source,
         color: colorForIndex(guests.length),
         gender: cls.gender,
+        summaryStatus: "ok",
       });
     } else if (s === null) {
-      // Wikipedia hatası/rate-limit: konuya uygun ismi minimal bilgiyle kullan.
+      // Wikipedia API tamamen başarısız (hata, rate-limit, sayfa yok):
+      // konuya uygun ismi minimal bilgiyle kullan.
       const nm = name.replace(/_/g, " ").trim();
-      if (nm) add({ name: nm, title: nm, era: "", blurb: nm, color: colorForIndex(guests.length) });
+      if (nm) add({ name: nm, title: nm, era: "", blurb: nm, color: colorForIndex(guests.length), summaryStatus: "minimal" });
     }
-    // s var ama standard değil (ayrım sayfası) -> atla.
+    // Anlam ayrımı vs. standart olmayan sayfalar: kişi doğrulaması
+    // yapılamadığı için ekleme, atla.
   }
 
   // SON ÇARE: en az 2 konuk yoksa küratörlü havuzdan tamamla (nadir).

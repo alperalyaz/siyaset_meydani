@@ -8,6 +8,8 @@ interface Props {
   onSend: (text: string) => void;
   onPauseToggle: () => void;
   onSuggest: () => void;
+  onSave?: () => void;
+  hasUtterances?: boolean;
   ttsOn: boolean;
   ttsSupported: boolean;
   onToggleTts: () => void;
@@ -22,6 +24,8 @@ export function ModeratorBar({
   onSend,
   onPauseToggle,
   onSuggest,
+  onSave,
+  hasUtterances,
   ttsOn,
   ttsSupported,
   onToggleTts,
@@ -71,6 +75,12 @@ export function ModeratorBar({
             title={ttsOn ? "Seslendirme açık" : "Seslendirme kapalı"}
           >
             {ttsOn ? "🔊" : "🔇"}
+          </button>
+        )}
+
+        {onSave && hasUtterances && (
+          <button className="btn btn--ghost btn--icon" onClick={onSave} title="Oturumu kaydet">
+            💾
           </button>
         )}
 

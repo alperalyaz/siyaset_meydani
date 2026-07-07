@@ -22,7 +22,8 @@ function renderRich(text: string): ReactNode[] {
 interface Props {
   utterances: Utterance[];
   guests: Guest[];
-  thinking: number | null; // konuşmak üzere olan konuğun index'i
+  thinking: number | null;
+  streamingText?: string;
 }
 
 function initials(name: string): string {
@@ -33,7 +34,7 @@ function initials(name: string): string {
     .join("");
 }
 
-export function ChatStream({ utterances, guests, thinking }: Props) {
+export function ChatStream({ utterances, guests, thinking, streamingText }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,11 +94,15 @@ export function ChatStream({ utterances, guests, thinking }: Props) {
             <div className="turn__name" style={{ color: guests[thinking].color }}>
               {guests[thinking].name}
             </div>
-            <div className="typing">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            {streamingText ? (
+              <p className="turn__text turn__text--streaming">{renderRich(streamingText)}</p>
+            ) : (
+              <div className="typing">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            )}
           </div>
         </div>
       )}

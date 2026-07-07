@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { Guest } from "../types";
+import type { SessionMeta } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas } from "../lib/engine";
 import { TOPIC_POOL } from "../lib/pool";
@@ -12,6 +13,11 @@ interface Props {
   demoRemaining: number | null;
   hasKey: boolean;
   checking: boolean;
+  savedSession?: { guests: Guest[]; topic: string; utterances: { id: string; speaker: string | number; text: string; mode: string }[]; rating: number; savedAt: number } | null;
+  onClearSession?: () => void;
+  sessions?: SessionMeta[];
+  onLoadSession?: (id: string) => void;
+  onDeleteSession?: (id: string) => void;
 }
 
 const MAX_GUESTS = 4;
@@ -20,7 +26,12 @@ function initials(name: string): string {
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
-export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking }: Props) {
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onDeleteSession }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [count, setCount] = useState<2 | 3>(3);
@@ -149,6 +160,24 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         </p>
       </header>
 
+      {savedSession && (
+        <section className="setup__block setup__block--saved">
+          <div className="setup__block-head">
+            <h2>💾 Kaydedilmiş Oturum</h2>
+            <button className="btn btn--ghost" onClick={onClearSession}>Sil</button>
+          </div>
+          <p className="context-hint">
+            Konu: <strong>{savedSession.topic}</strong> · {savedSession.guests.map(g => g.name).join(", ")} · {savedSession.utterances.length} replik
+          </p>
+          <button
+            className="btn btn--primary"
+            onClick={() => onStart(savedSession.guests, savedSession.topic, null)}
+          >
+            Kaldığın yerden devam et ▶
+          </button>
+        </section>
+      )}
+
       {/* 1) KONU */}
       <section className="setup__block">
         <div className="setup__block-head">
@@ -225,7 +254,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               masaya davet edeyim. Dilerseniz aşağıdan kendi konuğunuzu da ekleyebilirsiniz.
             </div>
           )}
-          {!loading &&
+              {!loading &&
             guests?.map((g) => (
               <div key={g.name} className="guest-card" style={{ borderColor: g.color }}>
                 <button
@@ -239,8 +268,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                   {g.thumbnail ? <img src={g.thumbnail} alt={g.name} /> : <span>{initials(g.name)}</span>}
                 </div>
                 <div className="guest-card__name">{g.name}</div>
-                <div className="guest-card__era">{g.era}</div>
+                <div className="guest-card__era">{g.era || <span className="guest-card__warn">Bilgi çekilemedi</span>}</div>
                 <p className="guest-card__blurb">{g.blurb}</p>
+                {g.summaryStatus === "minimal" && (
+                  <div className="guest-card__badge guest-card__badge--warn">Vikipedi'ye ulaşılamadı — minimal bilgi</div>
+                )}
               </div>
             ))}
         </div>
@@ -293,6 +325,43 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           )}
         </div>
       </div>
+
+      {/* Geçmiş oturumlar */}
+      {sessions && sessions.length > 0 && (
+        <section className="setup__block setup__block--history">
+          <div className="setup__block-head">
+            <h2>📜 Geçmiş Oturumlar</h2>
+          </div>
+          <div className="history-list">
+            {sessions.map((s) => (
+              <div key={s.id} className="history-card">
+                <div className="history-card__info">
+                  <div className="history-card__topic">{s.topic}</div>
+                  <div className="history-card__meta">
+                    {s.guestNames.join(", ")} · {s.utterancesCount} replik · {formatDate(s.savedAt)}
+                  </div>
+                </div>
+                <div className="history-card__actions">
+                  <button
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => onLoadSession?.(s.id)}
+                    title="Oturumu izle"
+                  >
+                    ▶ İzle
+                  </button>
+                  <button
+                    className="btn btn--ghost btn--sm btn--danger"
+                    onClick={() => onDeleteSession?.(s.id)}
+                    title="Sil"
+                  >
+                    Sil
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

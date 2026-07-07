@@ -17,10 +17,10 @@ import {
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
-import { loadApiKey, saveApiKey, clearApiKey } from "./lib/store";
+import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, type SavedSession, type SessionMeta } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported } from "./lib/tts";
 
-type Phase = "setup" | "panel";
+type Phase = "setup" | "panel" | "replay";
 type SessionPhase = "intro" | "opening" | "debate";
 interface Progress {
   phase: SessionPhase;
@@ -30,6 +30,13 @@ interface Thread {
   a: number;
   b: number;
   turns: number;
+}
+
+interface ReplayData {
+  guests: Guest[];
+  topic: string;
+  utterances: Utterance[];
+  rating: number;
 }
 
 function uid(): string {
@@ -64,6 +71,7 @@ export function App() {
   const [rating, setRating] = useState(50);
   const [ratingNote, setRatingNote] = useState("");
   const [thinking, setThinking] = useState<number | null>(null);
+  const [streamingText, setStreamingText] = useState<string>("");
   const [running, setRunning] = useState(false);
 
   const [apiKey, setApiKey] = useState<string | null>(loadApiKey());
@@ -77,6 +85,10 @@ export function App() {
 
   const [checking, setChecking] = useState(false);
   const [blockedMsg, setBlockedMsg] = useState<string | null>(null);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(loadSession);
+  const [sessionMetas, setSessionMetas] = useState<SessionMeta[]>(listSessionMetas);
+
+  const [replayData, setReplayData] = useState<ReplayData | null>(null);
 
   const [ttsOn, setTtsOn] = useState(ttsSupported());
   const ttsRef = useRef(ttsOn);
@@ -133,6 +145,7 @@ export function App() {
     abortRef.current?.abort();
     cancelSpeech();
     setThinking(null);
+    setStreamingText("");
   }, []);
 
   // Tempo: ses açıksa replik seslendirilir ve bitene kadar beklenir; kapalıysa
@@ -218,12 +231,24 @@ export function App() {
   );
 
   // Kod-tabanlı ritim: ikili atışma sürer, tıkanınca üçüncü girip yönlendirir.
+  // Aynı konuğun üst üste konuşması engellenir; tekrar eden konuşmacı tespit edilir.
   const nextSpeaker = useCallback((): { speaker: number; role: GuestRole } => {
     const active = activeRef.current;
     const th = threadRef.current!;
+    const last = lastGuestSpeaker();
+
+    // Tıkanma tespiti: son 5 konuk repliğinin hepsi aynı kişi mi?
+    const recentGuests = utterRef.current
+      .filter((u) => typeof u.speaker === "number")
+      .slice(-5);
+    if (recentGuests.length >= 3 && recentGuests.every((u) => u.speaker === recentGuests[0].speaker)) {
+      const stalledAt = recentGuests[0].speaker as number;
+      const alt = active.find((i) => i !== stalledAt) ?? stalledAt;
+      return { speaker: alt, role: "redirect" };
+    }
 
     // Spiker yön verdiyse: adı geçen konuk (herhangi bir isim parçası eşleşirse),
-    // yoksa en uzun susan aktif konuk.
+    // yoksa en uzun susan aktif konuk. Ama az önce konuşanı atla.
     if (modNoteRef.current) {
       const note = modNoteRef.current.toLocaleLowerCase("tr");
       const named = active.find((i) =>
@@ -232,16 +257,27 @@ export function App() {
           .split(/\s+/)
           .some((tok) => tok.length > 3 && note.includes(tok)),
       );
-      return { speaker: named ?? leastRecentActive(), role: "answerHost" };
+      let speaker = named ?? leastRecentActive();
+      if (speaker === last && active.length > 1) {
+        speaker = active.find((i) => i !== last) ?? speaker;
+      }
+      return { speaker, role: "answerHost" };
     }
 
     const third = active.find((i) => i !== th.a && i !== th.b);
     if (third !== undefined && th.turns >= 3) {
-      return { speaker: third, role: "redirect" };
+      // Üçüncü konuk: az önce konuşan değilse direkt, değilse en uzun susan diğer
+      const candidate = third === last && active.length > 2
+        ? active.filter((i) => i !== th.a && i !== th.b && i !== last)[0] ?? third
+        : third;
+      return { speaker: candidate, role: "redirect" };
     }
 
-    const last = lastGuestSpeaker();
-    const speaker = last === th.a ? th.b : th.a;
+    let speaker = last === th.a ? th.b : th.a;
+    // Aynı konuğun üst üste konuşmasını engelle
+    if (speaker === last && active.length > 1) {
+      speaker = active.find((i) => i !== last) ?? speaker;
+    }
     return { speaker, role: "continue" };
   }, [lastGuestSpeaker, leastRecentActive]);
 
@@ -302,8 +338,10 @@ export function App() {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         setThinking(i);
-        const text = await runIntro(g[i], g, t, apiKeyRef.current, ctrl.signal);
+        setStreamingText("");
+        const text = await runIntro(g[i], g, t, apiKeyRef.current, ctrl.signal, (token) => setStreamingText((p) => p + token));
         setThinking(null);
+        setStreamingText("");
         syncMeta();
         if (!runningRef.current) return;
         append({ id: uid(), speaker: i, text, mode: "normal" });
@@ -334,6 +372,7 @@ export function App() {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         setThinking(i);
+        setStreamingText("");
         const { text, hasStance } = await runOpeningStatement(
           g[i],
           g,
@@ -342,8 +381,10 @@ export function App() {
           topicContextRef.current,
           apiKeyRef.current,
           ctrl.signal,
+          (token) => setStreamingText((p) => p + token),
         );
         setThinking(null);
+        setStreamingText("");
         syncMeta();
         if (!runningRef.current) return;
         append({ id: uid(), speaker: i, text, mode: "normal" });
@@ -358,6 +399,7 @@ export function App() {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         setThinking(speaker);
+        setStreamingText("");
 
         const dec = await runRatingDirector(
           g,
@@ -385,8 +427,10 @@ export function App() {
           topicContextRef.current,
           apiKeyRef.current,
           ctrl.signal,
+          (token) => setStreamingText((p) => p + token),
         );
         setThinking(null);
+        setStreamingText("");
         syncMeta();
         if (!runningRef.current) return;
 
@@ -511,7 +555,7 @@ export function App() {
   const doSuggest = useCallback(async () => {
     setLoadingSuggestions(true);
     try {
-      const qs = await suggestQuestions(topicRef.current, guestsRef.current, apiKeyRef.current);
+      const qs = await suggestQuestions(topicRef.current, guestsRef.current, utterRef.current, apiKeyRef.current);
       syncMeta();
       setSuggestions(qs);
     } catch (e) {
@@ -529,7 +573,42 @@ export function App() {
     utterRef.current = [];
     setSuggestions([]);
     setError(null);
+    setReplayData(null);
   }, [pause]);
+
+  const doSave = useCallback(() => {
+    const session: SavedSession = {
+      guests,
+      topic,
+      utterances,
+      rating,
+      savedAt: Date.now(),
+    };
+    saveSessionAndIndex(session);
+    setSessionMetas(listSessionMetas());
+  }, [guests, topic, utterances, rating]);
+
+  const handleLoadSession = useCallback((id: string) => {
+    const s = loadSessionById(id);
+    if (!s) return;
+    setReplayData({
+      guests: s.guests,
+      topic: s.topic,
+      utterances: s.utterances,
+      rating: s.rating,
+    });
+    setPhase("replay");
+  }, []);
+
+  const handleDeleteSession = useCallback((id: string) => {
+    deleteSessionById(id);
+    setSessionMetas(listSessionMetas());
+  }, []);
+
+  const closeReplay = useCallback(() => {
+    setReplayData(null);
+    setPhase("setup");
+  }, []);
 
   const saveKey = useCallback((k: string) => {
     saveApiKey(k);
@@ -543,6 +622,44 @@ export function App() {
     setKeyModal(false);
   }, []);
 
+  if (phase === "replay" && replayData) {
+    return (
+      <div className="panel">
+        <header className="panel__head">
+          <button className="btn btn--ghost btn--icon" onClick={closeReplay} title="Ana ekran">
+            ‹
+          </button>
+          <div className="panel__topic">
+            <span className="panel__live" style={{ color: "var(--muted)" }}>KAYITTAN</span>
+            <h1>{replayData.topic}</h1>
+          </div>
+          <div className="panel__guests">
+            {replayData.guests.map((g, i) => (
+              <div
+                key={i}
+                className="panel__chip"
+                style={{ borderColor: g.color }}
+                title={g.era}
+              >
+                <span style={{ background: g.color }} />
+                {g.name}
+              </div>
+            ))}
+          </div>
+        </header>
+
+        <div className="panel__body">
+          <main className="panel__stage">
+            <ChatStream utterances={replayData.utterances} guests={replayData.guests} thinking={null} />
+          </main>
+          <aside className="panel__side">
+            <RatingMeter rating={replayData.rating} note="" />
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === "setup") {
     return (
       <>
@@ -554,6 +671,11 @@ export function App() {
           demoRemaining={demoRemaining}
           hasKey={!!apiKey}
           checking={checking}
+          savedSession={savedSession}
+          onClearSession={() => { clearSession(); setSavedSession(null); }}
+          sessions={sessionMetas}
+          onLoadSession={handleLoadSession}
+          onDeleteSession={handleDeleteSession}
         />
         <ApiKeyModal
           open={keyModal}
@@ -621,7 +743,7 @@ export function App() {
       <div className="panel__body">
         <main className="panel__stage">
           {error && <div className="banner banner--error">{error}</div>}
-          <ChatStream utterances={utterances} guests={guests} thinking={thinking} />
+          <ChatStream utterances={utterances} guests={guests} thinking={thinking} streamingText={streamingText} />
         </main>
         <aside className="panel__side">
           <RatingMeter rating={rating} note={ratingNote} />
@@ -636,6 +758,8 @@ export function App() {
         onSend={moderate}
         onPauseToggle={pauseToggle}
         onSuggest={doSuggest}
+        onSave={doSave}
+        hasUtterances={utterances.length > 0}
         ttsOn={ttsOn}
         ttsSupported={ttsSupported()}
         onToggleTts={() => setTtsOn((v) => !v)}

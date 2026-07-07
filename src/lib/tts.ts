@@ -64,11 +64,20 @@ function cleanForSpeech(text: string): string {
     .trim();
 }
 
+// Metni cümlelere böl (nokta, ünlem, soru işareti, noktalı virgül).
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?;])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 export function cancelSpeech(): void {
   if (ttsSupported()) window.speechSynthesis.cancel();
 }
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
+// Cümle cümle seslendirir — iptal anında yarım kalmaz, hemen susar.
 export function speak(
   text: string,
   opts: { voice?: SpeechSynthesisVoice; pitch?: number; rate?: number; signal?: AbortSignal } = {},
@@ -79,33 +88,36 @@ export function speak(
       resolve();
       return;
     }
-    const u = new SpeechSynthesisUtterance(clean);
-    u.lang = opts.voice?.lang || "tr-TR";
-    if (opts.voice) u.voice = opts.voice;
-    u.pitch = opts.pitch ?? 1;
-    u.rate = opts.rate ?? 1;
 
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      opts.signal?.removeEventListener("abort", onAbort);
-      resolve();
-    };
+    const sentences = splitSentences(clean);
+    if (sentences.length === 0) { resolve(); return; }
+
+    let cancelled = false;
     const onAbort = () => {
+      cancelled = true;
       window.speechSynthesis.cancel();
-      finish();
     };
-
-    u.onend = finish;
-    u.onerror = finish;
     if (opts.signal) {
-      if (opts.signal.aborted) {
+      if (opts.signal.aborted) { resolve(); return; }
+      opts.signal.addEventListener("abort", onAbort);
+    }
+
+    let idx = 0;
+    const speakNext = () => {
+      if (cancelled || idx >= sentences.length) {
+        opts.signal?.removeEventListener("abort", onAbort);
         resolve();
         return;
       }
-      opts.signal.addEventListener("abort", onAbort);
-    }
-    window.speechSynthesis.speak(u);
+      const u = new SpeechSynthesisUtterance(sentences[idx]);
+      u.lang = opts.voice?.lang || "tr-TR";
+      if (opts.voice) u.voice = opts.voice;
+      u.pitch = opts.pitch ?? 1;
+      u.rate = opts.rate ?? 1;
+      u.onend = () => { idx++; speakNext(); };
+      u.onerror = () => { idx++; speakNext(); };
+      window.speechSynthesis.speak(u);
+    };
+    speakNext();
   });
 }
