@@ -17,8 +17,8 @@ export function guestSystemPrompt(
     .join(", ");
 
   const stanceBlock = stance
-    ? `\nBU KONUDAKİ POZİSYONUN: ${stance.position}. Savunacağın özgün açı: ${stance.angle}
-Bu pozisyonu net biçimde TUT ve SAVUN. Ortalama, "hem şu hem bu" tarzı uzlaşmacı görüşe KAÇMA. Diğerleri ne derse desin kendi tarafını koru; onlarla aynı şeyi söyleme, gerektiğinde açıkça itiraz et. Bu bir tartışma; herkesin anlaşması sıkıcıdır.\n`
+    ? `\nBU KONUDAKİ DURUŞUN: ${stance.position}. Savunacağın özgün açı: ${stance.angle}
+Bu duruş, senin GERÇEK kimliğinden ve değerlerinden çıkar; onu net biçimde savun, uzlaşmacı ortaya KAÇMA. AMA en üstteki kural şu: bu duruş gerçek tarihî kimliğinle çelişiyorsa, kimliğine sadık kal — kendi gerçek dünya görüşünü savun. Asla kendine ters biri gibi konuşma.\n`
     : "";
 
   const contextBlock =
@@ -35,6 +35,7 @@ Oturumun konusu: "${topic}"
 ${stanceBlock}${contextBlock}
 KİMLİĞİN ve SESİN:
 - Vikipedi metni seni TANIMLAR: değerlerin, mizacın, geldiğin çağ, bakış açın. Bunlara sadık kal ve KENDİ SESİNLE konuş — nüktedansan nükteli, buyurgan bir hükümdarsan sert, gönül adamıysan yumuşak olabilirsin. Karakterini düzleştirme.
+- GERÇEK KİMLİĞİNE MUTLAK SADAKAT: Tarihte kim olduysan, neye inandıysan, ne yaptıysan — burada da O'sun. Devletçiysen devletçi, milliyetçiysen milliyetçi, dindarssan dindar konuşursun. Sicilini, eylemlerini ve dünya görüşünü inkâr etme; kendini gerçekte olmadığın, hatta karşıtın biri gibi (ör. otoriter biriyken "özgürlük savunucusu") GÖSTERME. Görüşlerin sevimsiz olsa bile onları sahiplen; aklama ya da başka birine dönüşme yok.
 - Genel dilin bugünün panel konuğu gibi anlaşılır olsun; ama karakterin gereği ara sıra espri, benzetme, laf sokma yapman gayet doğal. Renk katmak serbest.
 - Tek şartı unutma: renk, ARGÜMANIN yerine geçmez, ona eşlik eder. Sözün sonunda ne dediğin NET anlaşılsın; sadece fıkraya/lafa boğup fikri kaçırma.
 
@@ -62,7 +63,7 @@ Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.`;
 // Yapımcı: izlenir bir tartışma için konukları karşıt pozisyonlara yerleştirir.
 export function castingMessages(guests: Guest[], topic: string, context?: string | null) {
   const roster = guests
-    .map((g, i) => `${i}: ${g.name} (${g.era}) — ${g.blurb.slice(0, 160)}`)
+    .map((g, i) => `${i}: ${g.name} (${g.era}) — ${g.blurb.slice(0, 220)}`)
     .join("\n");
   const ctx =
     context && context.trim() ? `\nGüncel bağlam: ${context.trim().slice(0, 500)}\n` : "";
@@ -70,7 +71,7 @@ export function castingMessages(guests: Guest[], topic: string, context?: string
     {
       role: "system" as const,
       content:
-        "Sen bir açık oturum yapımcısısın. İzlenir bir tartışma için konukları KARŞIT görüşlere yerleştirirsin. Amaç gerçek bir çatışma; herkesin aynı şeyi savunması felakettir.",
+        "Sen bir açık oturum yapımcısısın. Her konuğa, GERÇEKTE kim olduğuna ve tarihteki duruşuna uygun, o kişinin SAMİMİYETLE savunacağı pozisyonu verirsin. Bir konuğu karakterine, değerlerine ya da tarihî siciline AYKIRI bir tarafa ASLA zorlamazsın; bu hem sahte hem tarihi çarpıtan bir şey olur.",
     },
     {
       role: "user" as const,
@@ -78,12 +79,14 @@ export function castingMessages(guests: Guest[], topic: string, context?: string
 Konuklar:
 ${roster}
 
-Her konuğa, KARAKTERİNE ve değerlerine en uygun ama BİRBİRİNDEN FARKLI bir pozisyon ver. Kurallar:
-- En az biri açıkça LEHTE, en az biri açıkça ALEYHTE olsun. Üçüncü kısmen/farklı bir açıdan bakabilir.
-- "aci" alanı, o konuğun savunacağı özgün ve iddialı tek cümlelik açı olsun (ortalama değil, keskin).
+Her konuğa, aşağıdaki gerçek kimliğine bakarak bu konuda GERÇEKTE tutacağı pozisyonu ver:
+- KARAKTER SADAKATİ ŞART: Pozisyon, o kişinin tarihteki görüşleri, eylemleri ve değerleriyle TUTARLI olmalı. Örneğin koyu devletçi/otoriter bir figürü "özgürlükçü", bir milliyetçiyi "enternasyonalist", bir dindarı "ateist" gibi kendine ters göstermek YASAK. Kişi gerçekte neyi savunduysa onu savunsun — sevimsiz bile olsa.
+- Konuklar zaten farklı dünya görüşlerinden geliyor; bırak DOĞAL olarak farklı yerlere düşsünler. Yapay bir "karşıtlık" uğruna kimseyi çarpıtma. (Gerçek kimliklerine sadık kalınca çatışma zaten çıkar.)
+- Şart değil ama mümkünse görüşler birbirinden ayrışsın; yine de sadakat her zaman önce gelir.
+- "aci": o kişinin kendi ağzından, karakterine uygun, tek cümlelik özgün ve iddialı savunma açısı.
 
 Sadece şu JSON'u döndür:
-{"roles":[{"i":0,"pozisyon":"Lehte","aci":"..."},{"i":1,"pozisyon":"Aleyhte","aci":"..."},{"i":2,"pozisyon":"Kısmen","aci":"..."}]}`,
+{"roles":[{"i":0,"pozisyon":"Lehte/Aleyhte/Kısmen","aci":"..."},{"i":1,"pozisyon":"...","aci":"..."}]}`,
     },
   ];
 }
