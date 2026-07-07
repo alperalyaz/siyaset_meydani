@@ -153,7 +153,15 @@ const SACRED_TITLES = new Set([
 
 // Özel engel listesi (genel bir kural değil, isme özel): tartışma masasına
 // konuk olarak alınmayacak belirli kişiler.
-const BLOCKED_TITLES = new Set(["recep tayyip erdoğan", "recep tayyip erdogan"]);
+const BLOCKED_TITLES = new Set([
+  "recep tayyip erdoğan",
+  "recep tayyip erdogan",
+  "mustafa kemal atatürk",
+  "mustafa kemal ataturk",
+  "atatürk",
+  "ataturk",
+  "mustafa kemal",
+]);
 
 function normTitle(t: string): string {
   return t
