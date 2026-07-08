@@ -43,8 +43,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [topic, setTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
-  const [topicTab, setTopicTab] = useState<TopicTab>("gunluk");
-  const topicTabRef = useRef<TopicTab>("gunluk");
+  // Derin/felsefi sohbet varsayılan; gündelik/magazinel bonus bir seçenek.
+  const [topicTab, setTopicTab] = useState<TopicTab>("derin");
+  const topicTabRef = useRef<TopicTab>("derin");
   topicTabRef.current = topicTab;
   // Her sekme için hazır havuzdan rastgele bir alt küme — açılışta farklı sıralama.
   const [gunlukTopics] = useState<string[]>(() => shuffleArr(TOPIC_POOL).slice(0, 6));
@@ -235,19 +236,19 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           <div className="topic-tabs" role="tablist">
             <button
               role="tab"
-              aria-selected={topicTab === "gunluk"}
-              className={`topic-tab ${topicTab === "gunluk" ? "topic-tab--active" : ""}`}
-              onClick={() => switchTab("gunluk")}
-            >
-              ☕ Gündelik
-            </button>
-            <button
-              role="tab"
               aria-selected={topicTab === "derin"}
               className={`topic-tab ${topicTab === "derin" ? "topic-tab--active" : ""}`}
               onClick={() => switchTab("derin")}
             >
               🧠 Derin
+            </button>
+            <button
+              role="tab"
+              aria-selected={topicTab === "gunluk"}
+              className={`topic-tab ${topicTab === "gunluk" ? "topic-tab--active" : ""}`}
+              onClick={() => switchTab("gunluk")}
+            >
+              ☕ Gündelik <span className="topic-tab__bonus">bonus</span>
             </button>
           </div>
         </div>
