@@ -502,8 +502,11 @@ export function guestSuggestMessages(
       ? `\nŞU İSİMLERİ ÖNERME (zaten geldiler, tamamen farklılarını bul): ${avoid.slice(0, 30).join(", ")}`
       : "";
   const mixRules = popular
-    ? `ÇOK ÖNEMLİ — TAMAMEN GÜNCEL/MAGAZİNEL (konu gündelik):
-- 8 ismin HEPSİ Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan/spordan bildiği YAŞAYAN ünlüler olsun (şarkıcı, oyuncu, TV sunucusu, fenomen, sporcu, iş insanı...). Sıradan insanların "aaa o da mı gelmiş" diyeceği, konuyla ilgisi olan isimler.
+    ? `ÇOK ÖNEMLİ — KONUYLA GERÇEK BAĞLANTI (en kritik kural, magazin ismi seçerken bile geçerli):
+- Her ismin bu SPESİFİK konuyla somut, gerçek bir bağı OLMALI: ya bu konu hakkında kamuoyunda konuşmuş/röportaj vermiş/tartışma yaratmış, ya kişisel hayatında bu konuyla doğrudan ilgili bilinen bir olay yaşamış, ya da imajı/mesleği doğrudan bu konuya değiyor.
+  Örnek eşleşmeler: "ilişki/evlilik/kavga" konusu → defalarca evlenip boşanmış, aşk hayatı hep magazin gündeminde olan, evlilik/çift programı sunan ya da jürisi olan biri; "para/zenginlik" konusu → serveti/iflası/tasarruf tavsiyeleriyle bilinen biri; "yemek" konusu → şef, gurme, diyet fenomeni; "trafik/araba" konusu → pilot, araba tutkunu ünlü; "sosyal medya" konusu → fenomen, influencer.
+- SIRF "çok ünlü/tanınmış" olmak YETERLİ DEĞİL. Konuyla hiçbir kişisel/mesleki bağı olmayan genel iş insanı, genel oyuncu, genel sunucu SEÇME. Test: bu isim masaya gelince spiker "bunun bu konuyla ne alakası var?" demeli mi? Diyorsa o ismi ELE.
+- 8 ismin HEPSİ Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan/spordan bildiği YAŞAYAN ünlüler olsun.
 - TARİHÎ/ÇAĞLAR ÖTESİ figür KARIŞTIRMA — bu listede sadece güncel, yaşayan isimler olsun; tarihî figürler ayrı bir bölümde zaten var.
 - Hepsinin Türkçe Vikipedi'de maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
     : `ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
