@@ -27,8 +27,8 @@ function turkishVoices(): SpeechSynthesisVoice[] {
 }
 
 const FEMALE_HINT =
-  /female|kadın|woman|\b(yelda|filiz|aylin|zeynep|emel|seda|elif|defne|nilüfer|google türkçe)\b/i;
-const MALE_HINT = /\bmale\b|erkek|\bman\b|\b(tolga|cem|volkan|burak|onur|ahmet|mehmet|kaan)\b/i;
+  /female|kad[ıi]n|woman|\b(yelda|filiz|aylin|zeynep|emel|seda|elif|defne|nilüfer|google türkçe)\b/i;
+const MALE_HINT = /\b(erkek|man|tolga|cem|volkan|burak|onur|ahmet|mehmet|kaan)\b/i;
 
 // Konuk cinsiyetine ve index'ine göre ses seçimi.
 // Türkçe sesler kısıtlıysa cinsiyet PERDE (pitch) ile ayrılır: kadın tiz, erkek
@@ -43,9 +43,13 @@ export function voiceForGuest(
   const mal = voices.filter((v) => MALE_HINT.test(v.name));
 
   let voice: SpeechSynthesisVoice | undefined;
-  if (gender === "female") voice = fem.length ? fem[i % fem.length] : voices[i % (voices.length || 1)];
-  else if (gender === "male") voice = mal.length ? mal[i % mal.length] : voices[i % (voices.length || 1)];
-  else voice = voices.length ? voices[i % voices.length] : undefined;
+  if (gender === "female") {
+    voice = fem.length ? fem[i % fem.length] : voices.find((v) => !MALE_HINT.test(v.name)) ?? voices[i % (voices.length || 1)];
+  } else if (gender === "male") {
+    voice = mal.length ? mal[i % mal.length] : voices.find((v) => !FEMALE_HINT.test(v.name)) ?? voices[i % (voices.length || 1)];
+  } else {
+    voice = voices.length ? voices[i % voices.length] : undefined;
+  }
 
   // Güçlü perde ayrımı + aynı cinsiyette bile index'e göre kayma (çeşitlilik).
   const base = gender === "female" ? 1.5 : gender === "male" ? 0.6 : 1.0;
@@ -112,8 +116,10 @@ export function speak(
       const u = new SpeechSynthesisUtterance(sentences[idx]);
       u.lang = opts.voice?.lang || "tr-TR";
       if (opts.voice) u.voice = opts.voice;
-      u.pitch = opts.pitch ?? 1;
-      u.rate = opts.rate ?? 1;
+      u.onstart = () => {
+        u.pitch = opts.pitch ?? 1;
+        u.rate = opts.rate ?? 1;
+      };
       u.onend = () => { idx++; speakNext(); };
       u.onerror = () => { idx++; speakNext(); };
       window.speechSynthesis.speak(u);

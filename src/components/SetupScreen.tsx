@@ -20,7 +20,8 @@ interface Props {
   onDeleteSession?: (id: string) => void;
 }
 
-const MAX_GUESTS = 4;
+const MAX_GUESTS = 50;
+const DEFAULT_COUNT = 3;
 
 function initials(name: string): string {
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -34,7 +35,6 @@ function formatDate(ts: number): string {
 export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onDeleteSession }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [count, setCount] = useState<2 | 3>(3);
   const [topic, setTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
@@ -49,7 +49,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const shownNamesRef = useRef<string[]>([]);
 
   const drawForTopic = useCallback(
-    async (t: string, cnt: number) => {
+    async (t: string) => {
       const q = t.trim();
       if (!q) return;
       setLoading(true);
@@ -58,7 +58,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       try {
         const names = await suggestGuestNames(q, null, shownNamesRef.current, apiKey);
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
-        const g = await buildGuestsFromNames(names, cnt);
+        const g = await buildGuestsFromNames(names, DEFAULT_COUNT);
         shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
         setGuests(g);
       } catch (e) {
@@ -74,27 +74,19 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     (t: string) => {
       setTopic(t);
       shownNamesRef.current = []; // yeni konu: geçmişi sıfırla
-      void drawForTopic(t, count);
+      void drawForTopic(t);
     },
-    [drawForTopic, count],
+    [drawForTopic],
   );
 
   const fetchGuestsForInput = useCallback(() => {
     shownNamesRef.current = [];
-    void drawForTopic(topic.trim(), count);
-  }, [topic, count, drawForTopic]);
+    void drawForTopic(topic.trim());
+  }, [topic, drawForTopic]);
 
   const reshuffle = useCallback(() => {
-    if (topic.trim()) void drawForTopic(topic, count);
-  }, [topic, count, drawForTopic]);
-
-  const changeCount = useCallback(
-    (c: 2 | 3) => {
-      setCount(c);
-      if (topic.trim()) void drawForTopic(topic, c);
-    },
-    [topic, drawForTopic],
-  );
+    if (topic.trim()) void drawForTopic(topic);
+  }, [topic, drawForTopic]);
 
   // Önceden gösterilmiş tüm konular (tekrar üretmemek için).
   const seenTopicsRef = useRef<string[]>([...TOPIC_POOL]);
@@ -149,7 +141,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     );
   }, []);
 
-  const canStart = !!guests && guests.length >= 2 && topic.trim().length > 0 && !loading;
+  const canStart = !!guests && guests.length >= 1 && topic.trim().length > 0 && !loading;
 
   return (
     <div className="setup">
@@ -221,20 +213,6 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="setup__block-head">
           <h2>2 · Sayın Konuklar</h2>
           <div className="setup__draw-controls">
-            <div className="modetabs" title="Konuk sayısı">
-              <button
-                className={`modetab ${count === 2 ? "modetab--on" : ""}`}
-                onClick={() => changeCount(2)}
-              >
-                2 konuk
-              </button>
-              <button
-                className={`modetab ${count === 3 ? "modetab--on" : ""}`}
-                onClick={() => changeCount(3)}
-              >
-                3 konuk
-              </button>
-            </div>
             {guests && guests.length > 0 && (
               <button className="btn btn--ghost" onClick={reshuffle} disabled={loading}>
                 ↻ Başkaları
@@ -245,7 +223,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
 
         <div className="guest-cards">
           {loading &&
-            Array.from({ length: count }, (_, i) => (
+            Array.from({ length: DEFAULT_COUNT }, (_, i) => (
               <div key={i} className="guest-card guest-card--skeleton" />
             ))}
           {!loading && (!guests || guests.length === 0) && (

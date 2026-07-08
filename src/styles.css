@@ -977,9 +977,16 @@ a {
   .panel__head {
     padding: 0.5rem 0.8rem;
     gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .panel__topic {
+    flex-basis: 100%;
   }
   .panel__topic h1 {
     font-size: 0.88rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
   }
   .panel__body {
     flex-direction: column-reverse;
@@ -1054,6 +1061,17 @@ a {
     flex-direction: column;
     align-items: flex-start;
   }
+  .topic-input {
+    padding: 0.9rem 1rem;
+    font-size: 1rem;
+    min-height: 3rem;
+  }
+  .topic-row {
+    flex-wrap: wrap;
+  }
+  .topic-row .btn {
+    flex-shrink: 0;
+  }
 }
 
 /* Dar telefonlarda spiker çubuğu: input üstte tam genişlik, kontroller altında */
@@ -1065,8 +1083,11 @@ a {
     flex-basis: 100%;
     order: -1;
   }
-  .panel__head h1 {
-    font-size: 0.92rem;
+  .panel__topic h1 {
+    font-size: 0.84rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
   }
 }
 

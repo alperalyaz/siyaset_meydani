@@ -143,6 +143,7 @@ export function App() {
   const earnedBadgesRef = useRef<Badge[]>([]);
   const sessionPhaseRef = useRef<SessionPhase>("warmup");
   const difficultyRef = useRef<Difficulty>("kolay");
+  const pausedRef = useRef(false); // manuel duraklatma vs oturum bitişi ayrımı
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -177,6 +178,7 @@ export function App() {
     cancelSpeech();
     setThinking(null);
     setStreamingText("");
+    pausedRef.current = true;
   }, []);
 
   // Tempo: ses açıksa replik seslendirilir ve bitene kadar beklenir; kapalıysa
@@ -360,6 +362,14 @@ export function App() {
         syncMeta();
       }
 
+      // Spiker welcome mesajını seslendir
+      {
+        const ctrl = new AbortController();
+        abortRef.current = ctrl;
+        const w = utterRef.current[0];
+        if (w) await pace(w.text, 9, undefined, ctrl.signal);
+      }
+
       // --- TANIŞMA TURU ---
       while (runningRef.current && progressRef.current.phase === "intro") {
         const i = progressRef.current.i;
@@ -394,13 +404,18 @@ export function App() {
       while (runningRef.current && progressRef.current.phase === "opening") {
         const i = progressRef.current.i;
         if (i >= g.length) {
-          if (activeRef.current.length === 0) {
+            if (activeRef.current.length === 0) {
             append({
               id: uid(),
               speaker: "moderator",
               text: "Konuklar bu konuda net bir fikir beyan etmedi; oturum burada duruyor.",
               mode: "system",
             });
+            {
+              const ctrl = new AbortController();
+              abortRef.current = ctrl;
+              await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
+            }
             pause();
             return;
           }
@@ -489,6 +504,7 @@ export function App() {
               text: `🎉 Tebrikler! Reytingler ${goal} üzerinde ${cfg.holdSeconds} saniyedir seyrediyor! Şimdi FİNAL bölümüne girdik — reytingi ${cfg.finalGoal} üzerine çıkarın, oturum şampiyon bitsin!`,
               mode: "system",
             });
+            await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
             continue;
           }
 
@@ -501,6 +517,7 @@ export function App() {
             text: `Harika bir oturum oldu! Reytinglerimiz final hedefi olan ${cfg.finalGoal}'i aştı ve seyircimiz coştu. Değerli konuklarımıza ve siz sevgili spikerimize teşekkür ediyorum. Yayınımız burada sona eriyor — bir sonraki oturumda görüşmek üzere! 👋🎬`,
             mode: "system",
           });
+          await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
           runningRef.current = false;
           setRunning(false);
           setThinking(null);
@@ -553,8 +570,8 @@ export function App() {
         else await delay(500, ctrl.signal);
       }
 
-      // ── Oturum durdurulduysa sonuçları hesapla ──
-      if (sessionPhaseRef.current !== "ended" && utterRef.current.length > 1) {
+      // ── Oturum durdurulduysa sonuçları hesapla (ama manuel pause değilse) ──
+      if (!pausedRef.current && sessionPhaseRef.current !== "ended" && utterRef.current.length > 1) {
         sessionPhaseRef.current = "ended";
         setSessionPhase("ended");
         const result = computeSessionResult(
@@ -581,6 +598,7 @@ export function App() {
 
   // Oturumu sürdür (boot / devam / müdahale sonrası tek giriş noktası).
   const drive = useCallback(() => {
+    pausedRef.current = false;
     runningRef.current = true;
     setRunning(true);
     if (loopActiveRef.current) return;
@@ -604,6 +622,11 @@ export function App() {
       append({ id: uid(), speaker: "moderator", text, mode: "normal" });
       modNoteRef.current = text;
       setSuggestions([]);
+      // Spiker sözünü seslendir (fire-and-forget: drive hemen çalışsın)
+      if (text.trim()) {
+        const ctrl = new AbortController();
+        speak(text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
+      }
       // Görüş turu bitmemişse spiker sözü akışı bozmasın; tartışmadaysa yönlendirsin.
       drive();
     },
@@ -733,6 +756,14 @@ export function App() {
       text: "Sayın konuklar, programımızın sonuna geldik. Hepinize katılımınız ve değerli katkılarınız için çok teşekkür ederiz. Bir sonraki programda görüşmek üzere, hoşçakalın.",
       mode: "system",
     });
+
+    // Kapanış mesajını seslendir
+    if (utterRef.current.length > 0) {
+      const last = utterRef.current[utterRef.current.length - 1];
+      const ctrl = new AbortController();
+      // fire-and-forget: sonuç ekranı görünmeden seslendir
+      speak(last.text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
+    }
 
     // Sezon sonucu hesapla
     const g = guestsRef.current;
