@@ -69,8 +69,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       setAddMsg(null);
       setNotice(null);
       try {
-        // Gündelik sekmesindeyken kadroya popüler kültür ünlüleri de karışır;
-        // isim sırası 2 pop : 1 klasik taşıdığı için seçimde korunur.
+        // Gündelik sekmesindeyken kadro TAMAMEN güncel/magazinel isimlerden
+        // kurulur (tarihî figür karışmaz); Derin sekmesinde eski çağlar-arası
+        // çeşitlilik kuralı geçerli.
         const popularMode = topicTabRef.current === "gunluk";
         const names = await suggestGuestNames(
           q,
@@ -86,7 +87,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           );
         }
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
-        const g = await buildGuestsFromNames(names, DEFAULT_COUNT, { preserveOrder: popularMode });
+        const g = await buildGuestsFromNames(names, DEFAULT_COUNT);
         shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
         setGuests(g);
       } catch (e) {

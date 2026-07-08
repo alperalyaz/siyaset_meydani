@@ -502,9 +502,9 @@ export function guestSuggestMessages(
       ? `\nŞU İSİMLERİ ÖNERME (zaten geldiler, tamamen farklılarını bul): ${avoid.slice(0, 30).join(", ")}`
       : "";
   const mixRules = popular
-    ? `ÇOK ÖNEMLİ — KARIŞIM (konu gündelik/magazinel):
-- "pop" listesine 5 isim: Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan bildiği YAŞAYAN ünlüler (şarkıcı, oyuncu, TV sunucusu, fenomen, sporcu...). Sıradan insanların "aaa o da mı gelmiş" diyeceği, konuyla ilgisi olan isimler.
-- "klasik" listesine 3 isim: çağlar ötesi tarihî/ünlü figürler — kontrast komediyi doğurur (ör. bir pop yıldızı ile bir Osmanlı padişahı aynı masada).
+    ? `ÇOK ÖNEMLİ — TAMAMEN GÜNCEL/MAGAZİNEL (konu gündelik):
+- 8 ismin HEPSİ Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan/spordan bildiği YAŞAYAN ünlüler olsun (şarkıcı, oyuncu, TV sunucusu, fenomen, sporcu, iş insanı...). Sıradan insanların "aaa o da mı gelmiş" diyeceği, konuyla ilgisi olan isimler.
+- TARİHÎ/ÇAĞLAR ÖTESİ figür KARIŞTIRMA — bu listede sadece güncel, yaşayan isimler olsun; tarihî figürler ayrı bir bölümde zaten var.
 - Hepsinin Türkçe Vikipedi'de maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
     : `ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
 - FARKLI ÇAĞLARDAN seç: en az biri antik/orta çağ, en az biri son 200 yıl. Hepsi aynı dönemden/aynı ekolden OLMASIN.
@@ -530,11 +530,7 @@ ${mixRules}
 - Yabancı isimleri Türkçe okunuşuyla YAZMA; Vikipedi'deki özgün yazımı kullan (yanlış: "Sesil B. DeMille" → doğru: "Cecil B. DeMille").
 - İsmi Türkçe Vikipedi madde başlığıyla aynen yaz; unvan, parantez, açıklama ekleme.${avoidLine}
 
-Sadece şu JSON: ${
-        popular
-          ? '{"pop": ["...", "...", "...", "...", "..."], "klasik": ["...", "...", "..."]}'
-          : '{"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}'
-      }`,
+Sadece şu JSON: {"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },
   ];
 }

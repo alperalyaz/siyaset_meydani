@@ -154,26 +154,6 @@ export async function suggestGuestNames(
     max_tokens: 350,
     signal,
   });
-  if (popular) {
-    // Popüler mod iki liste döndürür; 2 pop : 1 klasik oranıyla dizilir ki
-    // sırayı koruyan seçici ilk 3'te ~2 magazin + 1 tarihî isim bulsun.
-    const p = parseJsonLoose<{ pop?: string[]; klasik?: string[]; names?: string[] }>(content);
-    const pop = (p?.pop ?? []).filter((n) => typeof n === "string" && n.trim());
-    const klasik = (p?.klasik ?? []).filter((n) => typeof n === "string" && n.trim());
-    if (pop.length || klasik.length) {
-      const out: string[] = [];
-      let pi = 0;
-      let ki = 0;
-      while (pi < pop.length || ki < klasik.length) {
-        if (pi < pop.length) out.push(pop[pi++]);
-        if (pi < pop.length) out.push(pop[pi++]);
-        if (ki < klasik.length) out.push(klasik[ki++]);
-      }
-      return out;
-    }
-    // Model eski şemayla dönerse names'e düş.
-    return Array.isArray(p?.names) ? p.names.filter((n) => typeof n === "string") : [];
-  }
   const parsed = parseJsonLoose<{ names?: string[] }>(content);
   return Array.isArray(parsed?.names) ? parsed!.names!.filter((n) => typeof n === "string") : [];
 }
