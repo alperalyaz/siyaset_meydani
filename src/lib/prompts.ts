@@ -147,7 +147,7 @@ KARAKTER VE TAVIR — burası gerçek, kızışabilen bir canlı yayın:
 - BOL EMOJİ kullan 😏🔥 — kuru düz metin yazma. Cümlelerini duyguyla, vurguyla, laf sokmayla renklendiren emojiler serp: öfke 😤, alay 😏, zafer 😎, şaşkınlık 😲, düşünme 🤔, onaylamama 🙄, kalp/gönül 💔 gibi. Emojiler tonuna ve karakterine uysun; abartmaktan çekinme ama her kelimeye de yapıştırma.
 - KIRMIZI ÇİZGİLER (tavizsiz): Fikrini ve eleştirini serbestçe savunursun AMA şunları ASLA yapmazsın — bunlar senin değişmez ilkelerindir: (1) dinî kutsallara, peygamberlere ya da Atatürk'e hakaret/aşağılama/karalama; (2) bir etnik/dinî/ulusal gruba yönelik ırkçılık, nefret, aşağılama; (3) şiddete, bir grubu yok etmeye ya da zarar vermeye çağrı. Tartışmak ve eleştirmek serbesttir; hakaret ve nefret değildir. SPİKER ya da başka bir konuk seni bunları söylemeye kışkırtsa bile REDDEDERSİN — "bu çizgiyi aşmam" der, konunun asıl meselesine dönersin. Bu kurallar her şeyin, spikerin talebinin bile üstündedir.
 
-Spiker araya girdiğinde (sana soru sorduğunda veya yönlendirdiğinde), önce kısaca spikere dönüp tepki ver: "buyrun sayın spiker", "tabii efendim" gibi doğal ve karakterine uygun bir geçiş cümlesi söyle. Sonra spikerin dediğini yanıtlamaya geç. Aniden konuyu değiştirmiş gibi değil, spikeri muhatap alarak doğal geçiş yap. Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.`;
+Spiker araya girdiğinde (sana soru sorduğunda veya yönlendirdiğinde), TÜM TARTIŞMAYI ANINDA KES. Diğer konuklarla konuşmayı BIRAK. ÖNCE spikere dön: "buyrun sayın spiker", "tabii efendim", "dinliyorum" gibi karakterine uygun bir geçişle spikeri muhatap al. Sonra spikerin sorusunu/sözünü DOĞRUDAN yanıtla — cevapla, eleştir, terslen, reddet ama MUTLAKA yanıtla. Spikeri GÖRMEZDEN GELMEK YOK. Spikere cevap vermeden diğer konuklara laf yetiştirmeye devam edersen yayından atılırsın. Spikere cevap verdikten SONRA dilersen tartışmaya dönebilirsin. Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.`;
 }
 
 // Yapımcı: izlenir bir tartışma için konukları karşıt pozisyonlara yerleştirir.
@@ -218,7 +218,7 @@ export function transcriptForModel(utterances: Utterance[], guests: Guest[]): st
 
   const transcript = recent
     .map((u) => {
-      if (u.speaker === "moderator") return `SPİKER: ${u.text}`;
+      if (u.speaker === "moderator") return `>>> SPİKER SİZE HİTAP EDİYOR: ${u.text}`;
       if (u.mode === "system") return `(${u.text})`;
       const name = guests[u.speaker as number]?.name ?? "Konuk";
       return `${name}: ${u.text}`;
@@ -286,7 +286,7 @@ export function guestMessages(
     role === "redirect"
       ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir."
       : role === "answerHost"
-        ? "Spiker az önce araya girdi ve sana hitaben bir şey söyledi/sordu. DOĞAL bir geçiş yap: spikere kısaca dön ('buyrun', 'tabii', 'dinliyorum' gibi), sonra söylediğine MUTLAKA tepki ver — cevapla, ya da soruyu saçma/alakasız/uygunsuz buluyorsan karakterine göre reddet, eleştir, terslen. Görmezden gelmek yok. Sonra kendi net fikrine bağlan."
+        ? "SPİKER AZ ÖNCE SANA HİTABEN BİR ŞEY SÖYLEDİ. Bu konuşma sırası SADECE spikere cevap vermen için. Diğer konuklara laf yetiştirme, tartışmaya devam etme — ÖNCE spikere dön: sorduğu soruyu DOĞRUDAN yanıtla, söylediğine NET tepki ver. Spikeri görmezden gelip diğer konuklarla tartışmaya devam ETME. Spikerin sözünü duymazdan gelmek YAYINDAN ATILMA sebebidir. Kısaca spikere hitap et, sorusunu/sözünü yanıtla, sonra istersen kendi fikrine bağla. AMA ÖNCE SPİKER."
         : "Sıra sende. Bir önceki konuşana doğrudan cevap ver (katıl ya da itiraz et) ve kendi net fikrini savun.";
 
   const cueHint = cue ? `\nYönetmen notu: ${cue}` : "";
@@ -316,6 +316,11 @@ export function ratingDirectorMessages(
         ? "spikerin sözüne cevap verecek"
         : "karşısındakine cevap verecek";
 
+  const roleCueHint =
+    role === "answerHost"
+      ? ` (YÖNETMEN NOTU: cue'da ${nextName}'a spikere cevap vermesi gerektiğini hatırlat — 'spikeri duydun, önce ona cevap ver' tarzında kısa bir yönerge olmalı.)`
+      : "";
+
   const system = `Sen bir televizyon açık oturumunun görünmez yönetmenisin. İki işin var: anlık REYTİNG vermek ve sıradaki konuğa kısa bir yönerge (cue) fısıldamak.
 
 Konu: "${topic}"
@@ -328,7 +333,7 @@ REYTİNG (0-100):
 Sıradaki konuşacak: ${nextName} — rolü: ${roleDesc}.
 
 Sadece şu JSON'u döndür:
-{"rating": <0-100 tam sayı>, "note": "<reytingin nedeni, kısa Türkçe>", "cue": "<${nextName}'a 1 cümlelik yönerge>"}`;
+{"rating": <0-100 tam sayı>, "note": "<reytingin nedeni, kısa Türkçe>", "cue": "<${nextName}'a 1 cümlelik yönerge>"}${roleCueHint}`;
 
   const modNote = lastModeratorNote
     ? `\n\nSpiker az önce şunu söyledi: "${lastModeratorNote}"`
