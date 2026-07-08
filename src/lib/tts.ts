@@ -97,7 +97,11 @@ export function setActiveRate(rate: number): void {
 // Cümle cümle seslendirir — iptal anında yarım kalmaz, hemen susar.
 // Rate/pitch: voice atamasından ÖNCE ayarlanır (bazı tarayıcılarda voice ataması
 // rate'i sıfırlayabildiği için), sonra onstart'ta tekrar ayarlanır (fallback).
-// Uzak (remote) sesler pitch/rate uygulamaz, bu yüzden sadece yerel sesler atanır.
+// Ses HER ZAMAN atanır (yerel/uzak fark etmez): kimliği (kadın/erkek sesi)
+// belirleyen asıl şey VOICE SEÇİMİ, pitch sadece ek ayrım. Uzak sesler pitch'i
+// yok sayabilir ama voice ataması çalışır — atamayı yerelle sınırlamak,
+// tarayıcının rastgele/sabit varsayılan sesi (çoğu zaman hep aynı, erkek gibi
+// duyulan) kullanmasına yol açıp cinsiyeti tamamen yanlış gösteriyordu.
 export function speak(
   text: string,
   opts: { voice?: SpeechSynthesisVoice; pitch?: number; rate?: number; signal?: AbortSignal } = {},
@@ -134,8 +138,7 @@ export function speak(
       // Rate/pitch voice'tan ÖNCE ayarla — voice ataması asenkron sıfırlamasın
       u.pitch = opts.pitch ?? 1;
       u.rate = opts.rate ?? 1;
-      // Yalnızca YEREL ses ata (uzak/Google sesler pitch/rate'i yok sayıp sıfırlar)
-      if (opts.voice && opts.voice.localService) {
+      if (opts.voice) {
         u.voice = opts.voice;
       }
       // onstart fallback: voice yüklendikten sonra bir kez daha ayarla

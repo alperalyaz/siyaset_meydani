@@ -161,6 +161,10 @@ export function App() {
   const difficultyRef = useRef<Difficulty>("kolay");
   const pausedRef = useRef(false); // manuel duraklatma vs oturum bitişi ayrımı
   const rate429Ref = useRef(0); // ardışık hız-limiti denemesi (sonsuz döngü koruması)
+  // Bir konuğun repliği seslendirilirken (pace() içindeki TTS bitene kadar)
+  // true kalır. "thinking" ise pace() başlamadan ÖNCE null'a döner; spiker
+  // müdahalesinin sesin üstüne binip binmeyeceğine bununla karar verilir.
+  const speakingRef = useRef(false);
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -220,6 +224,7 @@ export function App() {
     setThinking(null);
     setStreamingText("");
     pausedRef.current = true;
+    speakingRef.current = false; // pace() abort ile kesilirse takılı kalmasın
   }, []);
 
   // Tempo: ses açıksa replik seslendirilir ve bitene kadar beklenir; kapalıysa
@@ -447,7 +452,9 @@ export function App() {
         if (!runningRef.current) return;
         append({ id: uid(), speaker: i, text, mode: "normal" });
         progressRef.current = { phase: "intro", i: i + 1 };
+        speakingRef.current = true;
         await pace(text, i, g[i].gender, ctrl.signal);
+        speakingRef.current = false;
       }
 
       // --- GÖRÜŞ TURU ---
@@ -500,7 +507,9 @@ export function App() {
         append({ id: uid(), speaker: i, text, mode: "normal" });
         if (hasStance && !activeRef.current.includes(i)) activeRef.current.push(i);
         progressRef.current = { phase: "opening", i: i + 1 };
+        speakingRef.current = true;
         await pace(text, i, g[i].gender, ctrl.signal);
+        speakingRef.current = false;
       }
 
       // --- SERBEST TARTIŞMA ---
@@ -629,8 +638,13 @@ export function App() {
           });
         }
         advanceThread(speaker, role);
-        if (text.trim()) await pace(text, speaker, g[speaker].gender, ctrl.signal);
-        else await delay(500, ctrl.signal);
+        if (text.trim()) {
+          speakingRef.current = true;
+          await pace(text, speaker, g[speaker].gender, ctrl.signal);
+          speakingRef.current = false;
+        } else {
+          await delay(500, ctrl.signal);
+        }
 
         } catch (e) {
           if (e instanceof ApiError && e.status === 429 && runningRef.current) {
@@ -702,8 +716,11 @@ export function App() {
     (text: string) => {
       setError(null);
       setSuggestions([]);
-      // Konuşma yoksa direkt ekle, yoksa kuyruğa al
-      if (!runningRef.current || thinking === null) {
+      // Konuşma yoksa direkt ekle, yoksa kuyruğa al. "thinking === null" tek
+      // başına yeterli değil: TTS, thinking null'a dönüp pace() başladıktan
+      // SONRA çalar; speakingRef bu boşluğu kapatıp iki sesin üst üste
+      // binmesini (spiker + konuk aynı anda) engeller.
+      if (!runningRef.current || (thinking === null && !speakingRef.current)) {
         append({ id: uid(), speaker: "moderator", text, mode: "normal" });
         if (ttsRef.current && text.trim()) {
           const ctrl = new AbortController();
