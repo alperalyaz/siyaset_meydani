@@ -503,8 +503,8 @@ export function guestSuggestMessages(
       : "";
   const mixRules = popular
     ? `ÇOK ÖNEMLİ — KARIŞIM (konu gündelik/magazinel):
-- 8 ismin EN AZ 3'ü Türk popüler kültüründen tanınan, halkın magazinden/TV'den/müzikten bildiği YAŞAYAN ünlüler olsun (şarkıcı, oyuncu, TV sunucusu, fenomen, sporcu...). Sıradan insanların "aaa o da mı gelmiş" diyeceği isimler.
-- Kalanlar çağlar ötesi tarihî/ünlü isimler olsun — kontrast komediyi doğurur (ör. bir pop yıldızı ile bir Osmanlı padişahı aynı masada).
+- "pop" listesine 5 isim: Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan bildiği YAŞAYAN ünlüler (şarkıcı, oyuncu, TV sunucusu, fenomen, sporcu...). Sıradan insanların "aaa o da mı gelmiş" diyeceği, konuyla ilgisi olan isimler.
+- "klasik" listesine 3 isim: çağlar ötesi tarihî/ünlü figürler — kontrast komediyi doğurur (ör. bir pop yıldızı ile bir Osmanlı padişahı aynı masada).
 - Hepsinin Türkçe Vikipedi'de maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
     : `ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
 - FARKLI ÇAĞLARDAN seç: en az biri antik/orta çağ, en az biri son 200 yıl. Hepsi aynı dönemden/aynı ekolden OLMASIN.
@@ -529,7 +529,11 @@ ${mixRules}
 - Yabancı isimleri Türkçe okunuşuyla YAZMA; Vikipedi'deki özgün yazımı kullan (yanlış: "Sesil B. DeMille" → doğru: "Cecil B. DeMille").
 - İsmi Türkçe Vikipedi madde başlığıyla aynen yaz; unvan, parantez, açıklama ekleme.${avoidLine}
 
-Sadece şu JSON: {"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
+Sadece şu JSON: ${
+        popular
+          ? '{"pop": ["...", "...", "...", "...", "..."], "klasik": ["...", "...", "..."]}'
+          : '{"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}'
+      }`,
     },
   ];
 }

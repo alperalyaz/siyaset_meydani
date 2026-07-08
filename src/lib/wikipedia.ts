@@ -429,7 +429,11 @@ export function isBlockedName(name: string): boolean {
   return SACRED_TITLES.has(t) || SACRED_TITLES.has(bare);
 }
 
-export async function buildGuestsFromNames(names: string[], count = 3): Promise<Guest[]> {
+export async function buildGuestsFromNames(
+  names: string[],
+  count = 3,
+  opts: { preserveOrder?: boolean } = {},
+): Promise<Guest[]> {
   const guests: Guest[] = [];
   const used = new Set<string>();
   const add = (g: Guest) => {
@@ -439,7 +443,9 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     guests.push(g);
   };
 
-  for (const name of shuffle(names)) {
+  // preserveOrder: liste kasıtlı bir karışım sırası taşıyor (2 pop : 1 klasik);
+  // karıştırmak oranı bozar. Normal modda çeşitlilik için karıştırılır.
+  for (const name of opts.preserveOrder ? names : shuffle(names)) {
     if (guests.length >= count) break;
     if (isBlockedName(name)) continue;
     const info = await resolveGuestInfo(name);

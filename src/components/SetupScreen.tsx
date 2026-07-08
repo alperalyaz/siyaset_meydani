@@ -66,17 +66,19 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       setGuests(null);
       setAddMsg(null);
       try {
-        // Gündelik sekmesindeyken kadroya popüler kültür ünlüleri de karışır.
+        // Gündelik sekmesindeyken kadroya popüler kültür ünlüleri de karışır;
+        // isim sırası 2 pop : 1 klasik taşıdığı için seçimde korunur.
+        const popularMode = topicTabRef.current === "gunluk";
         const names = await suggestGuestNames(
           q,
           null,
           shownNamesRef.current,
           apiKey,
           undefined,
-          topicTabRef.current === "gunluk",
+          popularMode,
         );
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
-        const g = await buildGuestsFromNames(names, DEFAULT_COUNT);
+        const g = await buildGuestsFromNames(names, DEFAULT_COUNT, { preserveOrder: popularMode });
         shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
         setGuests(g);
       } catch (e) {
@@ -371,7 +373,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                   : "Kısa demo · sonra kendi anahtarınız"}
               </span>
               <button className="linklike" onClick={onOpenKey}>
-                🔑 Ücretsiz anahtar (Groq) / API gir
+                🔑 Kendi API anahtarınızı girin
               </button>
             </>
           )}

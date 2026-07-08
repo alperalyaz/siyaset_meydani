@@ -160,6 +160,7 @@ export function App() {
   const sessionPhaseRef = useRef<SessionPhase>("warmup");
   const difficultyRef = useRef<Difficulty>("kolay");
   const pausedRef = useRef(false); // manuel duraklatma vs oturum bitişi ayrımı
+  const rate429Ref = useRef(0); // ardışık hız-limiti denemesi (sonsuz döngü koruması)
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -612,6 +613,7 @@ export function App() {
           ctrl.signal,
           (token) => setStreamingText((p) => p + token),
         );
+        rate429Ref.current = 0; // tur başarılı — limit sayacını sıfırla
         setThinking(null);
         setStreamingText("");
         syncMeta();
@@ -632,6 +634,17 @@ export function App() {
 
         } catch (e) {
           if (e instanceof ApiError && e.status === 429 && runningRef.current) {
+            rate429Ref.current += 1;
+            // Kota gerçekten bittiyse sonsuza dek "deneniyor..." göstermek
+            // kullanıcıya "uygulama bozuk" hissi verir; 3 denemede dürüstçe dur.
+            if (rate429Ref.current >= 3) {
+              rate429Ref.current = 0;
+              setError(
+                "Sağlayıcı limiti sürüyor — anahtarınızın günlük kotası dolmuş olabilir (özellikle Groq'un ücretsiz kotası hızlı dolar). Bir süre sonra ▶ Devam ile deneyin ya da farklı bir API anahtarı girin.",
+              );
+              pause();
+              return;
+            }
             setError("⏳ Hız limiti aşıldı, birkaç saniye içinde otomatik denenecek...");
             syncMeta();
             await delay(6000, new AbortController().signal);
