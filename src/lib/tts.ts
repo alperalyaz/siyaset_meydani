@@ -82,6 +82,9 @@ export function cancelSpeech(): void {
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
 // Cümle cümle seslendirir — iptal anında yarım kalmaz, hemen susar.
+// Rate/pitch: voice atamasından ÖNCE ayarlanır (bazı tarayıcılarda voice ataması
+// rate'i sıfırlayabildiği için), sonra onstart'ta tekrar ayarlanır (fallback).
+// Uzak (remote) sesler pitch/rate uygulamaz, bu yüzden sadece yerel sesler atanır.
 export function speak(
   text: string,
   opts: { voice?: SpeechSynthesisVoice; pitch?: number; rate?: number; signal?: AbortSignal } = {},
@@ -115,7 +118,14 @@ export function speak(
       }
       const u = new SpeechSynthesisUtterance(sentences[idx]);
       u.lang = opts.voice?.lang || "tr-TR";
-      if (opts.voice) u.voice = opts.voice;
+      // Rate/pitch voice'tan ÖNCE ayarla — voice ataması asenkron sıfırlamasın
+      u.pitch = opts.pitch ?? 1;
+      u.rate = opts.rate ?? 1;
+      // Yalnızca YEREL ses ata (uzak/Google sesler pitch/rate'i yok sayıp sıfırlar)
+      if (opts.voice && opts.voice.localService) {
+        u.voice = opts.voice;
+      }
+      // onstart fallback: voice yüklendikten sonra bir kez daha ayarla
       u.onstart = () => {
         u.pitch = opts.pitch ?? 1;
         u.rate = opts.rate ?? 1;
