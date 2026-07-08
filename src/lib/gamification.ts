@@ -189,9 +189,15 @@ export function computeSessionResult(
     (u) => u.speaker === "moderator" || u.mode === "system",
   ).length;
 
-  // En çok konuşan konuk
+  // En çok konuşan konuk (ısınma turu hariç)
+  const warmupSkip = guests.length * 2; // intro + opening
+  const debateUtterances = utterances.filter((u, i) => {
+    if (u.speaker === "moderator" || u.mode === "system") return true; // spiker her zaman sayılsın
+    const guestIdx = utterances.slice(0, i + 1).filter((x) => typeof x.speaker === "number").length;
+    return guestIdx > warmupSkip; // ısınma turunu atla
+  });
   const counts = new Map<string, number>();
-  for (const u of utterances) {
+  for (const u of debateUtterances) {
     if (typeof u.speaker === "number") {
       const name = guests[u.speaker]?.name ?? "?";
       counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -212,10 +218,10 @@ export function computeSessionResult(
   if (ratingSnapshots.length > 0) {
     const best = ratingSnapshots.reduce((a, b) => (a.rating > b.rating ? a : b));
     mostControversialRating = best.rating;
-    // En yakın utterance'ı bul
+    // En yakın TARTIŞMA utterance'ını bul (ısınma turu hariç)
     let closest: Utterance | null = null;
     let minDiff = Infinity;
-    for (const u of utterances) {
+    for (const u of debateUtterances) {
       const uIdx = utterances.indexOf(u);
       const snapIdx = ratingSnapshots.indexOf(best);
       if (Math.abs(uIdx - snapIdx) < minDiff) {

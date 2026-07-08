@@ -120,6 +120,7 @@ export function App() {
 
   const [leaveModal, setLeaveModal] = useState(false);
   const [closingSequence, setClosingSequence] = useState(false);
+  const [modPending, setModPending] = useState(false);
 
   const [ttsOn, setTtsOn] = useState(ttsSupported());
   const ttsRef = useRef(ttsOn);
@@ -149,6 +150,7 @@ export function App() {
   const activeRef = useRef<number[]>([]); // net fikri olan konuklar
   const threadRef = useRef<Thread | null>(null);
   const modNoteRef = useRef<string | undefined>(undefined);
+  const pendingModNoteRef = useRef<string | null>(null); // kuyruğa alınmış spiker mesajı
   const stancesRef = useRef<(Stance | null)[]>([]); // yapımcının atadığı pozisyonlar
   const topicContextRef = useRef<string | null>(null); // güncel olay grounding metni
   const startTimeRef = useRef<number>(0); // oturum başlangıcı
@@ -494,6 +496,19 @@ export function App() {
       // --- SERBEST TARTIŞMA ---
       while (runningRef.current && progressRef.current.phase === "debate") {
         try {
+        // Bekleyen spiker mesajını devreye sok
+        if (pendingModNoteRef.current) {
+          const modText = pendingModNoteRef.current;
+          pendingModNoteRef.current = null;
+          setModPending(false);
+          append({ id: uid(), speaker: "moderator", text: modText, mode: "normal" });
+          modNoteRef.current = modText;
+          if (modText.trim()) {
+            const mctrl = new AbortController();
+            speak(modText, { ...voiceForGuest(9, undefined), signal: mctrl.signal });
+          }
+        }
+
         const { speaker, role } = nextSpeaker();
         const ctrl = new AbortController();
         abortRef.current = ctrl;
@@ -659,24 +674,27 @@ export function App() {
     else drive();
   }, [pause, drive]);
 
-  // Spiker müdahalesi: sürmekte olan repliği kes, mesajı ekle, akış şekillensin.
+  // Spiker müdahalesi: mevcut konuşmayı KESMEDEN kuyruğa al, konuk bitirince devreye gir.
   const moderate = useCallback(
     (text: string) => {
       setError(null);
-      abortRef.current?.abort();
-      setThinking(null);
-      append({ id: uid(), speaker: "moderator", text, mode: "normal" });
-      modNoteRef.current = text;
       setSuggestions([]);
-      // Spiker sözünü seslendir (fire-and-forget: drive hemen çalışsın)
-      if (text.trim()) {
-        const ctrl = new AbortController();
-        speak(text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
+      // Konuşma yoksa direkt ekle, yoksa kuyruğa al
+      if (!runningRef.current || thinking === null) {
+        append({ id: uid(), speaker: "moderator", text, mode: "normal" });
+        if (text.trim()) {
+          const ctrl = new AbortController();
+          speak(text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
+        }
+        modNoteRef.current = text;
+        if (!runningRef.current && phase === "panel") drive();
+        return;
       }
-      // Görüş turu bitmemişse spiker sözü akışı bozmasın; tartışmadaysa yönlendirsin.
-      drive();
+      // Konuşma sürüyor: kuyruğa al (son mesaj geçerli, öncekini override)
+      pendingModNoteRef.current = text;
+      setModPending(true);
     },
-    [append, drive],
+    [append, drive, thinking, phase],
   );
 
   const startSession = useCallback((g: Guest[], t: string, diff: Difficulty, context?: string | null) => {
@@ -1111,6 +1129,7 @@ export function App() {
       <div className="panel__body">
         <main className="panel__stage">
           {error && <div className="banner banner--error">{error}</div>}
+          {modPending && <div className="banner" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>⏳ Spiker sırada bekliyor — konuk bitince araya girecek...</div>}
           <ChatStream utterances={utterances} guests={guests} thinking={thinking} streamingText={streamingText} />
         </main>
         <aside className="panel__side">
