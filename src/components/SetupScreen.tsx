@@ -208,43 +208,48 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       <section className="setup__block">
         <div className="setup__block-head">
           <h2>1 · Bugünün Konusu</h2>
-          <button className="btn btn--ghost" onClick={() => loadTopics()} disabled={loadingTopics}>
-            {loadingTopics ? "Konu üretiliyor…" : "Başka konular öner"}
-          </button>
-        </div>
-
-        <div className="topic-tabs" role="tablist">
-          <button
-            role="tab"
-            aria-selected={topicTab === "gunluk"}
-            className={`topic-tab ${topicTab === "gunluk" ? "topic-tab--active" : ""}`}
-            onClick={() => switchTab("gunluk")}
-          >
-            ☕ Gündelik
-          </button>
-          <button
-            role="tab"
-            aria-selected={topicTab === "derin"}
-            className={`topic-tab ${topicTab === "derin" ? "topic-tab--active" : ""}`}
-            onClick={() => switchTab("derin")}
-          >
-            🧠 Derin / Felsefi
-          </button>
-        </div>
-
-        <div className="topic-chips">
-          {(extraTopics.length
-            ? interleaveTopics(poolTopics.slice(0, 4), extraTopics)
-            : poolTopics
-          ).map((t) => (
+          <div className="topic-tabs" role="tablist">
             <button
-              key={t}
-              className={`chip ${extraTopics.length && extraTopics.includes(t) ? "chip--fresh" : ""} ${topic === t ? "chip--active" : ""}`}
-              onClick={() => pickTopic(t)}
+              role="tab"
+              aria-selected={topicTab === "gunluk"}
+              className={`topic-tab ${topicTab === "gunluk" ? "topic-tab--active" : ""}`}
+              onClick={() => switchTab("gunluk")}
             >
-              {t}
+              ☕ Gündelik
             </button>
-          ))}
+            <button
+              role="tab"
+              aria-selected={topicTab === "derin"}
+              className={`topic-tab ${topicTab === "derin" ? "topic-tab--active" : ""}`}
+              onClick={() => switchTab("derin")}
+            >
+              🧠 Derin
+            </button>
+          </div>
+        </div>
+
+        <div className="topic-board">
+          <div className="topic-chips">
+            {(extraTopics.length
+              ? interleaveTopics(poolTopics.slice(0, 4), extraTopics)
+              : poolTopics
+            ).map((t) => (
+              <button
+                key={t}
+                className={`chip ${extraTopics.length && extraTopics.includes(t) ? "chip--fresh" : ""} ${topic === t ? "chip--active" : ""}`}
+                onClick={() => pickTopic(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <button
+            className="topic-more"
+            onClick={() => loadTopics()}
+            disabled={loadingTopics}
+          >
+            {loadingTopics ? "⏳ Konu üretiliyor…" : "↻ Başka konular öner"}
+          </button>
         </div>
         <div className="topic-row">
           <input
