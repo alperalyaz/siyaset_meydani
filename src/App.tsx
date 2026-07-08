@@ -20,6 +20,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setActiveRate } from "./lib/tts";
+import { encodeSession, decodeSession } from "./lib/share";
 
 import {
   DIFFICULTY_CONFIGS,
@@ -104,9 +105,13 @@ export function App() {
 
   const [savedToast, setSavedToast] = useState(false);
   const savedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [shareToast, setShareToast] = useState(false);
+  const shareToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sharedSession, setSharedSession] = useState<ReplayData | null>(null);
   useEffect(() => {
     return () => {
       if (savedToastTimer.current) clearTimeout(savedToastTimer.current);
+      if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
     };
   }, []);
 
@@ -159,6 +164,27 @@ export function App() {
   useEffect(() => {
     apiKeyRef.current = apiKey;
   }, [apiKey]);
+
+  // URL'den paylasilan oturumu oku.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get("share");
+      if (encoded) {
+        const payload = decodeSession(encoded);
+        if (payload) {
+          setSharedSession({
+            guests: payload.g,
+            topic: payload.t,
+            utterances: payload.u,
+            rating: payload.r,
+          });
+        }
+      }
+    } catch {
+      /* gecersiz URL */
+    }
+  }, []);
 
   const commit = useCallback((next: Utterance[]) => {
     utterRef.current = next;
@@ -825,6 +851,29 @@ export function App() {
     savedToastTimer.current = setTimeout(() => setSavedToast(false), 2000);
   }, [guests, topic, utterances, rating]);
 
+  const handleShare = useCallback(async () => {
+    const encoded = encodeSession(guests, topic, utterances, rating);
+    const url = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `Siyaset Meydani — ${topic}`, text: topic, url });
+      } catch {
+        /* kullanici iptal etti veya hata */
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        /* clipboard erisilemedi */
+      }
+    }
+
+    setShareToast(true);
+    if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
+    shareToastTimer.current = setTimeout(() => setShareToast(false), 2500);
+  }, [guests, topic, utterances, rating]);
+
   const handleLoadSession = useCallback((id: string) => {
     const s = loadSessionById(id);
     if (!s) return;
@@ -992,6 +1041,8 @@ export function App() {
           onLoadSession={handleLoadSession}
           onContinueSession={handleContinueSession}
           onDeleteSession={handleDeleteSession}
+          sharedSession={sharedSession}
+          onClearSharedSession={() => setSharedSession(null)}
         />
         <ApiKeyModal
           open={keyModal}
@@ -1084,6 +1135,7 @@ export function App() {
         onPauseToggle={pauseToggle}
         onSuggest={doSuggest}
         onSave={doSave}
+        onShare={handleShare}
         onEndSession={() => setLeaveModal(true)}
         hasUtterances={utterances.length > 0}
         ttsOn={ttsOn}
@@ -1094,6 +1146,7 @@ export function App() {
       />
 
       {savedToast && <div className="save-toast">✅ Oturum kaydedildi</div>}
+      {shareToast && <div className="save-toast" style={{ background: "linear-gradient(135deg, #3fb6c9, #268fa8)" }}>🔗 Paylaşım linki kopyalandı!</div>}
 
       {leaveModal && (
         <div className="modal__backdrop" onClick={() => setLeaveModal(false)}>

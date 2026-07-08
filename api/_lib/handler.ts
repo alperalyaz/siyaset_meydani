@@ -18,14 +18,14 @@ interface Provider {
 
 function detectProvider(key: string): ProviderName {
   if (key.startsWith("sk-ant-")) return "anthropic";
-  if (key.startsWith("sk-")) return "openai";
-  if (key.startsWith("gsk_")) return "deepseek"; // Groq as deepseek compatible
+  if (key.startsWith("sk-")) return "deepseek"; // DeepSeek is primary for sk- keys
+  if (key.startsWith("gsk_")) return "deepseek";
   return "deepseek";
 }
 
-function providerForKey(key: string): Provider {
-  const name = detectProvider(key);
-  switch (name) {
+function providerForKey(key: string, name?: ProviderName): Provider {
+  const n = name || detectProvider(key);
+  switch (n) {
     case "anthropic":
       return {
         name: "anthropic",
@@ -189,7 +189,7 @@ export async function handleChat(
   }
 
   const providerName = body.provider || detectProvider(apiKey);
-  const provider = providerForKey(apiKey);
+  const provider = providerForKey(apiKey, providerName);
 
   // Demo modunda limit uygula (kalıcı Supabase sayacı).
   let demoRemaining: number | null = null;
