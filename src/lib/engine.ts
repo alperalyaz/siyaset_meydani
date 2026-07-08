@@ -1,7 +1,6 @@
 import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
 import { chat, chatStream, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
 import type { ChatMessage } from "./store";
-import { speak, voiceForGuest } from "./tts";
 import {
   introMessages,
   openingMessages,
@@ -197,60 +196,50 @@ export async function assignStances(
   return { stances, genders };
 }
 
-// Streaming TTS: gelen token'ları biriktirir, cümle tamamlandıkça anında seslendirir.
-function createStreamingSpeaker(
-  voiceIdx: number,
-  gender: "male" | "female" | undefined,
+// Token akışını görünür metne yazar ve TAM metni biriktirip döndürür.
+// Seslendirme burada YAPILMAZ; TTS'i App katmanındaki pace() tek noktadan yönetir
+// (çift ses, iptal sinyali, anlık hız ve "ses kapalı" durumu orada ele alınır).
+async function streamReply(
+  msgs: ChatMessage[],
+  apiKey: string | null,
+  opts: { temperature: number; max_tokens: number },
+  signal: AbortSignal | undefined,
   onToken: (t: string) => void,
-): { onToken: (t: string) => void; flush: () => void; accumulator: () => string } {
-  const vopts = voiceForGuest(voiceIdx, gender);
-  let buf = "";
-
-  function speakSentence(text: string): void {
-    const clean = text.replace(/[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}☀-➿️]/gu, "")
-      .replace(/[*_]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (clean.length > 3) {
-      speak(clean, { ...vopts, signal: new AbortController().signal });
-    }
-  }
-
-  const cb = (token: string) => {
-    const ft = stripNonLatin(token);
-    buf += ft;
-    onToken(ft);
-
-    // Cümle sonu tespiti: .!?; veya satır sonundaki boşluk
-    const m = buf.match(/^(.+?[.!?;]\s*)(.*)$/s);
-    if (m) {
-      speakSentence(m[1]);
-      buf = m[2] || "";
-    }
-  };
-
-  return {
-    onToken: cb,
-    flush: () => { if (buf.trim()) speakSentence(buf); buf = ""; },
-    accumulator: () => buf,
-  };
+): Promise<string> {
+  let full = "";
+  await chatStream(
+    msgs,
+    apiKey,
+    (token) => {
+      const ft = stripNonLatin(token);
+      if (!ft) return;
+      full += ft;
+      onToken(ft);
+    },
+    { ...opts, signal },
+  );
+  return full;
 }
 
 export async function runIntro(
   guest: Guest,
   guests: Guest[],
   topic: string,
-  guestIndex: number,
+  _guestIndex: number,
   apiKey: string | null,
   signal?: AbortSignal,
   onToken?: (t: string) => void,
 ): Promise<string> {
   const msgs = introMessages(guest, guests, topic);
   if (onToken) {
-    const spk = createStreamingSpeaker(guestIndex, guest.gender, onToken);
-    await chatStream(msgs as ChatMessage[], apiKey, spk.onToken, { temperature: 0.85, max_tokens: 180, signal });
-    spk.flush();
-    return cleanReply(spk.accumulator(), guest.name);
+    const full = await streamReply(
+      msgs as ChatMessage[],
+      apiKey,
+      { temperature: 0.85, max_tokens: 180 },
+      signal,
+      onToken,
+    );
+    return cleanReply(full, guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     temperature: 0.85,
@@ -260,29 +249,19 @@ export async function runIntro(
   return cleanReply(content, guest.name);
 }
 
+// Açılış görüşü JSON döndürür ({hasStance, text}); bu yüzden AKIŞ KULLANILMAZ
+// (aksi halde ham JSON kullanıcıya sızardı). Tek seferde alınır, ayrıştırılır.
 export async function runOpeningStatement(
   guest: Guest,
   guests: Guest[],
   topic: string,
   stance: Stance | null,
   context: string | null,
-  guestIndex: number,
+  _guestIndex: number,
   apiKey: string | null,
   signal?: AbortSignal,
-  onToken?: (t: string) => void,
 ): Promise<OpeningResult> {
   const msgs = openingMessages(guest, guests, topic, stance, context);
-  if (onToken) {
-    const spk = createStreamingSpeaker(guestIndex, guest.gender, onToken);
-    await chatStream(msgs as ChatMessage[], apiKey, spk.onToken, { temperature: 0.85, max_tokens: 240, signal });
-    spk.flush();
-    const text = spk.accumulator();
-    const parsed = parseJsonLoose<Partial<OpeningResult>>(text);
-    if (parsed && typeof parsed.text === "string" && parsed.text.trim()) {
-      return { text: cleanReply(parsed.text, guest.name), hasStance: parsed.hasStance !== false };
-    }
-    return { text: cleanReply(text, guest.name), hasStance: true };
-  }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     json: true,
     temperature: 0.85,
@@ -329,17 +308,21 @@ export async function runGuest(
   role: GuestRole,
   stance: Stance | null,
   context: string | null,
-  guestIndex: number,
+  _guestIndex: number,
   apiKey: string | null,
   signal?: AbortSignal,
   onToken?: (t: string) => void,
 ): Promise<string> {
   const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context);
   if (onToken) {
-    const spk = createStreamingSpeaker(guestIndex, guest.gender, onToken);
-    await chatStream(msgs as ChatMessage[], apiKey, spk.onToken, { temperature: 0.9, max_tokens: 230, signal });
-    spk.flush();
-    return cleanReply(spk.accumulator(), guest.name);
+    const full = await streamReply(
+      msgs as ChatMessage[],
+      apiKey,
+      { temperature: 0.9, max_tokens: 230 },
+      signal,
+      onToken,
+    );
+    return cleanReply(full, guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     temperature: 0.9, max_tokens: 230, signal,

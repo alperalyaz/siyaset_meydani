@@ -491,7 +491,6 @@ export function App() {
           i,
           apiKeyRef.current,
           ctrl.signal,
-          (token) => setStreamingText((p) => p + token),
         );
         setThinking(null);
         setStreamingText("");
@@ -513,7 +512,7 @@ export function App() {
           setModPending(false);
           append({ id: uid(), speaker: "moderator", text: modText, mode: "normal" });
           modNoteRef.current = modText;
-          if (modText.trim()) {
+          if (ttsRef.current && modText.trim()) {
             const mctrl = new AbortController();
             speak(modText, { ...voiceForGuest(9, undefined), signal: mctrl.signal });
           }
@@ -633,7 +632,7 @@ export function App() {
 
         } catch (e) {
           if (e instanceof ApiError && e.status === 429 && runningRef.current) {
-            setError(`⏳ Groq limiti doldu, ${6 * (1)} saniye sonra tekrar deneniyor...`);
+            setError("⏳ Groq limiti doldu, birkaç saniye sonra tekrar deneniyor...");
             syncMeta();
             await delay(6000, new AbortController().signal);
             setError(null);
@@ -693,7 +692,7 @@ export function App() {
       // Konuşma yoksa direkt ekle, yoksa kuyruğa al
       if (!runningRef.current || thinking === null) {
         append({ id: uid(), speaker: "moderator", text, mode: "normal" });
-        if (text.trim()) {
+        if (ttsRef.current && text.trim()) {
           const ctrl = new AbortController();
           speak(text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
         }
@@ -832,7 +831,7 @@ export function App() {
     });
 
     // Kapanış mesajını seslendir
-    if (utterRef.current.length > 0) {
+    if (ttsRef.current && utterRef.current.length > 0) {
       const last = utterRef.current[utterRef.current.length - 1];
       const ctrl = new AbortController();
       // fire-and-forget: sonuç ekranı görünmeden seslendir
