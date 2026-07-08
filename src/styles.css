@@ -570,6 +570,9 @@ a {
   flex-direction: column;
   max-width: 1100px;
   margin: 0 auto;
+  /* Opak zemin: body'nin üstteki geniş ışık efekti (radial-gradient) buraya
+     sızıp mesajların okunurluğunu bozmasın. */
+  background: var(--bg);
 }
 .panel__head {
   display: flex;
