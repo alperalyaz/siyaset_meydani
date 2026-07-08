@@ -524,6 +524,7 @@ export function guestSuggestMessages(
 Bu konuyla ilgili, gerçek ve Türkçe Vikipedi'de maddesi bulunan 8 farklı ünlü KİŞİ öner.
 ${mixRules}
 - ASLA peygamber ya da bir dinin kutsal saydığı figürleri önerme (Muhammed, İsa, Musa, Davud, İbrahim, Buda vb.). Onları bir tartışma masasına oturtmak saygısızlık olur. Onların yerine dinî konularda âlim, teolog, filozof, tarihçi ya da hükümdar öner.
+- Mustafa Kemal Atatürk'ü ve Recep Tayyip Erdoğan'ı da önerme; uygulama bu isimleri konuk olarak kabul etmez, önerirsen o koltuk boşa gider.
 İSİM YAZIMI (kritik — Vikipedi'de aranacak):
 - "Ad Soyad" sırasıyla yaz; "Soyad, Ad" biçimi YASAK (yanlış: "Makhmalbaf, Möhsün" → doğru: "Muhsin Mahmelbaf").
 - Yabancı isimleri Türkçe okunuşuyla YAZMA; Vikipedi'deki özgün yazımı kullan (yanlış: "Sesil B. DeMille" → doğru: "Cecil B. DeMille").
