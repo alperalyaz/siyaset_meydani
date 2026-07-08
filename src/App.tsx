@@ -822,7 +822,11 @@ export function App() {
     setApiKey(k);
     setKeyModal(false);
     setKeyReason(undefined);
-  }, []);
+    // Panel'de API hatasıyla durduysa otomatik devam et
+    if (phase === "panel" && !runningRef.current) {
+      drive();
+    }
+  }, [phase, drive]);
   const removeKey = useCallback(() => {
     clearApiKey();
     setApiKey(null);
