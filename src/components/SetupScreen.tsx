@@ -17,6 +17,7 @@ interface Props {
   onClearSession?: () => void;
   sessions?: SessionMeta[];
   onLoadSession?: (id: string) => void;
+  onContinueSession?: (id: string) => void;
   onDeleteSession?: (id: string) => void;
 }
 
@@ -32,7 +33,7 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onDeleteSession }: Props) {
+export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [topic, setTopic] = useState("");
@@ -326,13 +327,23 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                   </div>
                 </div>
                 <div className="history-card__actions">
-                  <button
-                    className="btn btn--ghost btn--sm"
-                    onClick={() => onLoadSession?.(s.id)}
-                    title="Oturumu izle"
-                  >
-                    ▶ İzle
-                  </button>
+                  {s.ended ? (
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => onLoadSession?.(s.id)}
+                      title="Oturumu izle"
+                    >
+                      ▶ İzle
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => onContinueSession?.(s.id)}
+                      title="Kaldığın yerden devam et"
+                    >
+                      ▶ Devam
+                    </button>
+                  )}
                   <button
                     className="btn btn--ghost btn--sm btn--danger"
                     onClick={() => onDeleteSession?.(s.id)}

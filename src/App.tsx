@@ -100,6 +100,14 @@ export function App() {
 
   const [replayData, setReplayData] = useState<ReplayData | null>(null);
 
+  const [savedToast, setSavedToast] = useState(false);
+  const savedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (savedToastTimer.current) clearTimeout(savedToastTimer.current);
+    };
+  }, []);
+
   // ── Gamification state ──
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("warmup");
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
@@ -791,9 +799,13 @@ export function App() {
       utterances,
       rating,
       savedAt: Date.now(),
+      ended: sessionPhaseRef.current === "ended",
     };
     saveSessionAndIndex(session);
     setSessionMetas(listSessionMetas());
+    setSavedToast(true);
+    if (savedToastTimer.current) clearTimeout(savedToastTimer.current);
+    savedToastTimer.current = setTimeout(() => setSavedToast(false), 2000);
   }, [guests, topic, utterances, rating]);
 
   const handleLoadSession = useCallback((id: string) => {
@@ -807,6 +819,65 @@ export function App() {
     });
     setPhase("replay");
   }, []);
+
+  const handleContinueSession = useCallback((id: string) => {
+    const s = loadSessionById(id);
+    if (!s) return;
+
+    setGuests(s.guests);
+    setTopic(s.topic);
+    guestsRef.current = s.guests;
+    topicRef.current = s.topic;
+    topicContextRef.current = null;
+
+    // Last utterance check: if last was a closing system message, remove it
+    const utts = [...s.utterances];
+    if (utts.length > 0) {
+      const last = utts[utts.length - 1];
+      if (last.mode === "system" && last.speaker === "moderator") {
+        utts.pop();
+      }
+    }
+
+    utterRef.current = utts;
+    setUtterances(utts);
+
+    // Try to reconstruct stances
+    stancesRef.current = [];
+    activeRef.current = [];
+    const seenNames = new Set<string>();
+    for (const u of utts) {
+      if (typeof u.speaker === "number" && !seenNames.has(s.guests[u.speaker]?.name ?? "")) {
+        seenNames.add(s.guests[u.speaker]?.name ?? "");
+        activeRef.current.push(u.speaker);
+      }
+    }
+    if (activeRef.current.length >= 2) {
+      threadRef.current = mostOpposedPair(activeRef.current);
+    } else if (activeRef.current.length === 1) {
+      threadRef.current = { a: activeRef.current[0], b: activeRef.current[0], turns: 0 };
+    } else {
+      threadRef.current = null;
+    }
+
+    progressRef.current = { phase: "debate", i: 0 };
+    modNoteRef.current = undefined;
+    setRating(s.rating);
+    setRatingNote("");
+    setSuggestions([]);
+    setError(null);
+    setReplayData(null);
+    setSessionResult(null);
+    setComboToast(null);
+
+    startTimeRef.current = Date.now();
+    ratingTracker.current = new RatingTracker();
+    sessionPhaseRef.current = "debate";
+    setSessionPhase("debate");
+    difficultyRef.current = "kolay";
+
+    setPhase("panel");
+  }, [mostOpposedPair]);
 
   const handleDeleteSession = useCallback((id: string) => {
     deleteSessionById(id);
@@ -1000,6 +1071,8 @@ export function App() {
         ttsRate={ttsRate}
         onTtsRateChange={setTtsRate}
       />
+
+      {savedToast && <div className="save-toast">✅ Oturum kaydedildi</div>}
 
       {leaveModal && (
         <div className="modal__backdrop" onClick={() => setLeaveModal(false)}>

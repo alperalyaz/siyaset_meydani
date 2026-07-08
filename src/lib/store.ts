@@ -17,6 +17,7 @@ export interface SavedSession {
   utterances: Utterance[];
   rating: number;
   savedAt: number;
+  ended?: boolean;
 }
 
 export interface SessionMeta {
@@ -26,6 +27,7 @@ export interface SessionMeta {
   utterancesCount: number;
   rating: number;
   savedAt: number;
+  ended?: boolean;
 }
 
 function uid(): string {
@@ -65,9 +67,9 @@ const TTS_RATE_KEY = "siyaset_meydani_tts_rate";
 export function loadTtsRate(): number {
   try {
     const raw = localStorage.getItem(TTS_RATE_KEY);
-    if (raw === null) return 1.0;
+    if (raw === null) return 1.5;
     const v = parseFloat(raw);
-    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.0, v)) : 1.0;
+    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.0, v)) : 1.5;
   } catch {
     return 1.0;
   }
@@ -152,6 +154,7 @@ export function saveSessionAndIndex(
       utterancesCount: session.utterances.length,
       rating: session.rating,
       savedAt: session.savedAt,
+      ended: session.ended,
     };
 
     if (idx >= 0) {
