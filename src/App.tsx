@@ -19,7 +19,7 @@ import {
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, type SavedSession, type SessionMeta } from "./lib/store";
-import { speak, cancelSpeech, voiceForGuest, ttsSupported } from "./lib/tts";
+import { speak, cancelSpeech, voiceForGuest, ttsSupported, setActiveRate } from "./lib/tts";
 import {
   DIFFICULTY_CONFIGS,
   RatingTracker,
@@ -120,6 +120,7 @@ export function App() {
   useEffect(() => {
     ttsRateRef.current = ttsRate;
     saveTtsRate(ttsRate);
+    setActiveRate(ttsRate);
   }, [ttsRate]);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).

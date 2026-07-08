@@ -141,7 +141,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     );
   }, []);
 
-  const canStart = !!guests && guests.length >= 1 && topic.trim().length > 0 && !loading;
+  const canStart = !!guests && guests.length >= 2 && topic.trim().length > 0 && !loading;
 
   return (
     <div className="setup">

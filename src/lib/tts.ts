@@ -78,6 +78,16 @@ function splitSentences(text: string): string[] {
 
 export function cancelSpeech(): void {
   if (ttsSupported()) window.speechSynthesis.cancel();
+  activeUtterance = null;
+}
+
+// Anlık hız değişimi için şu an çalan utterance referansı
+let activeUtterance: SpeechSynthesisUtterance | null = null;
+
+export function setActiveRate(rate: number): void {
+  if (activeUtterance) {
+    activeUtterance.rate = rate;
+  }
 }
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
@@ -129,9 +139,10 @@ export function speak(
       u.onstart = () => {
         u.pitch = opts.pitch ?? 1;
         u.rate = opts.rate ?? 1;
+        activeUtterance = u;
       };
-      u.onend = () => { idx++; speakNext(); };
-      u.onerror = () => { idx++; speakNext(); };
+      u.onend = () => { activeUtterance = null; idx++; speakNext(); };
+      u.onerror = () => { activeUtterance = null; idx++; speakNext(); };
       window.speechSynthesis.speak(u);
     };
     speakNext();
