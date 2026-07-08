@@ -1084,9 +1084,8 @@ export function App() {
             ya da tarihî kişilerin gerçek görüşlerini, sözlerini veya kişiliğini yansıtmaz.
             İçerik hatalı, eksik ya da yanıltıcı olabilir; kaynak veya danışmanlık niteliği taşımaz.
           </p>
-          <p className="credits__by">
-            Alper Alyaz'ın kişisel projesidir · DeepSeek / Groq ile çalışır · Vikipedi verileriyle
-            beslenir
+           <p className="credits__by">
+            <a href="https://github.com/alperalyaz/siyaset_meydani" target="_blank" rel="noopener">Alper Alyaz</a>'ın kişisel projesidir · DeepSeek / OpenAI / Claude ile çalışır · Vikipedi verileriyle beslenir
           </p>
         </footer>
       </>
