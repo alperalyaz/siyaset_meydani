@@ -270,6 +270,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                 <div className="guest-card__name">{g.name}</div>
                 <div className="guest-card__era">{g.era || <span className="guest-card__warn">Bilgi çekilemedi</span>}</div>
                 <p className="guest-card__blurb">{g.blurb}</p>
+                {g.summaryStatus === "en_wiki" && (
+                  <div className="guest-card__badge guest-card__badge--en">İngilizce Vikipedi'den</div>
+                )}
                 {g.summaryStatus === "minimal" && (
                   <div className="guest-card__badge guest-card__badge--warn">Vikipedi'ye ulaşılamadı — minimal bilgi</div>
                 )}

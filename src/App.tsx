@@ -18,7 +18,7 @@ import {
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
-import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, type SavedSession, type SessionMeta } from "./lib/store";
+import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, type SavedSession, type SessionMeta } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported } from "./lib/tts";
 import {
   DIFFICULTY_CONFIGS,
@@ -105,12 +105,22 @@ export function App() {
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [comboToast, setComboToast] = useState<SessionEvent | null>(null);
 
+  const [leaveModal, setLeaveModal] = useState(false);
+  const [closingSequence, setClosingSequence] = useState(false);
+
   const [ttsOn, setTtsOn] = useState(ttsSupported());
   const ttsRef = useRef(ttsOn);
   useEffect(() => {
     ttsRef.current = ttsOn;
     if (!ttsOn) cancelSpeech();
   }, [ttsOn]);
+
+  const [ttsRate, setTtsRate] = useState<number>(loadTtsRate);
+  const ttsRateRef = useRef(ttsRate);
+  useEffect(() => {
+    ttsRateRef.current = ttsRate;
+    saveTtsRate(ttsRate);
+  }, [ttsRate]);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
@@ -179,7 +189,8 @@ export function App() {
       signal: AbortSignal,
     ) => {
       if (ttsRef.current && text.trim()) {
-        await speak(text, { ...voiceForGuest(voiceIdx, gender), signal });
+        const vopts = voiceForGuest(voiceIdx, gender);
+        await speak(text, { ...vopts, rate: vopts.rate * ttsRateRef.current, signal });
       } else {
         await delay(readingDelay(text), signal);
       }
@@ -699,7 +710,47 @@ export function App() {
     setReplayData(null);
     setSessionResult(null);
     setComboToast(null);
+    setLeaveModal(false);
   }, [pause]);
+
+  const endSession = useCallback(() => {
+    setLeaveModal(false);
+    if (closingSequence) return;
+    setClosingSequence(true);
+
+    // Oturum boşsa direkt ayrıl
+    if (utterRef.current.length <= 1) {
+      leave();
+      setClosingSequence(false);
+      return;
+    }
+
+    pause();
+
+    append({
+      id: uid(),
+      speaker: "moderator",
+      text: "Sayın konuklar, programımızın sonuna geldik. Hepinize katılımınız ve değerli katkılarınız için çok teşekkür ederiz. Bir sonraki programda görüşmek üzere, hoşçakalın.",
+      mode: "system",
+    });
+
+    // Sezon sonucu hesapla
+    const g = guestsRef.current;
+    const result = computeSessionResult(
+      utterRef.current,
+      g,
+      ratingTracker.current.allSnapshots(),
+      startTimeRef.current,
+      difficultyRef.current,
+      earnedBadgesRef.current,
+      false,
+    );
+    const newBadges = evaluateBadges(result, utterRef.current, g, ratingTracker.current.allSnapshots());
+    result.badges = newBadges;
+    setSessionResult(result);
+    setPhase("result");
+    setClosingSequence(false);
+  }, [closingSequence, leave, pause, append]);
 
   const doSave = useCallback(() => {
     const session: SavedSession = {
@@ -856,7 +907,7 @@ export function App() {
   return (
     <div className="panel">
       <header className="panel__head">
-        <button className="btn btn--ghost btn--icon" onClick={leave} title="Ana ekran">
+        <button className="btn btn--ghost btn--icon" onClick={() => setLeaveModal(true)} title="Oturumu bitir">
           ‹
         </button>
         <div className="panel__topic">
@@ -905,11 +956,27 @@ export function App() {
         onPauseToggle={pauseToggle}
         onSuggest={doSuggest}
         onSave={doSave}
+        onEndSession={() => setLeaveModal(true)}
         hasUtterances={utterances.length > 0}
         ttsOn={ttsOn}
         ttsSupported={ttsSupported()}
         onToggleTts={() => setTtsOn((v) => !v)}
+        ttsRate={ttsRate}
+        onTtsRateChange={setTtsRate}
       />
+
+      {leaveModal && (
+        <div className="modal__backdrop" onClick={() => setLeaveModal(false)}>
+          <div className="modal modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <h2>Oturumu sonlandır</h2>
+            <p>Oturumu sonlandırmak istediğinize emin misiniz? Spiker bir kapanış konuşması yapacak ve sonuçlar gösterilecektir.</p>
+            <div className="modal__actions">
+              <button className="btn btn--ghost" onClick={() => setLeaveModal(false)}>İptal</button>
+              <button className="btn btn--primary" onClick={endSession}>Oturumu Bitir</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ApiKeyModal
         open={keyModal}

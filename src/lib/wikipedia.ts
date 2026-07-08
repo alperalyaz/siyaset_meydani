@@ -5,6 +5,9 @@ import { getCached, setCache } from "./cache";
 const TR_SUMMARY = (title: string) =>
   `https://tr.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
 
+const EN_SUMMARY = (title: string) =>
+  `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+
 interface Summary {
   extract?: string;
   description?: string;
@@ -14,22 +17,26 @@ interface Summary {
   type?: string;
 }
 
-// Bir Vikipedi başlığının canlı özetini çeker. Rate-limit'e (429/503) karşı
-// bir kez kısa beklemeyle yeniden dener.
-async function fetchSummary(title: string, retry = true): Promise<Summary | null> {
-  const cacheKey = `wp:summary:${title}`;
+// Bir Vikipedi başlığının canlı özetini belirtilen dilde çeker.
+async function fetchSummaryFromWiki(
+  wikiUrl: (title: string) => string,
+  cachePrefix: string,
+  title: string,
+  retry = true,
+): Promise<Summary | null> {
+  const cacheKey = `${cachePrefix}:${title}`;
   const cached = getCached<Summary>(cacheKey);
   if (cached !== null) return cached;
   if (getCached<boolean>(`${cacheKey}:neg`) === true) return null;
 
   try {
-    const res = await fetch(TR_SUMMARY(title), {
+    const res = await fetch(wikiUrl(title), {
       headers: { Accept: "application/json", "Api-User-Agent": "SiyasetMeydani/1.0" },
     });
     if (!res.ok) {
       if (retry && (res.status === 429 || res.status >= 500)) {
         await new Promise((r) => setTimeout(r, 900));
-        return fetchSummary(title, false);
+        return fetchSummaryFromWiki(wikiUrl, cachePrefix, title, false);
       }
       setCache(`${cacheKey}:neg`, true, 30_000);
       return null;
@@ -40,11 +47,150 @@ async function fetchSummary(title: string, retry = true): Promise<Summary | null
   } catch {
     if (retry) {
       await new Promise((r) => setTimeout(r, 900));
-      return fetchSummary(title, false);
+      return fetchSummaryFromWiki(wikiUrl, cachePrefix, title, false);
     }
     setCache(`${cacheKey}:neg`, true, 30_000);
     return null;
   }
+}
+
+// TR Vikipedi özeti (mevcut davranış).
+async function fetchTrSummary(title: string, retry = true): Promise<Summary | null> {
+  return fetchSummaryFromWiki(TR_SUMMARY, "wp:summary", title, retry);
+}
+
+// EN Vikipedi özeti (fallback).
+async function fetchEnSummary(title: string, retry = true): Promise<Summary | null> {
+  return fetchSummaryFromWiki(EN_SUMMARY, "wp:en:summary", title, retry);
+}
+
+// Wikidata entity araması — açıklama döndürür.
+interface WDEntity {
+  id: string;
+  descriptions?: Record<string, { value: string }>;
+  labels?: Record<string, { value: string }>;
+}
+
+async function fetchWikidataDescription(
+  title: string,
+): Promise<{ description: string; label: string } | null> {
+  const cacheKey = `wd:desc:${title}`;
+  const cached = getCached<{ description: string; label: string } | null>(cacheKey);
+  if (cached !== undefined) return cached;
+  if (getCached<boolean>(`${cacheKey}:neg`) === true) return null;
+
+  try {
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(
+      title,
+    )}&language=en&limit=3&format=json&origin=*`;
+    const searchRes = await fetch(searchUrl);
+    if (!searchRes.ok) {
+      setCache(`${cacheKey}:neg`, true, 60_000);
+      return null;
+    }
+    const searchData = (await searchRes.json()) as { search?: WDEntity[] };
+    const candidates = searchData.search ?? [];
+    if (candidates.length === 0) {
+      setCache(`${cacheKey}:neg`, true, 60_000);
+      return null;
+    }
+
+    const qid = candidates[0].id;
+    const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(
+      qid,
+    )}.json`;
+    const entityRes = await fetch(entityUrl);
+    if (!entityRes.ok) {
+      setCache(`${cacheKey}:neg`, true, 60_000);
+      return null;
+    }
+    const entityData = (await entityRes.json()) as {
+      entities?: Record<string, WDEntity>;
+    };
+    const entity = entityData.entities?.[qid];
+    if (!entity) {
+      setCache(`${cacheKey}:neg`, true, 60_000);
+      return null;
+    }
+
+    const desc =
+      entity.descriptions?.en?.value ||
+      entity.descriptions?.tr?.value ||
+      Object.values(entity.descriptions ?? {})[0]?.value ||
+      "";
+    const label =
+      entity.labels?.en?.value ||
+      entity.labels?.tr?.value ||
+      Object.values(entity.labels ?? {})[0]?.value ||
+      title;
+    const result = { description: desc, label };
+    setCache(cacheKey, result, 10 * 60_000);
+    return result;
+  } catch {
+    setCache(`${cacheKey}:neg`, true, 30_000);
+    return null;
+  }
+}
+
+// Konuk bilgisi çekmek için birleşik fallback zinciri.
+// TR → EN → Wikidata → minimal
+interface EnrichedInfo {
+  name: string;
+  era: string;
+  blurb: string;
+  thumbnail: string | undefined;
+  summaryStatus: Guest["summaryStatus"];
+}
+
+async function resolveGuestInfo(name: string): Promise<EnrichedInfo> {
+  // 1) TR Vikipedi
+  const tr = await fetchTrSummary(name);
+  if (tr && (!tr.type || tr.type === "standard")) {
+    const title = (tr.title ?? name).replace(/_/g, " ");
+    return {
+      name: title,
+      era: tr.description ?? "",
+      blurb: tr.extract && tr.extract.length > 40 ? tr.extract : title,
+      thumbnail: tr.thumbnail?.source,
+      summaryStatus: "ok",
+    };
+  }
+
+  // 2) EN Vikipedi — aynı başlıkla dene
+  const en = await fetchEnSummary(name);
+  if (en && (!en.type || en.type === "standard")) {
+    const title = (en.title ?? name).replace(/_/g, " ");
+    return {
+      name: title,
+      era: en.description ?? "",
+      blurb: en.extract && en.extract.length > 40 ? en.extract : title,
+      thumbnail: en.thumbnail?.source,
+      summaryStatus: "en_wiki",
+    };
+  }
+
+  // 3) Wikidata
+  const wd = await fetchWikidataDescription(name);
+  if (wd) {
+    const nm = wd.label.replace(/_/g, " ").trim() || name.replace(/_/g, " ").trim();
+    return {
+      name: nm,
+      era: wd.description || "",
+      blurb: wd.description || nm,
+      thumbnail: undefined,
+      summaryStatus: "en_wiki",
+    };
+  }
+
+  // 4) Hiçbir kaynakta yok
+  const nm = name.replace(/_/g, " ").trim();
+  return {
+    name: nm,
+    era: "",
+    blurb: nm,
+    thumbnail: undefined,
+    summaryStatus: "minimal",
+  };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -58,7 +204,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 async function enrich(seed: Seed, colorIndex: number): Promise<Guest> {
   const base = seedToGuest(seed, colorIndex);
-  const s = await fetchSummary(seed.title);
+  const s = await fetchTrSummary(seed.title);
   if (s?.extract && s.extract.length > 40) {
     base.blurb = s.extract;
   }
@@ -143,10 +289,7 @@ async function fetchPersonInfo(
 // Tartışma masasına konuk olarak oturtulması saygısızlık olacak, dinlerin
 // kutsal saydığı figürler. HARDCODED liste (kelime filtresi değil): yalnızca
 // çözümlenen Vikipedi başlığı bu isimlerden biriyle TAM eşleşirse elenir.
-// Gerçek kişilerin ayırt edici başlıkları vardır (Kanuni = "I. Süleyman",
-// Yunus Emre = "Yunus Emre"), bu yüzden tam eşleşme güvenlidir.
 const SACRED_TITLES = new Set([
-  // İslam'da anılan peygamberler (ve yaygın yazımları)
   "muhammed", "muhammad", "muhamed", "hz. muhammed",
   "isa", "îsâ", "isa mesih", "mesih",
   "musa", "mûsâ",
@@ -167,14 +310,11 @@ const SACRED_TITLES = new Set([
   "hud", "hûd",
   "lut", "lût",
   "şuayb", "zülkifl", "üzeyir",
-  // Diğer dinlerin merkezî/kutsal figürleri
   "buda", "buddha", "gautama buda", "siddhartha gautama",
   "krishna", "krişna", "zerdüşt", "zarathustra",
   "allah", "meryem", "aziz meryem",
 ]);
 
-// Özel engel listesi (genel bir kural değil, isme özel): tartışma masasına
-// konuk olarak alınmayacak belirli kişiler.
 const BLOCKED_TITLES = new Set([
   "recep tayyip erdoğan",
   "recep tayyip erdogan",
@@ -188,11 +328,10 @@ const BLOCKED_TITLES = new Set([
 function normTitle(t: string): string {
   return t
     .toLocaleLowerCase("tr")
-    .replace(/\s*\(.*?\)\s*$/, "") // "Süleyman (peygamber)" -> "süleyman"
+    .replace(/\s*\(.*?\)\s*$/, "")
     .trim();
 }
 
-// Konuk olarak eklenemeyecek kişi mi? (peygamber/kutsal figür + özel engel listesi)
 export function isBlockedGuest(s: Summary): boolean {
   const title = normTitle(s.title ?? "");
   if (BLOCKED_TITLES.has(title)) return true;
@@ -201,7 +340,6 @@ export function isBlockedGuest(s: Summary): boolean {
   return false;
 }
 
-// Bir maddenin gerçekten bir KİŞİ olduğunu doğrular + cinsiyetini döndürür.
 async function classifyPerson(s: Summary): Promise<{ isPerson: boolean; gender: Gender }> {
   if (s.wikibase_item) {
     const info = await fetchPersonInfo(s.wikibase_item);
@@ -210,8 +348,6 @@ async function classifyPerson(s: Summary): Promise<{ isPerson: boolean; gender: 
   return { isPerson: looksLikePerson(s), gender: undefined };
 }
 
-// İsimden (özet olmadan) engel kontrolü: Wikipedia takılsa bile peygamber/
-// Atatürk/Erdoğan gibi isimler yakalanır.
 export function isBlockedName(name: string): boolean {
   const t = normTitle(name);
   if (BLOCKED_TITLES.has(t)) return true;
@@ -219,10 +355,6 @@ export function isBlockedName(name: string): boolean {
   return SACRED_TITLES.has(t) || SACRED_TITLES.has(bare);
 }
 
-// Bir isim listesinden (LLM önerisi, konuya İLGİLİ) konuk kartları üretir.
-// Wikipedia özeti çekilebiliyorsa zenginleştirir; çekilemezse (rate-limit) ismi
-// yine de kullanır — çünkü LLM zaten konuya uygun önerdi. Alakasız küratörlü
-// havuza DÜŞMEK yalnızca hiç isim tutunamazsa (2'den az) son çaredir.
 export async function buildGuestsFromNames(names: string[], count = 3): Promise<Guest[]> {
   const guests: Guest[] = [];
   const used = new Set<string>();
@@ -233,34 +365,30 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     guests.push(g);
   };
 
-  // Önerilen isimleri karıştır: sürprizli kombinasyonlar.
   for (const name of shuffle(names)) {
     if (guests.length >= count) break;
-    if (isBlockedName(name)) continue; // özet olmadan da engelle
-    const s = await fetchSummary(name);
-    if (s && (!s.type || s.type === "standard")) {
-      if (isBlockedGuest(s)) continue;
-      const cls = await classifyPerson(s);
-      if (!cls.isPerson) continue;
-      const title = (s.title ?? name).replace(/_/g, " ");
+    if (isBlockedName(name)) continue;
+    const info = await resolveGuestInfo(name);
+    if (info.summaryStatus === "minimal") {
       add({
-        name: title,
-        title,
-        era: s.description ?? "",
-        blurb: s.extract && s.extract.length > 40 ? s.extract : title,
-        thumbnail: s.thumbnail?.source,
+        name: info.name,
+        title: info.name,
+        era: "",
+        blurb: info.name,
         color: colorForIndex(guests.length),
-        gender: cls.gender,
-        summaryStatus: "ok",
+        summaryStatus: "minimal",
       });
-    } else if (s === null) {
-      // Wikipedia API tamamen başarısız (hata, rate-limit, sayfa yok):
-      // konuya uygun ismi minimal bilgiyle kullan.
-      const nm = name.replace(/_/g, " ").trim();
-      if (nm) add({ name: nm, title: nm, era: "", blurb: nm, color: colorForIndex(guests.length), summaryStatus: "minimal" });
+      continue;
     }
-    // Anlam ayrımı vs. standart olmayan sayfalar: kişi doğrulaması
-    // yapılamadığı için ekleme, atla.
+    add({
+      name: info.name,
+      title: info.name,
+      era: info.era,
+      blurb: info.blurb,
+      thumbnail: info.thumbnail,
+      color: colorForIndex(guests.length),
+      summaryStatus: info.summaryStatus,
+    });
   }
 
   // SON ÇARE: en az 2 konuk yoksa küratörlü havuzdan tamamla (nadir).
@@ -277,10 +405,9 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
 
 export type ResolveResult =
   | { status: "ok"; guest: Guest }
-  | { status: "blocked" } // peygamber/kutsal figür
+  | { status: "blocked" }
   | { status: "notfound" };
 
-// Kullanıcının yazdığı ismi (ya da Vikipedi linkini) gerçek bir kişiye çözer.
 export async function resolveGuestByName(query: string): Promise<ResolveResult> {
   const q = query.trim();
   if (!q) return { status: "notfound" };
@@ -290,6 +417,7 @@ export async function resolveGuestByName(query: string): Promise<ResolveResult> 
   if (urlMatch) {
     candidates = [decodeURIComponent(urlMatch[1]).replace(/_/g, " ")];
   } else {
+    // TR Vikipedi opensearch
     try {
       const res = await fetch(
         `https://tr.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
@@ -298,34 +426,45 @@ export async function resolveGuestByName(query: string): Promise<ResolveResult> 
       );
       if (res.ok) {
         const data = (await res.json()) as [string, string[]];
-        candidates = Array.isArray(data?.[1]) ? data[1] : [];
+        if (Array.isArray(data?.[1])) candidates.push(...data[1]);
       }
     } catch {
       /* yoksay */
+    }
+    // TR'de bulunamadıysa EN opensearch'i de dene
+    if (candidates.length === 0) {
+      try {
+        const enRes = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
+            q,
+          )}&limit=5&namespace=0&format=json&origin=*`,
+        );
+        if (enRes.ok) {
+          const enData = (await enRes.json()) as [string, string[]];
+          if (Array.isArray(enData?.[1])) candidates.push(...enData[1]);
+        }
+      } catch {
+        /* yoksay */
+      }
     }
     if (candidates.length === 0) candidates = [q];
   }
 
   for (const title of candidates) {
-    const s = await fetchSummary(title);
-    if (!s || (s.type && s.type !== "standard")) continue;
-    if (isBlockedGuest(s)) return { status: "blocked" };
-    // Kullanıcı bu ismi bilerek seçti: kişi doğrulamasını ZORUNLU tutma (rate-limit'e
-    // dayanıklılık). Cinsiyeti en iyi çabayla al; alınamazsa boş geç.
-    const gender = await classifyPerson(s)
-      .then((c) => c.gender)
-      .catch(() => undefined);
-    const name = (s.title ?? title).replace(/_/g, " ");
+    const info = await resolveGuestInfo(title);
+    if (info.summaryStatus === "minimal") continue;
+    // Engelli isim kontrolü (orijinal title ile, info.name İngilizce ad olabilir)
+    if (isBlockedName(title) || isBlockedName(info.name)) return { status: "blocked" };
     return {
       status: "ok",
       guest: {
-        name,
-        title: name,
-        era: s.description ?? "",
-        blurb: s.extract && s.extract.length > 40 ? s.extract : name,
-        thumbnail: s.thumbnail?.source,
+        name: info.name,
+        title: info.name,
+        era: info.era,
+        blurb: info.blurb,
+        thumbnail: info.thumbnail,
         color: colorForIndex(0),
-        gender,
+        summaryStatus: info.summaryStatus,
       },
     };
   }
@@ -340,8 +479,6 @@ function recentDateParts(daysAgo: number): [string, string, string] {
   return [y, m, d];
 }
 
-// Vikipedi'nin son günlerdeki en çok görüntülenen maddelerinden kişi olanları çeker.
-// Başarısız olursa küratörlü havuza düşer.
 export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
   for (let back = 2; back <= 4; back++) {
     const [y, m, d] = recentDateParts(back);
@@ -364,7 +501,7 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
     const guests: Guest[] = [];
     for (const title of candidates) {
       if (guests.length >= count) break;
-      const s = await fetchSummary(title);
+      const s = await fetchTrSummary(title);
       if (!s || (s.type && s.type !== "standard")) continue;
       if (isBlockedGuest(s)) continue;
       const cls = await classifyPerson(s);
@@ -382,6 +519,8 @@ export async function pickLivePopularGuests(count = 3): Promise<Guest[]> {
     }
     if (guests.length >= count) return guests;
   }
-  // Canlı mod yeterli kişi bulamadı: küratörlü havuza düş.
   return pickCuratedGuests(count);
 }
+
+// Eski fetchSummary ihracı — geriye uyumluluk için TR'ye yönlendirir.
+export const fetchSummary = fetchTrSummary;

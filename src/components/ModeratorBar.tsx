@@ -9,10 +9,13 @@ interface Props {
   onPauseToggle: () => void;
   onSuggest: () => void;
   onSave?: () => void;
+  onEndSession?: () => void;
   hasUtterances?: boolean;
   ttsOn: boolean;
   ttsSupported: boolean;
   onToggleTts: () => void;
+  ttsRate?: number;
+  onTtsRateChange?: (rate: number) => void;
 }
 
 // Spiker kontrol çubuğu: müdahale, duraklat/devam, hazır soru önerileri.
@@ -25,10 +28,13 @@ export function ModeratorBar({
   onPauseToggle,
   onSuggest,
   onSave,
+  onEndSession,
   hasUtterances,
   ttsOn,
   ttsSupported,
   onToggleTts,
+  ttsRate,
+  onTtsRateChange,
 }: Props) {
   const [text, setText] = useState("");
 
@@ -78,9 +84,37 @@ export function ModeratorBar({
           </button>
         )}
 
+        {ttsSupported && ttsOn && ttsRate !== undefined && onTtsRateChange && (
+          <div className="tts-rate">
+            <button
+              className="btn btn--ghost btn--icon btn--sm"
+              onClick={() => onTtsRateChange(Math.max(0.5, ttsRate - 0.25))}
+              title="Yavaşlat"
+              disabled={ttsRate <= 0.5}
+            >
+              🐢
+            </button>
+            <span className="tts-rate__val">{ttsRate.toFixed(2)}x</span>
+            <button
+              className="btn btn--ghost btn--icon btn--sm"
+              onClick={() => onTtsRateChange(Math.min(2.0, ttsRate + 0.25))}
+              title="Hızlandır"
+              disabled={ttsRate >= 2.0}
+            >
+              🐇
+            </button>
+          </div>
+        )}
+
         {onSave && hasUtterances && (
           <button className="btn btn--ghost btn--icon" onClick={onSave} title="Oturumu kaydet">
             💾
+          </button>
+        )}
+
+        {onEndSession && hasUtterances && (
+          <button className="btn btn--ghost btn--icon" onClick={onEndSession} title="Oturumu bitir">
+            🔚
           </button>
         )}
 

@@ -58,6 +58,29 @@ export function clearApiKey(): void {
   }
 }
 
+// --- TTS hız tercihi ---
+
+const TTS_RATE_KEY = "siyaset_meydani_tts_rate";
+
+export function loadTtsRate(): number {
+  try {
+    const raw = localStorage.getItem(TTS_RATE_KEY);
+    if (raw === null) return 1.0;
+    const v = parseFloat(raw);
+    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.0, v)) : 1.0;
+  } catch {
+    return 1.0;
+  }
+}
+
+export function saveTtsRate(rate: number): void {
+  try {
+    localStorage.setItem(TTS_RATE_KEY, String(rate));
+  } catch {
+    /* yoksay */
+  }
+}
+
 // --- Eski tekli oturum (geriye uyumlu) ---
 
 export function saveSession(session: SavedSession): void {

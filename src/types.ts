@@ -25,8 +25,8 @@ export interface Guest {
   color: string;
   /** Seslendirmede erkek/kadın sesi seçimi için (Wikidata P21) */
   gender?: "male" | "female";
-  /** Vikipedi özeti çekilemediyse uyarı göster */
-  summaryStatus?: "ok" | "minimal" | "blocked";
+  /** ok = TR Vikipedi, en_wiki = İngilizce Vikipedi, minimal = bulunamadı */
+  summaryStatus?: "ok" | "minimal" | "blocked" | "en_wiki";
   /** Tartışma üslubu: agresif, alaycı, bilgiç, duygusal, soğukkanlı vb. */
   debateStyle?: DebateStyle;
 }

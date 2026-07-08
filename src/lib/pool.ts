@@ -388,6 +388,16 @@ export const PERSON_POOL: Seed[] = [
     gender: "male",
     debateStyle: "soğukkanlı",
   },
+  // ── Prehistorik ──
+  {
+    name: "Ötzi",
+    title: "Ötzi",
+    era: "Buz adamı, MÖ 3300",
+    blurb:
+      "Alpler'de 1991'de keşfedilen, MÖ 3300 civarında yaşamış ve buzul içinde doğal olarak mumyalanmış Neolitik çağ avcısı. Bakır baltası, ok ve yayı, çakmak taşı bıçağıyla donanmış; vücudunda 61 dövme ve ok yarası izi bulunan, dağlarda hayatta kalma mücadelesi vermiş bir savaşçı-avcı.",
+    gender: "male",
+    debateStyle: "soğukkanlı",
+  },
 ];
 
 const COLORS = [

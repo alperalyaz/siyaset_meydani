@@ -207,7 +207,7 @@ export async function runIntro(
   const msgs = introMessages(guest, guests, topic);
   if (onToken) {
     let text = "";
-    await chatStream(msgs as ChatMessage[], apiKey, (t) => { text += t; onToken(t); }, { temperature: 0.85, max_tokens: 180, signal });
+    await chatStream(msgs as ChatMessage[], apiKey, (t) => { const ft = stripNonLatin(t); text += ft; onToken(ft); }, { temperature: 0.85, max_tokens: 180, signal });
     return cleanReply(text, guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
@@ -231,7 +231,7 @@ export async function runOpeningStatement(
   const msgs = openingMessages(guest, guests, topic, stance, context);
   if (onToken) {
     let text = "";
-    await chatStream(msgs as ChatMessage[], apiKey, (t) => { text += t; onToken(t); }, { temperature: 0.85, max_tokens: 240, signal });
+    await chatStream(msgs as ChatMessage[], apiKey, (t) => { const ft = stripNonLatin(t); text += ft; onToken(ft); }, { temperature: 0.85, max_tokens: 240, signal });
     const parsed = parseJsonLoose<Partial<OpeningResult>>(text);
     if (parsed && typeof parsed.text === "string" && parsed.text.trim()) {
       return { text: cleanReply(parsed.text, guest.name), hasStance: parsed.hasStance !== false };
@@ -291,7 +291,7 @@ export async function runGuest(
   const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context);
   if (onToken) {
     let text = "";
-    await chatStream(msgs as ChatMessage[], apiKey, (t) => { text += t; onToken(t); }, { temperature: 0.9, max_tokens: 230, signal });
+    await chatStream(msgs as ChatMessage[], apiKey, (t) => { const ft = stripNonLatin(t); text += ft; onToken(ft); }, { temperature: 0.9, max_tokens: 230, signal });
     return cleanReply(text, guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
@@ -324,13 +324,20 @@ function clampRating(r: unknown): number {
 }
 
 // Model bazen "İsim:" ön eki, tırnak veya sahne yönergesi ekler; temizle.
+// Ayrıca Groq/Llama modellerinden sızabilen CJK, Kiril, Arapça karakterleri temizler.
 function cleanReply(text: string, name: string): string {
   let t = text.trim();
   const prefix = new RegExp(`^${escapeRe(name)}\\s*[:：]-?\\s*`, "i");
   t = t.replace(prefix, "");
   t = t.replace(/^["'“”]|["'“”]$/g, "");
   t = t.replace(/^\((.*?)\)\s*/, "");
-  return t.trim();
+  return stripNonLatin(t.trim());
+}
+
+// Groq/Llama gibi modellerden araya sızabilen CJK (Çin/Japon/Kore),
+// Kiril ve Arap alfabesi karakterlerini temizler.
+function stripNonLatin(text: string): string {
+  return text.replace(/[\u0400-\u052F\u0600-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\u1100-\u11FF\u3040-\u312F\u3190-\u4DBF\u4E00-\u9FFF\uA000-\uA4CF\uA960-\uA97F\uAC00-\uD7AF\uFF00-\uFFEF]+/g, "");
 }
 
 function escapeRe(s: string): string {

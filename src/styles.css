@@ -251,6 +251,11 @@ a {
   color: #ffd98a;
   border: 1px solid rgba(242, 177, 52, 0.35);
 }
+.guest-card__badge--en {
+  background: rgba(63, 182, 201, 0.15);
+  color: #7fdbe8;
+  border: 1px solid rgba(63, 182, 201, 0.35);
+}
 .guest-card__blurb {
   font-size: 0.82rem;
   color: #c3cbe4;
@@ -747,6 +752,22 @@ a {
   font-size: 0.75rem;
   margin-top: 0.4rem;
   padding-left: 0.2rem;
+}
+
+/* TTS hız kontrolü */
+.tts-rate {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+.tts-rate__val {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 2.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Uyarı / hata ---------- */
