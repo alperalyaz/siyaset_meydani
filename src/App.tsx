@@ -173,6 +173,9 @@ export function App() {
     if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) {
       setKeyReason(e.message);
       setKeyModal(true);
+    } else if (e instanceof ApiError && e.status === 429) {
+      // Groq / upstream rate-limit — retry olarak handle edilecek, pause etme
+      setError("⏳ Groq limiti doldu, birkaç saniye sonra tekrar deneniyor...");
     } else if (e instanceof ApiError) {
       setError(e.message);
     } else {
@@ -465,6 +468,7 @@ export function App() {
 
       // --- SERBEST TARTIŞMA ---
       while (runningRef.current && progressRef.current.phase === "debate") {
+        try {
         const { speaker, role } = nextSpeaker();
         const ctrl = new AbortController();
         abortRef.current = ctrl;
@@ -577,6 +581,17 @@ export function App() {
         advanceThread(speaker, role);
         if (text.trim()) await pace(text, speaker, g[speaker].gender, ctrl.signal);
         else await delay(500, ctrl.signal);
+
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 429 && runningRef.current) {
+            setError(`⏳ Groq limiti doldu, ${6 * (1)} saniye sonra tekrar deneniyor...`);
+            syncMeta();
+            await delay(6000, new AbortController().signal);
+            setError(null);
+            continue;
+          }
+          throw e;
+        }
       }
 
       // ── Oturum durdurulduysa sonuçları hesapla (ama manuel pause değilse) ──
@@ -971,6 +986,7 @@ export function App() {
           onClearSession={() => { clearSession(); setSavedSession(null); }}
           sessions={sessionMetas}
           onLoadSession={handleLoadSession}
+          onContinueSession={handleContinueSession}
           onDeleteSession={handleDeleteSession}
         />
         <ApiKeyModal

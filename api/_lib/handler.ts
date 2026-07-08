@@ -154,24 +154,40 @@ export async function handleChat(
     payload.response_format = { type: "json_object" };
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(provider.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch (err) {
-    return {
-      status: 502,
-      body: { error: "Sağlayıcıya ulaşılamadı.", detail: String(err) },
-    };
-  }
+  let upstream: Response | undefined;
+  let lastError: unknown;
+  const maxRetries = 2;
 
-  if (!upstream.ok) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      upstream = await fetch(provider.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 1500));
+        continue;
+      }
+      return {
+        status: 502,
+        body: { error: "Sağlayıcıya ulaşılamadı.", detail: String(err) },
+      };
+    }
+
+    if (upstream.ok) break;
+
+    // 429 / 503 → retry with backoff
+    if ((upstream.status === 429 || upstream.status === 503) && attempt < maxRetries) {
+      await new Promise((r) => setTimeout(r, (attempt + 1) * 1500));
+      continue;
+    }
+
     const text = await upstream.text().catch(() => "");
     return {
       status: upstream.status,
@@ -182,6 +198,9 @@ export async function handleChat(
       },
     };
   }
+
+  // for döngüsünden sadece upstream.ok === true ile çıkılır
+  if (!upstream) return { status: 502, body: { error: "Beklenmeyen hata." } };
 
   if (useStream && upstream.body) {
     return {
