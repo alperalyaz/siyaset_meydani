@@ -88,6 +88,9 @@ export function setActiveRate(rate: number): void {
   if (activeUtterance) {
     activeUtterance.rate = rate;
   }
+  if (ttsSupported() && window.speechSynthesis.speaking) {
+    try { window.speechSynthesis.pause(); window.speechSynthesis.resume(); } catch { /* ignore */ }
+  }
 }
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
@@ -141,8 +144,9 @@ export function speak(
         u.rate = opts.rate ?? 1;
         activeUtterance = u;
       };
-      u.onend = () => { activeUtterance = null; idx++; speakNext(); };
-      u.onerror = () => { activeUtterance = null; idx++; speakNext(); };
+      u.onend = () => { idx++; speakNext(); };
+      u.onerror = () => { idx++; speakNext(); };
+      activeUtterance = u; // hemen ata — cümleler arası null kalmasın
       window.speechSynthesis.speak(u);
     };
     speakNext();
