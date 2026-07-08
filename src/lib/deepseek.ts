@@ -1,4 +1,4 @@
-import type { ChatMessage } from "./store";
+import type { ChatMessage, ProviderKind } from "./store";
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -42,21 +42,25 @@ export async function chat(
   messages: ChatMessage[],
   userApiKey: string | null,
   opts: ChatOptions = {},
+  provider?: ProviderKind,
 ): Promise<ChatResult> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (userApiKey && userApiKey.trim()) {
     headers["x-user-api-key"] = userApiKey.trim();
   }
 
+  const body: Record<string, unknown> = {
+    messages,
+    json: opts.json ?? false,
+    temperature: opts.temperature,
+    max_tokens: opts.max_tokens,
+  };
+  if (provider) body.provider = provider;
+
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      messages,
-      json: opts.json ?? false,
-      temperature: opts.temperature,
-      max_tokens: opts.max_tokens,
-    }),
+    body: JSON.stringify(body),
     signal: opts.signal,
   });
 
@@ -104,21 +108,25 @@ export async function chatStream(
   userApiKey: string | null,
   onToken: (token: string) => void,
   opts: ChatOptions = {},
+  provider?: ProviderKind,
 ): Promise<{ remaining: number | null; byok: boolean }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (userApiKey && userApiKey.trim()) {
     headers["x-user-api-key"] = userApiKey.trim();
   }
 
+  const body: Record<string, unknown> = {
+    messages,
+    stream: true,
+    temperature: opts.temperature,
+    max_tokens: opts.max_tokens,
+  };
+  if (provider) body.provider = provider;
+
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      messages,
-      stream: true,
-      temperature: opts.temperature,
-      max_tokens: opts.max_tokens,
-    }),
+    body: JSON.stringify(body),
     signal: opts.signal,
   });
 

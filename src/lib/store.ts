@@ -6,10 +6,13 @@ export interface ChatMessage {
 }
 
 const KEY = "siyaset_meydani_api_key";
+const PROVIDER_KEY = "siyaset_meydani_provider";
 const SESSION_KEY = "siyaset_meydani_session";
 const META_LIST_KEY = "siyaset_meydani_meta";
 const FULL_SESSION_PREFIX = "siyaset_meydani_full_";
 const MAX_SESSIONS = 15;
+
+export type ProviderKind = "deepseek" | "openai" | "anthropic";
 
 export interface SavedSession {
   guests: Guest[];
@@ -55,6 +58,24 @@ export function saveApiKey(key: string): void {
 export function clearApiKey(): void {
   try {
     localStorage.removeItem(KEY);
+  } catch {
+    /* yoksay */
+  }
+}
+
+export function loadProvider(): ProviderKind {
+  try {
+    const raw = localStorage.getItem(PROVIDER_KEY);
+    if (raw === "openai" || raw === "anthropic") return raw;
+    return "deepseek";
+  } catch {
+    return "deepseek";
+  }
+}
+
+export function saveProvider(p: ProviderKind): void {
+  try {
+    localStorage.setItem(PROVIDER_KEY, p);
   } catch {
     /* yoksay */
   }

@@ -1,57 +1,89 @@
 import { useState } from "react";
+import type { ProviderKind } from "../lib/store";
 
 interface Props {
   open: boolean;
   reason?: string;
   currentKey: string | null;
-  onSave: (key: string) => void;
+  currentProvider?: ProviderKind;
+  onSave: (key: string, provider: ProviderKind) => void;
   onClear: () => void;
   onClose: () => void;
 }
 
-// BYOK: kullanıcı kendi DeepSeek anahtarını girer. Anahtar yalnızca
-// tarayıcıda (localStorage) saklanır; isteklerde header ile taşınır.
-export function ApiKeyModal({ open, reason, currentKey, onSave, onClear, onClose }: Props) {
+const PROVIDERS: { id: ProviderKind; label: string; prefix: string; desc: string; link: string; linkText: string; placeholder: string }[] = [
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    prefix: "sk-",
+    desc: "DeepSeek API anahtarınızı platform.deepseek.com adresinden alabilirsiniz.",
+    link: "https://platform.deepseek.com/api_keys",
+    linkText: "platform.deepseek.com",
+    placeholder: "sk-... (DeepSeek)",
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    prefix: "sk-proj-",
+    desc: "OpenAI API anahtarınızı platform.openai.com adresinden alabilirsiniz.",
+    link: "https://platform.openai.com/api-keys",
+    linkText: "platform.openai.com",
+    placeholder: "sk-proj-... (OpenAI)",
+  },
+  {
+    id: "anthropic",
+    label: "Claude",
+    prefix: "sk-ant-",
+    desc: "Anthropic API anahtarınızı console.anthropic.com adresinden alabilirsiniz.",
+    link: "https://console.anthropic.com/settings/keys",
+    linkText: "console.anthropic.com",
+    placeholder: "sk-ant-... (Claude)",
+  },
+];
+
+export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave, onClear, onClose }: Props) {
   const [value, setValue] = useState(currentKey ?? "");
+  const [provider, setProvider] = useState<ProviderKind>(currentProvider ?? "deepseek");
+
   if (!open) return null;
+
+  const sel = PROVIDERS.find((p) => p.id === provider)!;
 
   return (
     <div className="modal__backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Kendi API Anahtarınız</h2>
+        <h2>API Anahtarı</h2>
         {reason && <p className="modal__reason">{reason}</p>}
         <p className="modal__desc">
-          Kendi anahtarınızı girerek sınırsız oturum açabilirsiniz. Anahtar yalnızca bu
-          tarayıcıda saklanır, hiçbir sunucuda tutulmaz. Groq mu DeepSeek mi kullandığınız
-          anahtardan otomatik anlaşılır.
+          Kendi API anahtarınızı girerek sınırsız oturum açabilirsiniz. Anahtar yalnızca
+          bu tarayıcıda saklanır, hiçbir sunucuda tutulmaz.
         </p>
 
-        <div className="modal__providers">
-          <div className="modal__prov modal__prov--free">
-            <div className="modal__prov-head">
-              <strong>Groq</strong>
-              <span className="badge badge--free">ÜCRETSİZ</span>
-            </div>
-            <p>API'niz yok mu? Groq saniyeler içinde ücretsiz anahtar veriyor, kartsız.</p>
-            <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
-              console.groq.com/keys →
-            </a>
-          </div>
-          <div className="modal__prov">
-            <div className="modal__prov-head">
-              <strong>DeepSeek</strong>
-              <span className="badge">ücretli</span>
-            </div>
-            <p>Zaten DeepSeek anahtarınız varsa onu da kullanabilirsiniz.</p>
-            <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">
-              platform.deepseek.com →
-            </a>
-          </div>
+        <div className="modal__tabs">
+          {PROVIDERS.map((p) => (
+            <button
+              key={p.id}
+              className={`btn btn--sm ${provider === p.id ? "btn--primary" : "btn--ghost"}`}
+              onClick={() => setProvider(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="modal__prov">
+          <p>
+            {sel.desc}{" "}
+            <a href={sel.link} target="_blank" rel="noreferrer">
+              {sel.linkText}
+            </a>{" "}
+            adresinden alabilirsiniz.
+          </p>
         </div>
 
         <input
           type="password"
-          placeholder="gsk_... (Groq) veya sk-... (DeepSeek)"
+          placeholder={sel.placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           autoFocus
@@ -68,7 +100,7 @@ export function ApiKeyModal({ open, reason, currentKey, onSave, onClear, onClose
           <button
             className="btn btn--primary"
             disabled={!value.trim()}
-            onClick={() => onSave(value.trim())}
+            onClick={() => onSave(value.trim(), provider)}
           >
             Kaydet
           </button>

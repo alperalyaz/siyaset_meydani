@@ -19,6 +19,8 @@ interface Props {
   onLoadSession?: (id: string) => void;
   onContinueSession?: (id: string) => void;
   onDeleteSession?: (id: string) => void;
+  sharedSession?: { guests: Guest[]; topic: string; utterances: { id: string; speaker: string | number; text: string; mode: string }[]; rating: number } | null;
+  onClearSharedSession?: () => void;
 }
 
 const MAX_GUESTS = 50;
@@ -33,7 +35,7 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession }: Props) {
+export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession, sharedSession, onClearSharedSession }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [topic, setTopic] = useState("");
@@ -167,6 +169,24 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             onClick={() => onStart(savedSession.guests, savedSession.topic, "kolay", null)}
           >
             Kaldığın yerden devam et ▶
+          </button>
+        </section>
+      )}
+
+      {sharedSession && (
+        <section className="setup__block setup__block--saved">
+          <div className="setup__block-head">
+            <h2>🔗 Paylaşılan Oturum</h2>
+            <button className="btn btn--ghost" onClick={onClearSharedSession}>Kapat</button>
+          </div>
+          <p className="context-hint">
+            Konu: <strong>{sharedSession.topic}</strong> · {sharedSession.guests.map(g => g.name).join(", ")} · {sharedSession.utterances.length} replik
+          </p>
+          <button
+            className="btn btn--primary"
+            onClick={() => onStart(sharedSession.guests, sharedSession.topic, "kolay", null)}
+          >
+            İzle ▶
           </button>
         </section>
       )}

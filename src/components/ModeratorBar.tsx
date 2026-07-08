@@ -10,6 +10,7 @@ interface Props {
   onSuggest: () => void;
   onSave?: () => void;
   onEndSession?: () => void;
+  onShare?: () => void;
   hasUtterances?: boolean;
   ttsOn: boolean;
   ttsSupported: boolean;
@@ -29,6 +30,7 @@ export function ModeratorBar({
   onSuggest,
   onSave,
   onEndSession,
+  onShare,
   hasUtterances,
   ttsOn,
   ttsSupported,
@@ -109,6 +111,12 @@ export function ModeratorBar({
         {onSave && hasUtterances && (
           <button className="btn btn--ghost btn--icon" onClick={onSave} title="Oturumu kaydet">
             💾
+          </button>
+        )}
+
+        {onShare && hasUtterances && (
+          <button className="btn btn--ghost btn--icon" onClick={onShare} title="Paylaş">
+            📤
           </button>
         )}
 

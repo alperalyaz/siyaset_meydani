@@ -18,8 +18,9 @@ import {
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
-import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, type SavedSession, type SessionMeta } from "./lib/store";
+import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setActiveRate } from "./lib/tts";
+
 import {
   DIFFICULTY_CONFIGS,
   RatingTracker,
@@ -85,6 +86,7 @@ export function App() {
   const [running, setRunning] = useState(false);
 
   const [apiKey, setApiKey] = useState<string | null>(loadApiKey());
+  const [provider, setProvider] = useState<ProviderKind>(loadProvider);
   const [demoRemaining, setDemoRemaining] = useState<number | null>(null);
   const [keyModal, setKeyModal] = useState(false);
   const [keyReason, setKeyReason] = useState<string | undefined>();
@@ -904,9 +906,11 @@ export function App() {
     setPhase("setup");
   }, []);
 
-  const saveKey = useCallback((k: string) => {
+  const saveKey = useCallback((k: string, p: ProviderKind) => {
     saveApiKey(k);
+    saveProvider(p);
     setApiKey(k);
+    setProvider(p);
     setKeyModal(false);
     setKeyReason(undefined);
     // Panel'de API hatasıyla durduysa otomatik devam et
@@ -993,6 +997,7 @@ export function App() {
           open={keyModal}
           reason={keyReason}
           currentKey={apiKey}
+          currentProvider={provider}
           onSave={saveKey}
           onClear={removeKey}
           onClose={() => setKeyModal(false)}
@@ -1107,6 +1112,7 @@ export function App() {
         open={keyModal}
         reason={keyReason}
         currentKey={apiKey}
+        currentProvider={provider}
         onSave={saveKey}
         onClear={removeKey}
         onClose={() => setKeyModal(false)}

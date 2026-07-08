@@ -27,22 +27,18 @@ müdahaleye çağırır.
 
 ## Model / API
 
-Proxy iki OpenAI uyumlu sağlayıcıyı destekler ve anahtarın önekinden otomatik seçer:
-
-- **DeepSeek** (`sk-...`) → `deepseek-chat`
-- **Groq** (`gsk_...`) → `llama-3.3-70b-versatile` (ücretsiz katman)
+Proxy DeepSeek API'sini kullanır (`deepseek-chat` modeli).
 
 İki mod var:
 
 1. **Demo modu:** Sunucudaki `DEEPSEEK_API_KEY` kullanılır, IP başına günlük limitle. Kısa süreli,
    anahtarsız deneme için.
-2. **BYOK:** Kullanıcı kendi anahtarını girer (🔑). API'si olmayanlar **Groq'tan ücretsiz** anahtar
-   alabilir (kartsız, saniyeler içinde: <https://console.groq.com/keys>). Anahtar yalnızca
+2. **BYOK:** Kullanıcı kendi DeepSeek anahtarını girer (🔑). Anahtar yalnızca
    tarayıcının `localStorage`'ında saklanır, isteklerde header ile taşınır, hiçbir yerde kalıcı
    tutulmaz. Sınırsız kullanım.
 
 İstekler `/api/chat` proxy'si üzerinden gider; anahtar tarayıcıdan doğrudan sağlayıcıya sızmaz.
-Varsayılan modeller `GROQ_MODEL` / `DEEPSEEK_MODEL` ortam değişkenleriyle değiştirilebilir.
+Model `DEEPSEEK_MODEL` ortam değişkeniyle değiştirilebilir.
 
 ## Çalıştırma
 
