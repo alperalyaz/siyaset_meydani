@@ -321,16 +321,25 @@ export function App() {
       return { speaker: alt, role: "redirect" };
     }
 
-    // Spiker yön verdiyse: adı geçen konuk (herhangi bir isim parçası eşleşirse),
+    // Spiker yön verdiyse: adı geçen konuk (metinde en erken geçen isim),
     // yoksa en uzun susan aktif konuk. Ama az önce konuşanı atla.
     if (modNoteRef.current) {
       const note = modNoteRef.current.toLocaleLowerCase("tr");
-      const named = active.find((i) =>
+      // En erken geçen isim token'ını bul (ilk eşleşen değil, metinde önce geçen)
+      let bestIdx = -1;
+      let bestPos = Infinity;
+      active.forEach((i) => {
         guestsRef.current[i].name
           .toLocaleLowerCase("tr")
           .split(/\s+/)
-          .some((tok) => tok.length > 3 && note.includes(tok)),
-      );
+          .forEach((tok) => {
+            if (tok.length > 3) {
+              const pos = note.indexOf(tok);
+              if (pos >= 0 && pos < bestPos) { bestPos = pos; bestIdx = i; }
+            }
+          });
+      });
+      const named = bestIdx >= 0 ? bestIdx : undefined;
       let speaker = named ?? leastRecentActive();
       if (speaker === last && active.length > 1) {
         speaker = active.find((i) => i !== last) ?? speaker;
@@ -430,7 +439,7 @@ export function App() {
         abortRef.current = ctrl;
         setThinking(i);
         setStreamingText("");
-        const text = await runIntro(g[i], g, t, apiKeyRef.current, ctrl.signal, (token) => setStreamingText((p) => p + token));
+        const text = await runIntro(g[i], g, t, i, apiKeyRef.current, ctrl.signal, (token) => setStreamingText((p) => p + token));
         setThinking(null);
         setStreamingText("");
         syncMeta();
@@ -479,6 +488,7 @@ export function App() {
           t,
           stancesRef.current[i] ?? null,
           topicContextRef.current,
+          i,
           apiKeyRef.current,
           ctrl.signal,
           (token) => setStreamingText((p) => p + token),
@@ -598,6 +608,7 @@ export function App() {
           role,
           stancesRef.current[speaker] ?? null,
           topicContextRef.current,
+          speaker,
           apiKeyRef.current,
           ctrl.signal,
           (token) => setStreamingText((p) => p + token),

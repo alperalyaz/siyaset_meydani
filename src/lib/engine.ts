@@ -1,6 +1,7 @@
 import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
 import { chat, chatStream, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
 import type { ChatMessage } from "./store";
+import { speak, voiceForGuest } from "./tts";
 import {
   introMessages,
   openingMessages,
@@ -196,19 +197,60 @@ export async function assignStances(
   return { stances, genders };
 }
 
+// Streaming TTS: gelen token'ları biriktirir, cümle tamamlandıkça anında seslendirir.
+function createStreamingSpeaker(
+  voiceIdx: number,
+  gender: "male" | "female" | undefined,
+  onToken: (t: string) => void,
+): { onToken: (t: string) => void; flush: () => void; accumulator: () => string } {
+  const vopts = voiceForGuest(voiceIdx, gender);
+  let buf = "";
+
+  function speakSentence(text: string): void {
+    const clean = text.replace(/[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}☀-➿️]/gu, "")
+      .replace(/[*_]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (clean.length > 3) {
+      speak(clean, { ...vopts, signal: new AbortController().signal });
+    }
+  }
+
+  const cb = (token: string) => {
+    const ft = stripNonLatin(token);
+    buf += ft;
+    onToken(ft);
+
+    // Cümle sonu tespiti: .!?; veya satır sonundaki boşluk
+    const m = buf.match(/^(.+?[.!?;]\s*)(.*)$/s);
+    if (m) {
+      speakSentence(m[1]);
+      buf = m[2] || "";
+    }
+  };
+
+  return {
+    onToken: cb,
+    flush: () => { if (buf.trim()) speakSentence(buf); buf = ""; },
+    accumulator: () => buf,
+  };
+}
+
 export async function runIntro(
   guest: Guest,
   guests: Guest[],
   topic: string,
+  guestIndex: number,
   apiKey: string | null,
   signal?: AbortSignal,
   onToken?: (t: string) => void,
 ): Promise<string> {
   const msgs = introMessages(guest, guests, topic);
   if (onToken) {
-    let text = "";
-    await chatStream(msgs as ChatMessage[], apiKey, (t) => { const ft = stripNonLatin(t); text += ft; onToken(ft); }, { temperature: 0.85, max_tokens: 180, signal });
-    return cleanReply(text, guest.name);
+    const spk = createStreamingSpeaker(guestIndex, guest.gender, onToken);
+    await chatStream(msgs as ChatMessage[], apiKey, spk.onToken, { temperature: 0.85, max_tokens: 180, signal });
+    spk.flush();
+    return cleanReply(spk.accumulator(), guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     temperature: 0.85,
@@ -224,14 +266,17 @@ export async function runOpeningStatement(
   topic: string,
   stance: Stance | null,
   context: string | null,
+  guestIndex: number,
   apiKey: string | null,
   signal?: AbortSignal,
   onToken?: (t: string) => void,
 ): Promise<OpeningResult> {
   const msgs = openingMessages(guest, guests, topic, stance, context);
   if (onToken) {
-    let text = "";
-    await chatStream(msgs as ChatMessage[], apiKey, (t) => { const ft = stripNonLatin(t); text += ft; onToken(ft); }, { temperature: 0.85, max_tokens: 240, signal });
+    const spk = createStreamingSpeaker(guestIndex, guest.gender, onToken);
+    await chatStream(msgs as ChatMessage[], apiKey, spk.onToken, { temperature: 0.85, max_tokens: 240, signal });
+    spk.flush();
+    const text = spk.accumulator();
     const parsed = parseJsonLoose<Partial<OpeningResult>>(text);
     if (parsed && typeof parsed.text === "string" && parsed.text.trim()) {
       return { text: cleanReply(parsed.text, guest.name), hasStance: parsed.hasStance !== false };
@@ -284,15 +329,17 @@ export async function runGuest(
   role: GuestRole,
   stance: Stance | null,
   context: string | null,
+  guestIndex: number,
   apiKey: string | null,
   signal?: AbortSignal,
   onToken?: (t: string) => void,
 ): Promise<string> {
   const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context);
   if (onToken) {
-    let text = "";
-    await chatStream(msgs as ChatMessage[], apiKey, (t) => { const ft = stripNonLatin(t); text += ft; onToken(ft); }, { temperature: 0.9, max_tokens: 230, signal });
-    return cleanReply(text, guest.name);
+    const spk = createStreamingSpeaker(guestIndex, guest.gender, onToken);
+    await chatStream(msgs as ChatMessage[], apiKey, spk.onToken, { temperature: 0.9, max_tokens: 230, signal });
+    spk.flush();
+    return cleanReply(spk.accumulator(), guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     temperature: 0.9, max_tokens: 230, signal,
