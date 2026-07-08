@@ -16,22 +16,29 @@ import {
 } from "./prompts";
 
 // Açık oturum konu fikirleri üretir (çoğu polemik-gündelik, azı derin).
+// Yüksek sıcaklıkta model nadiren (~1/8) dejenere/bozuk JSON üretiyor;
+// bu durumda sessizce boş dönmek yerine bir kez daha denenir — kullanıcı
+// bunu neredeyse hiç görmez.
 export async function suggestTopicIdeas(
   avoid: string[],
   apiKey: string | null,
   signal?: AbortSignal,
   deep = false,
 ): Promise<string[]> {
-  const { content } = await chat(topicIdeasMessages(avoid, deep), apiKey, {
-    json: true,
-    temperature: 1.3,
-    max_tokens: 400,
-    signal,
-  });
-  const parsed = parseJsonLoose<{ topics?: string[] }>(content);
-  return Array.isArray(parsed?.topics)
-    ? parsed!.topics!.filter((t) => typeof t === "string" && t.trim()).slice(0, 8)
-    : [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { content } = await chat(topicIdeasMessages(avoid, deep), apiKey, {
+      json: true,
+      temperature: 1.1,
+      max_tokens: 500,
+      signal,
+    });
+    const parsed = parseJsonLoose<{ topics?: string[] }>(content);
+    const topics = Array.isArray(parsed?.topics)
+      ? parsed!.topics!.filter((t) => typeof t === "string" && t.trim()).slice(0, 8)
+      : [];
+    if (topics.length) return topics;
+  }
+  return [];
 }
 
 export interface ModerationVerdict {
@@ -140,6 +147,7 @@ export async function moderateTopic(
 }
 
 // Konuya göre ilgili kişi isimleri önerir (Vikipedi doğrulaması ayrı yapılır).
+// Nadiren model bozuk/tamamlanmamış JSON döndürebilir; bir kez daha denenir.
 export async function suggestGuestNames(
   topic: string,
   context: string | null,
@@ -148,14 +156,18 @@ export async function suggestGuestNames(
   signal?: AbortSignal,
   popular = false,
 ): Promise<string[]> {
-  const { content } = await chat(guestSuggestMessages(topic, context, avoid, popular), apiKey, {
-    json: true,
-    temperature: 1.05,
-    max_tokens: 350,
-    signal,
-  });
-  const parsed = parseJsonLoose<{ names?: string[] }>(content);
-  return Array.isArray(parsed?.names) ? parsed!.names!.filter((n) => typeof n === "string") : [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { content } = await chat(guestSuggestMessages(topic, context, avoid, popular), apiKey, {
+      json: true,
+      temperature: 1.05,
+      max_tokens: 400,
+      signal,
+    });
+    const parsed = parseJsonLoose<{ names?: string[] }>(content);
+    const names = Array.isArray(parsed?.names) ? parsed!.names!.filter((n) => typeof n === "string") : [];
+    if (names.length) return names;
+  }
+  return [];
 }
 
 // Yapımcı: konukları karşıt pozisyonlara yerleştirir (guest index'ine göre dizi).
