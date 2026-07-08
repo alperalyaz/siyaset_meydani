@@ -64,68 +64,45 @@ async function fetchEnSummary(title: string, retry = true): Promise<Summary | nu
   return fetchSummaryFromWiki(EN_SUMMARY, "wp:en:summary", title, retry);
 }
 
-// Wikidata entity araması — açıklama döndürür.
-interface WDEntity {
-  id: string;
-  descriptions?: Record<string, { value: string }>;
-  labels?: Record<string, { value: string }>;
-}
-
+// Wikidata'da adı arar ve adaylar arasından KİŞİ görünen ilkini seçer.
+// Eski Türkçe/alternatif adları da yakalar: "Eflatun" araması renk maddesini
+// değil, takma adı Eflatun olan Platon'u (Yunan filozofu) döndürür.
 async function fetchWikidataDescription(
   title: string,
 ): Promise<{ description: string; label: string } | null> {
   const cacheKey = `wd:desc:${title}`;
-  const cached = getCached<{ description: string; label: string } | null>(cacheKey);
-  if (cached !== undefined) return cached;
+  const cached = getCached<{ description: string; label: string }>(cacheKey);
+  if (cached !== null) return cached;
   if (getCached<boolean>(`${cacheKey}:neg`) === true) return null;
 
+  interface WDSearchItem {
+    id: string;
+    label?: string;
+    description?: string;
+  }
+
   try {
-    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(
-      title,
-    )}&language=en&limit=3&format=json&origin=*`;
-    const searchRes = await fetch(searchUrl);
-    if (!searchRes.ok) {
-      setCache(`${cacheKey}:neg`, true, 60_000);
-      return null;
+    for (const lang of ["tr", "en"] as const) {
+      const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(
+        title,
+      )}&language=${lang}&uselang=tr&limit=5&format=json&origin=*`;
+      const res = await fetch(searchUrl);
+      if (!res.ok) continue;
+      const data = (await res.json()) as { search?: WDSearchItem[] };
+      const person = (data.search ?? []).find(
+        (c) => c.description && descLooksLikePerson(c.description),
+      );
+      if (person) {
+        const result = {
+          description: person.description ?? "",
+          label: person.label || title,
+        };
+        setCache(cacheKey, result, 10 * 60_000);
+        return result;
+      }
     }
-    const searchData = (await searchRes.json()) as { search?: WDEntity[] };
-    const candidates = searchData.search ?? [];
-    if (candidates.length === 0) {
-      setCache(`${cacheKey}:neg`, true, 60_000);
-      return null;
-    }
-
-    const qid = candidates[0].id;
-    const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(
-      qid,
-    )}.json`;
-    const entityRes = await fetch(entityUrl);
-    if (!entityRes.ok) {
-      setCache(`${cacheKey}:neg`, true, 60_000);
-      return null;
-    }
-    const entityData = (await entityRes.json()) as {
-      entities?: Record<string, WDEntity>;
-    };
-    const entity = entityData.entities?.[qid];
-    if (!entity) {
-      setCache(`${cacheKey}:neg`, true, 60_000);
-      return null;
-    }
-
-    const desc =
-      entity.descriptions?.en?.value ||
-      entity.descriptions?.tr?.value ||
-      Object.values(entity.descriptions ?? {})[0]?.value ||
-      "";
-    const label =
-      entity.labels?.en?.value ||
-      entity.labels?.tr?.value ||
-      Object.values(entity.labels ?? {})[0]?.value ||
-      title;
-    const result = { description: desc, label };
-    setCache(cacheKey, result, 10 * 60_000);
-    return result;
+    setCache(`${cacheKey}:neg`, true, 60_000);
+    return null;
   } catch {
     setCache(`${cacheKey}:neg`, true, 30_000);
     return null;
@@ -224,43 +201,58 @@ function summaryToInfo(s: Summary, fallbackName: string, status: Guest["summaryS
   };
 }
 
+// Standart ve KİŞİ görünen sayfa mı? ("Eflatun" gibi eş-adlı renk/kavram
+// maddeleri kabul edilmez — zincir bir sonraki adıma düşer.)
+function acceptablePersonPage(s: Summary | null): s is Summary {
+  return !!s && (!s.type || s.type === "standard") && looksLikePerson(s);
+}
+
 async function resolveGuestInfo(rawName: string): Promise<EnrichedInfo> {
   const name = normalizeName(rawName);
 
   // 1) TR Vikipedi — doğrudan başlık
   const tr = await fetchTrSummary(name);
-  if (tr && (!tr.type || tr.type === "standard")) return summaryToInfo(tr, name, "ok");
+  if (acceptablePersonPage(tr)) return summaryToInfo(tr, name, "ok");
 
   // 2) EN Vikipedi — doğrudan başlık
   const en = await fetchEnSummary(name);
-  if (en && (!en.type || en.type === "standard")) return summaryToInfo(en, name, "en_wiki");
+  if (acceptablePersonPage(en)) return summaryToInfo(en, name, "en_wiki");
 
-  // 3) TR tam metin arama — LLM'in bozuk yazımını ("Sesil B. DeMille",
-  //    "Soyad, Ad") gerçek maddeye eşler.
-  const trHit = await searchWikiTitle("tr", name);
-  if (trHit) {
-    const s = await fetchTrSummary(trHit);
-    if (s && (!s.type || s.type === "standard")) return summaryToInfo(s, trHit, "ok");
-  }
-
-  // 4) EN tam metin arama
-  const enHit = await searchWikiTitle("en", name);
-  if (enHit) {
-    const s = await fetchEnSummary(enHit);
-    if (s && (!s.type || s.type === "standard")) return summaryToInfo(s, enHit, "en_wiki");
-  }
-
-  // 5) Wikidata
+  // 3) Wikidata — kişi tercihli arama. Metin aramasından ÖNCE: eski/alternatif
+  //    adı gerçek kişiye çevirir (Eflatun → Platon), metin araması ise aynı
+  //    kelimeli alakasız sayfalara ("Eflatun Pınar" anıtı) kayabilir. Bulunan
+  //    etiketle Vikipedi bir kez daha denenir ki foto/özet de gelsin.
   const wd = await fetchWikidataDescription(name);
   if (wd) {
-    const nm = wd.label.replace(/_/g, " ").trim() || name;
+    const label = wd.label.replace(/_/g, " ").trim() || name;
+    if (label.toLocaleLowerCase("tr") !== name.toLocaleLowerCase("tr")) {
+      const s2 = await fetchTrSummary(label);
+      if (acceptablePersonPage(s2)) return summaryToInfo(s2, label, "ok");
+      const s3 = await fetchEnSummary(label);
+      if (acceptablePersonPage(s3)) return summaryToInfo(s3, label, "en_wiki");
+    }
     return {
-      name: nm,
+      name: label,
       era: wd.description || "",
-      blurb: wd.description || nm,
+      blurb: wd.description || label,
       thumbnail: undefined,
       summaryStatus: "en_wiki",
     };
+  }
+
+  // 4) TR tam metin arama — LLM'in bozuk yazımını ("Soyad, Ad", ufak typo)
+  //    gerçek maddeye eşler.
+  const trHit = await searchWikiTitle("tr", name);
+  if (trHit) {
+    const s = await fetchTrSummary(trHit);
+    if (acceptablePersonPage(s)) return summaryToInfo(s, trHit, "ok");
+  }
+
+  // 5) EN tam metin arama
+  const enHit = await searchWikiTitle("en", name);
+  if (enHit) {
+    const s = await fetchEnSummary(enHit);
+    if (acceptablePersonPage(s)) return summaryToInfo(s, enHit, "en_wiki");
   }
 
   // 6) Hiçbir kaynakta yok
@@ -304,14 +296,21 @@ const PAGEVIEWS_TOP = (y: string, m: string, d: string) =>
 // Kişi olmayan tipik başlıkları eler.
 const JUNK = /[:_]|Vikipedi|Anasayfa|Özel|Kategori|Liste|listesi|\bTürkiye\b|filmi|dizisi/i;
 
-// Özet/açıklamadan "bu bir insan mı" sezgisi.
+// Özet/açıklamadan "bu bir insan mı" sezgisi (TR + EN meslek/rol sözcükleri).
+// Eş-adlılık tuzağına karşı ("Eflatun" TR'de RENK maddesi!) çözümleme
+// zinciri yalnızca bu sezgiden geçen sayfaları kabul eder.
 const OCCUPATION =
-  /(oyuncu|şarkıcı|futbolcu|siyaset|yazar|şair|padişah|sultan|hükümdar|bilim|matematik|müzisyen|yönetmen|sanatçı|komutan|imparator|kağan|filozof|hekim|ressam|besteci|kraliç|kral|prens|sultanı|başbakan|cumhurbaşkan)/i;
-const BIRTH = /\bd\.?\s?\d{3,4}\b|doğ(du|umlu)/i;
+  /(oyuncu|şarkıcı|futbolcu|sporcu|siyaset|yazar|şair|padişah|sultan|hükümdar|bilim|matematik|müzisyen|yönetmen|sanatçı|sanatkâr|komutan|imparator|kağan|filozof|hekim|ressam|besteci|kraliç|kral|prens|başbakan|cumhurbaşkan|sunucu|komedyen|gazeteci|tarihçi|mimar|iktisat|ekonomist|aktör|aktris|model|dansçı|rapçi|fenomen|iş insanı|işadamı|medya|hoca|âlim|alim|bilge|general|mareşal|amiral|denizci|kâşif|kaşif|mucit|mühendis|doktor|psikolog|sosyolog|antropolog|aktivist|devrimci|lider|teknik direktör|antrenör|pilot|astronot|avukat|hukukçu|diplomat|stratejist|teolog|keşiş|derviş|mutasavvıf|philosopher|singer|actor|actress|writer|author|politician|statesman|footballer|athlete|player|scientist|physicist|chemist|biologist|mathematician|painter|artist|composer|musician|emperor|king|queen|poet|director|filmmaker|comedian|presenter|host|businessman|entrepreneur|rapper|dancer|explorer|inventor|engineer|physician|monarch|ruler|warrior|hunter|journalist|historian|architect|economist|activist|revolutionary|leader|general|admiral|pilot|astronaut|lawyer|diplomat|strategist|theologian|monk|scholar)/i;
+const BIRTH = /\bd\.?\s?\d{3,4}\b|doğ(du|umlu)|\bborn\b|\b\d{3,4}\s?[-–]\s?\d{3,4}\b|\bMÖ\b|\bBCE?\b/i;
 
 function looksLikePerson(s: Summary): boolean {
   const hay = `${s.description ?? ""} ${s.extract ?? ""}`;
   return OCCUPATION.test(hay) || BIRTH.test(hay);
+}
+
+// Yalnızca kısa açıklama metniyle (Wikidata) kişi sezgisi.
+function descLooksLikePerson(desc: string): boolean {
+  return OCCUPATION.test(desc) || BIRTH.test(desc);
 }
 
 type Gender = "male" | "female" | undefined;
