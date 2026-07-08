@@ -203,7 +203,7 @@ export function App() {
       setKeyModal(true);
     } else if (e instanceof ApiError && e.status === 429) {
       // Groq / upstream rate-limit — retry olarak handle edilecek, pause etme
-      setError("⏳ Groq limiti doldu, birkaç saniye sonra tekrar deneniyor...");
+      setError("⏳ Hız limiti aşıldı, birkaç saniye içinde otomatik denenecek...");
     } else if (e instanceof ApiError) {
       setError(e.message);
     } else {
@@ -632,7 +632,7 @@ export function App() {
 
         } catch (e) {
           if (e instanceof ApiError && e.status === 429 && runningRef.current) {
-            setError("⏳ Groq limiti doldu, birkaç saniye sonra tekrar deneniyor...");
+            setError("⏳ Hız limiti aşıldı, birkaç saniye içinde otomatik denenecek...");
             syncMeta();
             await delay(6000, new AbortController().signal);
             setError(null);

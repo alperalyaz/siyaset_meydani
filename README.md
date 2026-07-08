@@ -27,7 +27,7 @@ müdahaleye çağırır.
 
 ## Model / API
 
-Proxy DeepSeek API'sini kullanır (`deepseek-chat` modeli).
+Proxy DeepSeek API'sini kullanır (`deepseek-v4-flash` modeli); Groq/OpenAI/Claude anahtarları da desteklenir.
 
 İki mod var:
 

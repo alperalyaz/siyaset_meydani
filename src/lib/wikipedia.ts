@@ -132,8 +132,79 @@ async function fetchWikidataDescription(
   }
 }
 
+// LLM'den gelen adı Vikipedi'nin sevdiği biçime getirir:
+// "Soyad, Ad" → "Ad Soyad"; alt çizgi ve fazla boşluk temizliği.
+function normalizeName(raw: string): string {
+  let n = raw.replace(/_/g, " ").trim();
+  const m = n.match(/^([^,]+),\s*(.+)$/);
+  if (m) n = `${m[2].trim()} ${m[1].trim()}`;
+  return n.replace(/\s+/g, " ");
+}
+
+// Arama sonucu gerçekten aranan kişi mi? Alakasız ilk sonucu (ör. "Sesil B.
+// DeMille" araması "Richard Dix" döndürebilir) elemek için sorgu ile başlık en
+// az bir anlamlı (4+ harf) kelimeyi paylaşmalı. Aksan/farklı harfler eşitlenir.
+function titleMatchesQuery(title: string, query: string): boolean {
+  const norm = (s: string) =>
+    s
+      .toLocaleLowerCase("tr")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+  const tokens = new Set(
+    norm(title)
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 4),
+  );
+  return norm(query)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4)
+    .some((w) => tokens.has(w));
+}
+
+// Tam metin arama (CirrusSearch) — yazım hatasına/ters sıraya toleranslı.
+// Sonuç yoksa API'nin "bunu mu demek istediniz" önerisiyle bir kez daha dener.
+async function searchWikiTitle(lang: "tr" | "en", query: string): Promise<string | null> {
+  const cacheKey = `wp:${lang}:search:${query}`;
+  const cached = getCached<string>(cacheKey);
+  if (cached !== null) return cached;
+  if (getCached<boolean>(`${cacheKey}:neg`) === true) return null;
+
+  const searchOnce = async (q: string): Promise<{ title: string | null; suggestion?: string }> => {
+    try {
+      const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+        q,
+      )}&srlimit=1&srnamespace=0&format=json&origin=*`;
+      const res = await fetch(url);
+      if (!res.ok) return { title: null };
+      const data = (await res.json()) as {
+        query?: { search?: { title: string }[]; searchinfo?: { suggestion?: string } };
+      };
+      return {
+        title: data.query?.search?.[0]?.title ?? null,
+        suggestion: data.query?.searchinfo?.suggestion,
+      };
+    } catch {
+      return { title: null };
+    }
+  };
+
+  let { title, suggestion } = await searchOnce(query);
+  // İlk sonuç alakasızsa (isim örtüşmesi yok) güvenme; öneriyle tekrar dene.
+  if (title && !titleMatchesQuery(title, query)) title = null;
+  if (!title && suggestion && suggestion !== query) {
+    ({ title } = await searchOnce(suggestion));
+    if (title && !titleMatchesQuery(title, suggestion)) title = null;
+  }
+  if (title) {
+    setCache(cacheKey, title, 10 * 60_000);
+    return title;
+  }
+  setCache(`${cacheKey}:neg`, true, 60_000);
+  return null;
+}
+
 // Konuk bilgisi çekmek için birleşik fallback zinciri.
-// TR → EN → Wikidata → minimal
+// TR → EN → TR arama → EN arama → Wikidata → minimal
 interface EnrichedInfo {
   name: string;
   era: string;
@@ -142,37 +213,47 @@ interface EnrichedInfo {
   summaryStatus: Guest["summaryStatus"];
 }
 
-async function resolveGuestInfo(name: string): Promise<EnrichedInfo> {
-  // 1) TR Vikipedi
+function summaryToInfo(s: Summary, fallbackName: string, status: Guest["summaryStatus"]): EnrichedInfo {
+  const title = (s.title ?? fallbackName).replace(/_/g, " ");
+  return {
+    name: title,
+    era: s.description ?? "",
+    blurb: s.extract && s.extract.length > 40 ? s.extract : title,
+    thumbnail: s.thumbnail?.source,
+    summaryStatus: status,
+  };
+}
+
+async function resolveGuestInfo(rawName: string): Promise<EnrichedInfo> {
+  const name = normalizeName(rawName);
+
+  // 1) TR Vikipedi — doğrudan başlık
   const tr = await fetchTrSummary(name);
-  if (tr && (!tr.type || tr.type === "standard")) {
-    const title = (tr.title ?? name).replace(/_/g, " ");
-    return {
-      name: title,
-      era: tr.description ?? "",
-      blurb: tr.extract && tr.extract.length > 40 ? tr.extract : title,
-      thumbnail: tr.thumbnail?.source,
-      summaryStatus: "ok",
-    };
-  }
+  if (tr && (!tr.type || tr.type === "standard")) return summaryToInfo(tr, name, "ok");
 
-  // 2) EN Vikipedi — aynı başlıkla dene
+  // 2) EN Vikipedi — doğrudan başlık
   const en = await fetchEnSummary(name);
-  if (en && (!en.type || en.type === "standard")) {
-    const title = (en.title ?? name).replace(/_/g, " ");
-    return {
-      name: title,
-      era: en.description ?? "",
-      blurb: en.extract && en.extract.length > 40 ? en.extract : title,
-      thumbnail: en.thumbnail?.source,
-      summaryStatus: "en_wiki",
-    };
+  if (en && (!en.type || en.type === "standard")) return summaryToInfo(en, name, "en_wiki");
+
+  // 3) TR tam metin arama — LLM'in bozuk yazımını ("Sesil B. DeMille",
+  //    "Soyad, Ad") gerçek maddeye eşler.
+  const trHit = await searchWikiTitle("tr", name);
+  if (trHit) {
+    const s = await fetchTrSummary(trHit);
+    if (s && (!s.type || s.type === "standard")) return summaryToInfo(s, trHit, "ok");
   }
 
-  // 3) Wikidata
+  // 4) EN tam metin arama
+  const enHit = await searchWikiTitle("en", name);
+  if (enHit) {
+    const s = await fetchEnSummary(enHit);
+    if (s && (!s.type || s.type === "standard")) return summaryToInfo(s, enHit, "en_wiki");
+  }
+
+  // 5) Wikidata
   const wd = await fetchWikidataDescription(name);
   if (wd) {
-    const nm = wd.label.replace(/_/g, " ").trim() || name.replace(/_/g, " ").trim();
+    const nm = wd.label.replace(/_/g, " ").trim() || name;
     return {
       name: nm,
       era: wd.description || "",
@@ -182,15 +263,8 @@ async function resolveGuestInfo(name: string): Promise<EnrichedInfo> {
     };
   }
 
-  // 4) Hiçbir kaynakta yok
-  const nm = name.replace(/_/g, " ").trim();
-  return {
-    name: nm,
-    era: "",
-    blurb: nm,
-    thumbnail: undefined,
-    summaryStatus: "minimal",
-  };
+  // 6) Hiçbir kaynakta yok
+  return { name, era: "", blurb: name, thumbnail: undefined, summaryStatus: "minimal" };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -369,6 +443,7 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
     if (guests.length >= count) break;
     if (isBlockedName(name)) continue;
     const info = await resolveGuestInfo(name);
+    if (isBlockedName(info.name)) continue; // arama engelli kişiye çözülmüş olabilir
     if (info.summaryStatus === "minimal") {
       add({
         name: info.name,

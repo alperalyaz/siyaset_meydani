@@ -486,7 +486,13 @@ Sadece şu JSON: {"topics":[{"i":<ham index>,"konu":"<tartışma konusu>"}]}  �
 }
 
 // Konuya göre, o alanla ilgili gerçek ve Vikipedi'de maddesi olan kişiler önerir.
-export function guestSuggestMessages(topic: string, context?: string | null, avoid?: string[]) {
+// popular=true: gündelik/magazinel konu — popüler kültür ünlüleri de masaya gelir.
+export function guestSuggestMessages(
+  topic: string,
+  context?: string | null,
+  avoid?: string[],
+  popular = false,
+) {
   const ctx =
     context && context.trim()
       ? `\nGüncel bağlam (konuyu anlaman için): ${context.trim().slice(0, 500)}\n`
@@ -495,6 +501,16 @@ export function guestSuggestMessages(topic: string, context?: string | null, avo
     avoid && avoid.length
       ? `\nŞU İSİMLERİ ÖNERME (zaten geldiler, tamamen farklılarını bul): ${avoid.slice(0, 30).join(", ")}`
       : "";
+  const mixRules = popular
+    ? `ÇOK ÖNEMLİ — KARIŞIM (konu gündelik/magazinel):
+- 8 ismin EN AZ 3'ü Türk popüler kültüründen tanınan, halkın magazinden/TV'den/müzikten bildiği YAŞAYAN ünlüler olsun (şarkıcı, oyuncu, TV sunucusu, fenomen, sporcu...). Sıradan insanların "aaa o da mı gelmiş" diyeceği isimler.
+- Kalanlar çağlar ötesi tarihî/ünlü isimler olsun — kontrast komediyi doğurur (ör. bir pop yıldızı ile bir Osmanlı padişahı aynı masada).
+- Hepsinin Türkçe Vikipedi'de maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
+    : `ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
+- FARKLI ÇAĞLARDAN seç: en az biri antik/orta çağ, en az biri son 200 yıl. Hepsi aynı dönemden/aynı ekolden OLMASIN.
+- Birbirine çok benzeyen (aynı okul, aynı görüş) 3 kişi seçme. Beklenmedik, ilk bakışta alakasız görünen ama konuya farklı bir açıdan dokunan isimleri tercih et.
+- Örnek çeşitlilik (konu 'devlet otoritesi' olsaydı): Sun Tzu, Machiavelli, İbn Haldun, Napolyon, Gandhi, Hannah Arendt gibi çok farklı çağ ve cepheler.
+- Farklı milletlerden ve farklı mesleklerden olabilirler; yeter ki konuya güçlü bir sözleri olsun.`;
   return [
     {
       role: "system" as const,
@@ -506,13 +522,12 @@ export function guestSuggestMessages(topic: string, context?: string | null, avo
       content: `Konu: "${topic}"${ctx}
 
 Bu konuyla ilgili, gerçek ve Türkçe Vikipedi'de maddesi bulunan 8 farklı ünlü KİŞİ öner.
-ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
-- FARKLI ÇAĞLARDAN seç: en az biri antik/orta çağ, en az biri son 200 yıl. Hepsi aynı dönemden/aynı ekolden OLMASIN.
-- Birbirine çok benzeyen (aynı okul, aynı görüş) 3 kişi seçme. Beklenmedik, ilk bakışta alakasız görünen ama konuya farklı bir açıdan dokunan isimleri tercih et.
-- Örnek çeşitlilik (konu 'devlet otoritesi' olsaydı): Sun Tzu, Machiavelli, İbn Haldun, Napolyon, Gandhi, Hannah Arendt gibi çok farklı çağ ve cepheler.
-- Farklı milletlerden ve farklı mesleklerden olabilirler; yeter ki konuya güçlü bir sözleri olsun.
+${mixRules}
 - ASLA peygamber ya da bir dinin kutsal saydığı figürleri önerme (Muhammed, İsa, Musa, Davud, İbrahim, Buda vb.). Onları bir tartışma masasına oturtmak saygısızlık olur. Onların yerine dinî konularda âlim, teolog, filozof, tarihçi ya da hükümdar öner.
-İsimleri Türkçe Vikipedi başlığıyla tam yaz.${avoidLine}
+İSİM YAZIMI (kritik — Vikipedi'de aranacak):
+- "Ad Soyad" sırasıyla yaz; "Soyad, Ad" biçimi YASAK (yanlış: "Makhmalbaf, Möhsün" → doğru: "Muhsin Mahmelbaf").
+- Yabancı isimleri Türkçe okunuşuyla YAZMA; Vikipedi'deki özgün yazımı kullan (yanlış: "Sesil B. DeMille" → doğru: "Cecil B. DeMille").
+- İsmi Türkçe Vikipedi madde başlığıyla aynen yaz; unvan, parantez, açıklama ekleme.${avoidLine}
 
 Sadece şu JSON: {"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },

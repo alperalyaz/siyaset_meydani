@@ -12,7 +12,7 @@ const META_LIST_KEY = "siyaset_meydani_meta";
 const FULL_SESSION_PREFIX = "siyaset_meydani_full_";
 const MAX_SESSIONS = 15;
 
-export type ProviderKind = "deepseek" | "openai" | "anthropic";
+export type ProviderKind = "deepseek" | "openai" | "anthropic" | "groq";
 
 export interface SavedSession {
   guests: Guest[];
@@ -66,7 +66,7 @@ export function clearApiKey(): void {
 export function loadProvider(): ProviderKind {
   try {
     const raw = localStorage.getItem(PROVIDER_KEY);
-    if (raw === "openai" || raw === "anthropic") return raw;
+    if (raw === "openai" || raw === "anthropic" || raw === "groq") return raw;
     return "deepseek";
   } catch {
     return "deepseek";

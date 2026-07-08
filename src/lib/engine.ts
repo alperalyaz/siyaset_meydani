@@ -146,8 +146,9 @@ export async function suggestGuestNames(
   avoid: string[],
   apiKey: string | null,
   signal?: AbortSignal,
+  popular = false,
 ): Promise<string[]> {
-  const { content } = await chat(guestSuggestMessages(topic, context, avoid), apiKey, {
+  const { content } = await chat(guestSuggestMessages(topic, context, avoid, popular), apiKey, {
     json: true,
     temperature: 1.05,
     max_tokens: 350,

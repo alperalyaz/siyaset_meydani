@@ -1,14 +1,15 @@
-// Çoklu sağlayıcı sohbet proxy'si. OpenAI uyumlu üç sağlayıcıyı
+// Çoklu sağlayıcı sohbet proxy'si. OpenAI uyumlu sağlayıcıları
 // destekler ve anahtarın önekinden otomatik seçer:
 //   - DeepSeek ("sk-..."):  demo modunda sunucu anahtarı burada.
-//   - OpenAI ("sk-proj-..." veya "sk-"):  kullanıcı kendi anahtarını girer.
+//   - Groq ("gsk_..."):  ücretsiz anahtar yolu (OpenAI uyumlu).
+//   - OpenAI ("sk-proj-..."):  kullanıcı kendi anahtarını girer.
 //   - Anthropic ("sk-ant-..."):   farklı API formatı — handler'da çeviri yapılır.
 // İstemci "provider" alanı göndererek de sağlayıcıyı belirtebilir.
 // İki mod:
 //   - Demo modu: sunucudaki DEEPSEEK_API_KEY ile, IP başına günlük limitle.
 //   - BYOK modu: kullanıcının kendi anahtarıyla, limitsiz.
 
-type ProviderName = "deepseek" | "openai" | "anthropic";
+type ProviderName = "deepseek" | "openai" | "anthropic" | "groq";
 
 interface Provider {
   name: ProviderName;
@@ -18,8 +19,9 @@ interface Provider {
 
 function detectProvider(key: string): ProviderName {
   if (key.startsWith("sk-ant-")) return "anthropic";
+  if (key.startsWith("gsk_")) return "groq";
+  if (key.startsWith("sk-proj-")) return "openai";
   if (key.startsWith("sk-")) return "deepseek"; // DeepSeek is primary for sk- keys
-  if (key.startsWith("gsk_")) return "deepseek";
   return "deepseek";
 }
 
@@ -38,11 +40,18 @@ function providerForKey(key: string, name?: ProviderName): Provider {
         url: "https://api.openai.com/v1/chat/completions",
         model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       };
+    case "groq":
+      return {
+        name: "groq",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      };
     default:
       return {
         name: "deepseek",
         url: "https://api.deepseek.com/chat/completions",
-        model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
+        // deepseek-chat 2026-07-24'te kaldırıldı; v4-flash birebir halefi.
+        model: process.env.DEEPSEEK_MODEL || "deepseek-v4-flash",
       };
   }
 }

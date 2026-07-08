@@ -13,6 +13,15 @@ interface Props {
 
 const PROVIDERS: { id: ProviderKind; label: string; prefix: string; desc: string; link: string; linkText: string; placeholder: string }[] = [
   {
+    id: "groq",
+    label: "Groq (ücretsiz)",
+    prefix: "gsk_",
+    desc: "Groq'tan ÜCRETSİZ API anahtarı alabilirsiniz — kredi kartı gerekmez.",
+    link: "https://console.groq.com/keys",
+    linkText: "console.groq.com",
+    placeholder: "gsk_... (Groq)",
+  },
+  {
     id: "deepseek",
     label: "DeepSeek",
     prefix: "sk-",
@@ -43,7 +52,7 @@ const PROVIDERS: { id: ProviderKind; label: string; prefix: string; desc: string
 
 export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave, onClear, onClose }: Props) {
   const [value, setValue] = useState(currentKey ?? "");
-  const [provider, setProvider] = useState<ProviderKind>(currentProvider ?? "deepseek");
+  const [provider, setProvider] = useState<ProviderKind>(currentProvider ?? "groq");
 
   if (!open) return null;
 

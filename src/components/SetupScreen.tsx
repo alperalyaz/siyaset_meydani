@@ -44,6 +44,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [topicTab, setTopicTab] = useState<TopicTab>("gunluk");
+  const topicTabRef = useRef<TopicTab>("gunluk");
+  topicTabRef.current = topicTab;
   // Her sekme için hazır havuzdan rastgele bir alt küme — açılışta farklı sıralama.
   const [gunlukTopics] = useState<string[]>(() => shuffleArr(TOPIC_POOL).slice(0, 6));
   const [derinTopics] = useState<string[]>(() => shuffleArr(DEEP_TOPIC_POOL).slice(0, 6));
@@ -64,7 +66,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       setGuests(null);
       setAddMsg(null);
       try {
-        const names = await suggestGuestNames(q, null, shownNamesRef.current, apiKey);
+        // Gündelik sekmesindeyken kadroya popüler kültür ünlüleri de karışır.
+        const names = await suggestGuestNames(
+          q,
+          null,
+          shownNamesRef.current,
+          apiKey,
+          undefined,
+          topicTabRef.current === "gunluk",
+        );
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
         const g = await buildGuestsFromNames(names, DEFAULT_COUNT);
         shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
@@ -307,13 +317,13 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                   {g.thumbnail ? <img src={g.thumbnail} alt={g.name} /> : <span>{initials(g.name)}</span>}
                 </div>
                 <div className="guest-card__name">{g.name}</div>
-                <div className="guest-card__era">{g.era || <span className="guest-card__warn">Bilgi çekilemedi</span>}</div>
-                <p className="guest-card__blurb">{g.blurb}</p>
+                {g.era && <div className="guest-card__era">{g.era}</div>}
+                {g.blurb !== g.name && <p className="guest-card__blurb">{g.blurb}</p>}
                 {g.summaryStatus === "en_wiki" && (
                   <div className="guest-card__badge guest-card__badge--en">İngilizce Vikipedi'den</div>
                 )}
                 {g.summaryStatus === "minimal" && (
-                  <div className="guest-card__badge guest-card__badge--warn">Vikipedi'ye ulaşılamadı — minimal bilgi</div>
+                  <div className="guest-card__badge guest-card__badge--warn">Vikipedi özeti yok — yine de masada!</div>
                 )}
               </div>
             ))}
