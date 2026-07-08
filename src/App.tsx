@@ -29,7 +29,6 @@ import {
   evaluateBadges,
   comboEvent,
   phaseChangeEvent,
-  phaseLabel,
 } from "./lib/gamification";
 
 type Phase = "setup" | "panel" | "replay" | "result";
@@ -116,7 +115,6 @@ export function App() {
   }, []);
 
   // ── Gamification state ──
-  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("warmup");
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [comboToast, setComboToast] = useState<SessionEvent | null>(null);
 
@@ -465,7 +463,6 @@ export function App() {
           progressRef.current = { phase: "debate", i: 0 };
           // Gamification: warming up is done, enter debate phase
           sessionPhaseRef.current = "debate";
-          setSessionPhase("debate");
           eventQueueRef.current.push(phaseChangeEvent("debate", Date.now()));
           flushEvent();
           continue;
@@ -535,7 +532,6 @@ export function App() {
           // FİNAL BÖLÜMÜNE GEÇİŞ
           if (!isFinal) {
             sessionPhaseRef.current = "final";
-            setSessionPhase("final");
             eventQueueRef.current.push(phaseChangeEvent("final", now));
             flushEvent();
             // Hedefe ulaşıldı— konuklara sürpriz final repliği fırsatı ver
@@ -551,7 +547,6 @@ export function App() {
 
           // FİNALDE BAŞARI → OTURUM BİTER
           sessionPhaseRef.current = "ended";
-          setSessionPhase("ended");
           append({
             id: uid(),
             speaker: "moderator",
@@ -625,7 +620,6 @@ export function App() {
       // ── Oturum durdurulduysa sonuçları hesapla (ama manuel pause değilse) ──
       if (!pausedRef.current && sessionPhaseRef.current !== "ended" && utterRef.current.length > 1) {
         sessionPhaseRef.current = "ended";
-        setSessionPhase("ended");
         const result = computeSessionResult(
           utterRef.current,
           g,
@@ -699,7 +693,6 @@ export function App() {
     earnedBadgesRef.current = [];
     startTimeRef.current = Date.now();
     sessionPhaseRef.current = "warmup";
-    setSessionPhase("warmup");
     setSessionResult(null);
     setComboToast(null);
 
@@ -939,7 +932,6 @@ export function App() {
     startTimeRef.current = Date.now();
     ratingTracker.current = new RatingTracker();
     sessionPhaseRef.current = "debate";
-    setSessionPhase("debate");
     difficultyRef.current = "kolay";
 
     setPhase("panel");
@@ -1091,7 +1083,7 @@ export function App() {
         </button>
         <div className="panel__topic">
           <span className="panel__live">
-            ● CANLI · <span className="panel__phase-badge">{phaseLabel(sessionPhase)}</span>
+             ● CANLI
           </span>
           <h1>{topic}</h1>
         </div>
