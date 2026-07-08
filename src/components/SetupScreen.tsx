@@ -180,10 +180,13 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         </div>
 
         <div className="topic-chips">
-          {(extraTopics.length ? extraTopics : poolTopics).map((t) => (
+          {(extraTopics.length
+            ? interleaveTopics(poolTopics.slice(0, 4), extraTopics)
+            : poolTopics
+          ).map((t) => (
             <button
               key={t}
-              className={`chip ${extraTopics.length ? "chip--fresh" : ""} ${topic === t ? "chip--active" : ""}`}
+              className={`chip ${extraTopics.length && extraTopics.includes(t) ? "chip--fresh" : ""} ${topic === t ? "chip--active" : ""}`}
               onClick={() => pickTopic(t)}
             >
               {t}
@@ -359,4 +362,15 @@ function shuffleArr<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// Havuz + LLM konularını karıştırır: her iki kaynaktan dönüşümlü gösterir.
+function interleaveTopics(pool: string[], llm: string[]): string[] {
+  const result: string[] = [];
+  const max = Math.max(pool.length, llm.length);
+  for (let i = 0; i < max; i++) {
+    if (i < llm.length) result.push(llm[i]);
+    if (i < pool.length) result.push(pool[i]);
+  }
+  return result;
 }

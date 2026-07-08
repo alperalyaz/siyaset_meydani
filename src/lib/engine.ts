@@ -23,7 +23,7 @@ export async function suggestTopicIdeas(
 ): Promise<string[]> {
   const { content } = await chat(topicIdeasMessages(avoid), apiKey, {
     json: true,
-    temperature: 1.1,
+    temperature: 1.3,
     max_tokens: 400,
     signal,
   });

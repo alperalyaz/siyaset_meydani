@@ -362,8 +362,8 @@ export function App() {
         syncMeta();
       }
 
-      // Spiker welcome mesajını seslendir
-      {
+      // Spiker welcome mesajını seslendir (sadece ilk başlangıçta)
+      if (utterRef.current.length <= 1) {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         const w = utterRef.current[0];

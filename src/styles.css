@@ -26,6 +26,8 @@ body,
 body {
   background:
     radial-gradient(1200px 600px at 50% -10%, #1a2140 0%, transparent 60%),
+    radial-gradient(circle at 20% 80%, rgba(139, 123, 216, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(233, 75, 107, 0.03) 0%, transparent 50%),
     var(--bg);
   color: var(--text);
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -105,6 +107,22 @@ a {
 .setup__hero {
   text-align: center;
   margin: 1.5rem 0 2.5rem;
+  position: relative;
+}
+.setup__hero::before {
+  content: "";
+  position: absolute;
+  top: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 300px;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(242, 177, 52, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 30% 50%, rgba(139, 123, 216, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 50%, rgba(233, 75, 107, 0.06) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
 }
 .setup__hero h1 {
   font-size: clamp(2.2rem, 7vw, 3.4rem);
@@ -114,11 +132,15 @@ a {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  position: relative;
+  z-index: 1;
 }
 .setup__tag {
   color: var(--muted);
   font-size: 1.05rem;
   margin-top: 0.6rem;
+  position: relative;
+  z-index: 1;
 }
 .setup__block {
   background: var(--bg-2);
@@ -126,6 +148,18 @@ a {
   border-radius: var(--radius);
   padding: 1.3rem;
   margin-bottom: 1.4rem;
+  position: relative;
+  overflow: hidden;
+}
+.setup__block::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(180deg, var(--accent) 0%, rgba(242, 177, 52, 0.1) 100%);
+  border-radius: var(--radius) 0 0 var(--radius);
 }
 .setup__block h2 {
   margin: 0 0 1rem;
@@ -218,6 +252,16 @@ a {
   font-weight: 800;
   font-size: 1.3rem;
   color: #fff;
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+.guest-card__avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.18) 0%, transparent 55%);
+  pointer-events: none;
 }
 .guest-card__avatar img {
   width: 100%;
@@ -306,8 +350,16 @@ a {
   text-align: center;
   color: var(--muted);
   font-size: 0.9rem;
-  padding: 2rem 1rem;
+  padding: 2.5rem 1rem;
   line-height: 1.5;
+  position: relative;
+}
+.guest-empty::before {
+  content: "🏛️";
+  display: block;
+  font-size: 2.2rem;
+  margin-bottom: 0.8rem;
+  opacity: 0.5;
 }
 .trend-chips {
   margin-bottom: 0.9rem;
@@ -378,6 +430,16 @@ a {
   align-items: center;
   gap: 0.8rem;
   margin-top: 1rem;
+  position: relative;
+}
+.setup__footer::before {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  margin: 0 auto 0.4rem;
+  opacity: 0.5;
 }
 .setup__meta {
   display: flex;
@@ -418,7 +480,8 @@ a {
   gap: 0.8rem;
   padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
+  background: linear-gradient(180deg, var(--bg-2) 0%, rgba(19, 24, 41, 0.6) 100%);
+  backdrop-filter: blur(6px);
 }
 .panel__topic {
   flex: 1;
@@ -479,6 +542,8 @@ a {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background:
+    radial-gradient(800px 400px at 50% 100%, rgba(242, 177, 52, 0.04) 0%, transparent 60%);
 }
 .panel__side {
   width: 190px;
@@ -527,6 +592,15 @@ a {
   font-weight: 800;
   font-size: 0.9rem;
   color: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+.turn__avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.15) 0%, transparent 50%);
+  pointer-events: none;
 }
 .turn__avatar img {
   width: 100%;
@@ -539,6 +613,7 @@ a {
   border-radius: 4px 14px 14px 14px;
   padding: 0.7rem 0.95rem;
   max-width: 80%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 .turn--cut .turn__body {
   border-style: dashed;

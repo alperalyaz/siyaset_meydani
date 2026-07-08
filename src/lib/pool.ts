@@ -3,28 +3,64 @@ import type { Guest, DebateStyle } from "../types";
 // Konu havuzları: kullanıcı yazmak istemezse hazır, kışkırtıcı başlıklar.
 // Her açılışta buradan rastgele bir alt küme gösterilir.
 export const TOPIC_POOL: string[] = [
-  "Yeniçeri Ocağı'nın kapatılması doğru muydu?",
-  "İstanbul'un fethi bir zafer mi yoksa bir medeniyetin sonu mu?",
-  "Türkçenin sadeleştirilmesi dili zenginleştirdi mi, fakirleştirdi mi?",
-  "Bir toplumu ileri taşıyan bilim mi, inanç mı?",
-  "Kahraman tek bir insan olabilir mi, yoksa kahramanlık bir halkın işi midir?",
-  "Sanat iktidara hizmet etmeli mi, ona karşı durmalı mı?",
-  "Göçebe hayat mı yerleşik hayat mı insanı özgür kılar?",
-  "Tarihi yazan galipler haklı mıdır?",
-  "Matematik keşfedilir mi, icat mı edilir?",
+  // ── Felsefe / Toplum ──
   "İyi bir lider sevilmeli mi, korkulmalı mı?",
-  "Para insanı özgürleştirir mi, köleleştirir mi?",
   "Adalet mi merhamet mi bir toplumu ayakta tutar?",
+  "Vicdan mı kanun mu üstündür?",
+  "Bir toplumu ileri taşıyan bilim mi, inanç mı?",
+  "Tarihi yazan galipler haklı mıdır?",
+  "Kader mi vardır, yoksa insan kendi yolunu mu çizer?",
+  "İyi niyetli bir diktatör mü, kararsız bir demokrasi mi?",
   "Devlet otoritesi bireysel özgürlüğün karşısında nereye kadar meşrudur?",
+  "Göçebe hayat mı yerleşik hayat mı insanı özgür kılar?",
+
+
+  // ── Tarih ──
+  "Yeniçeri Ocağı'nın kapatılması doğru muydu?",
+  "Osmanlı'nın çöküşü kaçınılmaz mıydı yoksa bir liderlik hatası mı?",
+  "Soğuk Savaş'ı kazanan gerçekten Batı mıydı?",
+  "Türkçenin sadeleştirilmesi dili zenginleştirdi mi, fakirleştirdi mi?",
+  "Bir milleti millet yapan dili midir, tarihi midir?",
+  "Roma İmparatorluğu yıkılmasaydı bugün dünya nasıl olurdu?",
+  "Gelenekler korunmalı mı, yıkılmalı mı?",
+
+  // ── Bilim / Teknoloji ──
+  "Matematik keşfedilir mi, icat mı edilir?",
+  "Yapay zeka insanlığın sonunu mu getirecek, kurtarıcısı mı olacak?",
+  "Evrenin simülasyon olduğunu Mustafa Sandal şarkılarında mı açıkladı?",
+  "İnsan beyni tamamen haritalanırsa özgür irade diye bir şey kalır mı?",
+  "Mars'a koloni kurmak insanlığın geleceği için şart mı?",
+  "Sosyal medya toplumu birleştiriyor mu, kutuplaştırıyor mu?",
+
+  // ── Gündelik Hayat ──
+  "Para insanı özgürleştirir mi, köleleştirir mi?",
+  "Başarı çalışmanın mı yoksa şansın mı eseridir?",
+  "Kahraman tek bir insan olabilir mi, yoksa kahramanlık bir halkın işi midir?",
   "Aşkın sırrı akılda mı, kalpte mi?",
   "İnsanı bozan güç müdür, para mıdır?",
-  "Gelenekler korunmalı mı, yıkılmalı mı?",
   "Cesaret mi akıl mı zor zamanda yol gösterir?",
-  "Kader mi vardır, yoksa insan kendi yolunu mu çizer?",
-  "Başarı çalışmanın mı yoksa şansın mı eseridir?",
-  "İyi niyetli bir diktatör mü, kararsız bir demokrasi mi?",
-  "Bir milleti millet yapan dili midir, tarihi midir?",
-  "Vicdan mı kanun mu üstündür?",
+  "Şöhret mutluluk getirir mi?",
+
+  // ── Sanat / Kültür ──
+  "Sanat iktidara hizmet etmeli mi, ona karşı durmalı mı?",
+  "Yapay zeka sanat üretebilir mi?",
+  "Neden eskisi gibi unutulmaz şarkılar çıkmıyor?",
+  "Sanat eseri neye göre paha biçilmez olur?",
+  "Dublaj mı altyazı mı: bir filmi gerçekten anlamak için hangisi?",
+
+  // ── Spor ──
+  "Futbol sadece bir oyun mu, yoksa modern toplumun dini mi?",
+  "En büyük sporcu kim: yetenek mi, çalışma mı belirler?",
+  "VAR adaleti getirdi mi, yoksa heyecanı mı öldürdü?",
+  "Olimpiyatlar birleştirici mi, yoksa devletlerin gövde gösterisi mi?",
+
+  // ── Absürt / Mizah ──
+  "Kediler bizi yönetiyor mu?",
+  "Dünya düz olsaydı sosyal medya daha mı az kullanılırdı?",
+  "Eğer hayvanlar konuşabilseydi insanlara ne derdi?",
+  "Neden tuvalette en iyi fikirler gelir?",
+  "Karıncalar insanlardan daha mı uygardır?",
+  "Zamanda yolculuk yapabilseydin geçmişe mi, geleceğe mi giderdin — ve neden ikisi de felaket?",
 ];
 
 // Küratörlü kişi havuzu: çağlar arası çarpışmayı garantilemek için

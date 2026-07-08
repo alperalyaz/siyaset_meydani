@@ -373,6 +373,7 @@ Sadece şu JSON:
 }
 
 // Açık oturum konu fikirleri üretir — ÇOĞU gündelik/eğlenceli, azı derin.
+// Farklı formatlarda konu üretir: "X mi Y mi?", "Neden X?", "X'in sırrı nedir?", "X hakkında ne düşünüyorsunuz?"
 export function topicIdeasMessages(avoid: string[]) {
   const avoidLine = avoid.length
     ? `\nŞunları TEKRARLAMA (yenilerini üret): ${avoid.slice(0, 24).join("; ")}`
@@ -385,17 +386,31 @@ export function topicIdeasMessages(avoid: string[]) {
     },
     {
       role: "user" as const,
-      content: `8 tane birbirinden FARKLI açık oturum konusu üret. Aradığımız kayıt (register) tam olarak şu örnekler gibi olsun:
-- "İyi bir lider sevilmeli mi, korkulmalı mı?"
-- "Devlet otoritesi bireysel özgürlüklerin karşısında nereye kadar meşrudur?"
-- "Bir toplumu ileri taşıyan bilim mi, inanç mı?"
-- "İK mı adalet mi daha öncelikli bir toplumsal değerdir?"
-- "Tarihi yazan galipler haklı mıdır?"
-- "Sanat iktidara hizmet etmeli mi, ona karşı mı durmalı?"
-- "Para mı yoksa itibar mı insanı daha çok bozar?"
-- "Cesaret mi akıl mı zor zamanda yol gösterir?"
+      content: `8 tane birbirinden FARKLI açık oturum konusu üret.
 
-Yani: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, polemik ve heyecan yaratan ama düşündüren konular. Toplum, ahlak, adalet, iktidar, para, aşk, cesaret, gelenek, ilerleme, kader gibi eksenler. Bazıları biraz daha gündelik/hafif olabilir ama asla sığ dedikodu değil. Kısa, çarpıcı, Türkçe cümleler; klişe ve ders kitabı havası olmasın.${avoidLine}
+FORMAT ÇEŞİTLİLİĞİ (hepsi aynı kalıpta olmasın, EN AZ 3 FARKLI format kullan):
+- İkili karşılaştırma: "X mi Y mi?" ör: "İyi bir lider sevilmeli mi, korkulmalı mı?"
+- Açık soru: "Neden X?" ör: "Neden büyük imparatorluklar hep aynı şekilde çöker?"
+- Tartışmalı iddia: "X hakkında ne düşünüyorsunuz?" ör: "Özgür irade diye bir şey olmadığı hakkında ne düşünüyorsunuz?"
+- Gizem/merak: "X'in sırrı nedir?" ör: "Büyük liderlerin sırrı nedir?"
+- Varsayımsal/Spekülatif: "Ya X olsaydı?" ör: "Ya İstanbul fethedilmeseydi?"
+- Trend/Güncel: "X gerçekten oluyor mu?" ör: "Uzaktan çalışma devrimi gerçekten oluyor mu?"
+- Absürt/Mizah: "X'in aslında Y olduğunu ne zaman anladınız?" ör: "Hayatın aslında bir sitcom olduğunu ne zaman anladınız?"
+
+KATEGORİ ÇEŞİTLİLİĞİ (her seferinde farklı alanlardan seç):
+- Felsefe/Toplum, Tarih, Bilim/Teknoloji, Gündelik Hayat, Sanat/Kültür, Spor, Absürt/Mizah
+
+Örnekler:
+- "Bir toplumu ileri taşıyan bilim mi, inanç mı?"
+- "Neden eskisi gibi unutulmaz şarkılar çıkmıyor?"
+- "Yapay zeka sanat üretebilir mi?"
+- "Kediler bizi yönetiyor mu?"
+- "Roma İmparatorluğu yıkılmasaydı bugün dünya nasıl olurdu?"
+- "Şöhret mutluluk getirir mi?"
+- "En büyük sporcu kim: yetenek mi, çalışma mı belirler?"
+- "Neden tuvalette en iyi fikirler gelir?"
+
+Kurallar: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, polemik yaratan ama düşündüren konular. Kısa ve çarpıcı. Klişe/ders kitabı havası olmasın.${avoidLine}
 
 Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },
