@@ -54,6 +54,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [addName, setAddName] = useState("");
   const [adding, setAdding] = useState(false);
   const [addMsg, setAddMsg] = useState<string | null>(null);
+  // Sessiz hata olmasın: boş sonuç/yedek havuz gibi durumlar kullanıcıya söylenir.
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Daha önce önerilmiş isimler — "Yeniden"de tekrar gelmesinler (çeşitlilik).
   const shownNamesRef = useRef<string[]>([]);
@@ -65,6 +67,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       setLoading(true);
       setGuests(null);
       setAddMsg(null);
+      setNotice(null);
       try {
         // Gündelik sekmesindeyken kadroya popüler kültür ünlüleri de karışır;
         // isim sırası 2 pop : 1 klasik taşıdığı için seçimde korunur.
@@ -77,6 +80,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           undefined,
           popularMode,
         );
+        if (names.length === 0) {
+          setNotice(
+            "⚠️ Yapay zekâ bu konu için konuk öneremedi; hazır havuzdan konuk getirildi. Tekrar denemek için ↻ Başkaları'na basın.",
+          );
+        }
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
         const g = await buildGuestsFromNames(names, DEFAULT_COUNT, { preserveOrder: popularMode });
         shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
@@ -112,11 +120,14 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const seenTopicsRef = useRef<string[]>([...TOPIC_POOL, ...DEEP_TOPIC_POOL]);
   const loadTopics = useCallback(async () => {
     setLoadingTopics(true);
+    setNotice(null);
     try {
       const fresh = await suggestTopicIdeas(seenTopicsRef.current, apiKey, undefined, topicTab === "derin");
       if (fresh.length) {
         seenTopicsRef.current = [...seenTopicsRef.current, ...fresh].slice(-80);
         setExtraTopics(fresh.slice(0, 6)); // en fazla 6 göster
+      } else {
+        setNotice("⚠️ Konu üretilemedi — yapay zekâ beklenmedik biçimde yanıt verdi. Tekrar deneyin.");
       }
     } catch (e) {
       onError(e);
@@ -263,6 +274,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             {loadingTopics ? "⏳ Konu üretiliyor…" : "↻ Başka konular öner"}
           </button>
         </div>
+        {notice && <p className="setup-notice">{notice}</p>}
         <div className="topic-row">
           <input
             className="topic-input"

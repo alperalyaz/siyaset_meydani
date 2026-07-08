@@ -402,6 +402,46 @@ a {
   opacity: 0.6;
   cursor: default;
 }
+/* Kurulum ekranı hata bandı: sessiz hatalar sesli olsun. */
+.error-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: min(92vw, 640px);
+  padding: 0.75rem 1rem;
+  background: #3a1520;
+  border: 1px solid #e94b6b;
+  border-radius: 12px;
+  color: #ffd9e0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.error-toast__close {
+  border: none;
+  background: transparent;
+  color: #ffd9e0;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  flex-shrink: 0;
+}
+.setup-notice {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  background: rgba(242, 177, 52, 0.08);
+  border: 1px solid rgba(242, 177, 52, 0.4);
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
 .guest-empty {
   grid-column: 1 / -1;
   text-align: center;

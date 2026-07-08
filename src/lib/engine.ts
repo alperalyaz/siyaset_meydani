@@ -240,6 +240,14 @@ async function streamReply(
     },
     { ...opts, signal },
   );
+  // Akış hiç içerik üretmeden bittiyse bunu sessizce yutma (model/kota sorunu).
+  if (!full.trim()) {
+    throw new ApiError(
+      "Sağlayıcı boş yanıt döndürdü. Model/kota sorunu olabilir — tekrar deneyin; sürerse farklı bir API anahtarı girin.",
+      502,
+      "EMPTY_CONTENT",
+    );
+  }
   return full;
 }
 

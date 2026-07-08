@@ -249,8 +249,9 @@ export async function handleChat(
   }
 
   // --- OpenAI / DeepSeek (OpenAI uyumlu) ---
+  const model = String(body.model || provider.model);
   const payload: Record<string, unknown> = {
-    model: body.model || provider.model,
+    model,
     messages: body.messages,
     temperature: body.temperature ?? 0.9,
     max_tokens: body.max_tokens ?? 400,
@@ -258,6 +259,12 @@ export async function handleChat(
   };
   if (body.json) {
     payload.response_format = { type: "json_object" };
+  }
+  // DeepSeek V4 varsayılanı "thinking: enabled" — düşünme tokenları max_tokens
+  // bütçesini yiyip content'i BOŞ bırakıyor. Eski deepseek-chat davranışı
+  // (hızlı, düşünmesiz) için açıkça kapatılır.
+  if (providerName === "deepseek" && model.startsWith("deepseek-v4")) {
+    payload.thinking = { type: "disabled" };
   }
 
   let upstream: Response | undefined;

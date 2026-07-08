@@ -1060,6 +1060,14 @@ export function App() {
   if (phase === "setup") {
     return (
       <>
+        {error && (
+          <div className="error-toast" role="alert">
+            <span>⚠️ {error}</span>
+            <button className="error-toast__close" onClick={() => setError(null)} title="Kapat">
+              ×
+            </button>
+          </div>
+        )}
         <SetupScreen
           onStart={beginSession}
           onOpenKey={() => setKeyModal(true)}

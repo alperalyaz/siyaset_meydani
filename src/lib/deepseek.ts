@@ -77,6 +77,18 @@ export async function chat(
   }
 
   lastMeta = { remaining: data.remaining ?? null, byok: data.byok ?? false };
+
+  // Sağlayıcı 200 dönüp içerik BOŞ bırakabiliyor (model/kota/parametre
+  // sorunu). Bunu sessizce yutmak "hiçbir şey olmuyor" hissi yaratır;
+  // hata olarak fırlat ki arayüz kullanıcıya söyleyebilsin.
+  if (!(data.content ?? "").trim()) {
+    throw new ApiError(
+      "Sağlayıcı boş yanıt döndürdü. Model/kota sorunu olabilir — tekrar deneyin; sürerse farklı bir API anahtarı girin.",
+      502,
+      "EMPTY_CONTENT",
+    );
+  }
+
   return {
     content: data.content ?? "",
     remaining: data.remaining ?? null,
