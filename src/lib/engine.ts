@@ -20,8 +20,9 @@ export async function suggestTopicIdeas(
   avoid: string[],
   apiKey: string | null,
   signal?: AbortSignal,
+  deep = false,
 ): Promise<string[]> {
-  const { content } = await chat(topicIdeasMessages(avoid), apiKey, {
+  const { content } = await chat(topicIdeasMessages(avoid, deep), apiKey, {
     json: true,
     temperature: 1.3,
     max_tokens: 400,

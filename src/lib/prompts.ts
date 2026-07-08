@@ -379,43 +379,74 @@ Sadece şu JSON:
 
 // Açık oturum konu fikirleri üretir — ÇOĞU gündelik/eğlenceli, azı derin.
 // Farklı formatlarda konu üretir: "X mi Y mi?", "Neden X?", "X'in sırrı nedir?", "X hakkında ne düşünüyorsunuz?"
-export function topicIdeasMessages(avoid: string[]) {
+export function topicIdeasMessages(avoid: string[], deep = false) {
   const avoidLine = avoid.length
     ? `\nŞunları TEKRARLAMA (yenilerini üret): ${avoid.slice(0, 24).join("; ")}`
     : "";
+
+  if (deep) {
+    return [
+      {
+        role: "system" as const,
+        content:
+          "Sen bir açık oturum programının editörüsün. Bu sefer DERİN, DÜŞÜNDÜREN, felsefî/tarihî/toplumsal konular üreteceksin — çağlar ötesi şahsiyetlerin (filozoflar, hükümdarlar, bilim insanları) en iyi kapıştığı, izleyiciyi de düşünmeye iten başlıklar. Yine de ulaşılabilir olsun: 'ahlak epistemolojik olarak nesnel midir' gibi aşırı teknik/akademik jargon YASAK; sıradan bir insan da bir tarafı tutabilmeli.",
+      },
+      {
+        role: "user" as const,
+        content: `8 tane birbirinden FARKLI, DERİN ve düşündüren açık oturum konusu üret.
+
+Alanlar: felsefe/ahlak, toplum/siyaset, tarih, bilim/teknoloji, insan doğası, sanat. İki güçlü cephesi olan, üzerine saatlerce tartışılabilecek meseleler.
+
+FORMAT ÇEŞİTLİLİĞİ (EN AZ 3 farklı format):
+- İkili karşılaştırma: ör: "Adalet mi, merhamet mi bir toplumu ayakta tutar?"
+- Açık soru: ör: "Neden büyük imparatorluklar hep aynı şekilde çöker?"
+- Varsayımsal: ör: "Roma yıkılmasaydı bugün dünya nasıl olurdu?"
+- Tartışmalı iddia: ör: "Tarihi yazan galipler haklı mıdır?"
+
+Örnekler (bu DERİNLİĞİ yakala):
+- "İyi niyetli bir diktatör mü, kararsız bir demokrasi mi?"
+- "Vicdan mı, kanun mu üstündür?"
+- "Matematik keşfedilir mi, icat mı edilir?"
+- "İnsanı bozan güç müdür, para mıdır?"
+
+Kurallar: derin ama anlaşılır, iki cepheli, polemikli. Kısa ve çarpıcı.${avoidLine}
+
+Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
+      },
+    ];
+  }
+
   return [
     {
       role: "system" as const,
       content:
-        "Sen bir açık oturum programının editörüsün. Amacın SOKAKTAKİ İNSANIN bile fikir sahibi olabileceği, polemik yaratan ama tarihî şahsiyetlerin de derinlemesine kapışabileceği konular üretmek. Ne fildişi kule akademik felsefesi (ör. 'ahlak epistemolojik olarak nesnel midir' YASAK), ne de sıradan dedikodu.",
+        "Sen bir açık oturum programının editörüsün. Programın ruhu: SOKAKTAKİ İNSANIN her gün tartıştığı GÜNDELİK meseleleri (ilişki, para, yemek, komşuluk, telefon, trafik, futbol, nesil farkı, ev içi küçük savaşlar) çağlar ötesi şahsiyetlere tartıştırmak. Komedi de buradan çıkar. Konular herkesin masada/çay ocağında/grup sohbetinde kavga edebileceği türden olmalı. Fildişi kule akademik felsefesi (ör. 'ahlak epistemolojik olarak nesnel midir', 'özgür irade var mı') YASAK. Kuru dedikodu da değil — iki güçlü cephesi olan, polemikli günlük mesele.",
     },
     {
       role: "user" as const,
-      content: `8 tane birbirinden FARKLI açık oturum konusu üret.
+      content: `8 tane birbirinden FARKLI, GÜNDELİK açık oturum konusu üret.
+
+Konuların NEREDEYSE HEPSİ günlük hayattan olsun (ilişki, para, yemek-içme, telefon/sosyal medya alışkanlıkları, komşuluk, trafik/şehir, futbol, nesil farkı, ev içi küçük tartışmalar). EN FAZLA 1 tanesi biraz daha derin/felsefi olabilir.
 
 FORMAT ÇEŞİTLİLİĞİ (hepsi aynı kalıpta olmasın, EN AZ 3 FARKLI format kullan):
-- İkili karşılaştırma: "X mi Y mi?" ör: "İyi bir lider sevilmeli mi, korkulmalı mı?"
-- Açık soru: "Neden X?" ör: "Neden büyük imparatorluklar hep aynı şekilde çöker?"
-- Tartışmalı iddia: "X hakkında ne düşünüyorsunuz?" ör: "Özgür irade diye bir şey olmadığı hakkında ne düşünüyorsunuz?"
-- Gizem/merak: "X'in sırrı nedir?" ör: "Büyük liderlerin sırrı nedir?"
-- Varsayımsal/Spekülatif: "Ya X olsaydı?" ör: "Ya İstanbul fethedilmeseydi?"
-- Trend/Güncel: "X gerçekten oluyor mu?" ör: "Uzaktan çalışma devrimi gerçekten oluyor mu?"
-- Absürt/Mizah: "X'in aslında Y olduğunu ne zaman anladınız?" ör: "Hayatın aslında bir sitcom olduğunu ne zaman anladınız?"
+- İkili karşılaştırma: "X mi Y mi?" ör: "Ev almak mı akıllıca, kirada oturmak mı?"
+- Açık soru: "Neden X?" ör: "Neden en iyi fikirler tuvalette gelir?"
+- Tartışmalı iddia: "X olur mu?" ör: "Eski sevgiliyle arkadaş kalınır mı?"
+- Gündelik ikilem: ör: "Yemekte telefon masaya konur mu?"
+- Varsayımsal: "Ya X olsaydı?" ör: "Ya hiç sosyal medya olmasaydı?"
+- Absürt/Mizah: ör: "Kediler bizi yönetiyor mu?"
 
-KATEGORİ ÇEŞİTLİLİĞİ (her seferinde farklı alanlardan seç):
-- Felsefe/Toplum, Tarih, Bilim/Teknoloji, Gündelik Hayat, Sanat/Kültür, Spor, Absürt/Mizah
+Örnekler (bu TONU yakala):
+- "Ananasın pizzada ne işi var?"
+- "İlk buluşmada hesabı kim ödemeli?"
+- "Misafirliğe eli boş gidilir mi?"
+- "Trafikte korna çalmak derdi çözer mi, sinir mi bozar?"
+- "Gençler gerçekten tembelleşti mi?"
+- "Grup sohbetinden sessizce çıkmak ayıp mı?"
+- "Futbol sadece bir oyun mu, yoksa modern toplumun dini mi?"
+- "Klima açık mı uyunur, kapalı mı?"
 
-Örnekler:
-- "Bir toplumu ileri taşıyan bilim mi, inanç mı?"
-- "Neden eskisi gibi unutulmaz şarkılar çıkmıyor?"
-- "Yapay zeka sanat üretebilir mi?"
-- "Kediler bizi yönetiyor mu?"
-- "Roma İmparatorluğu yıkılmasaydı bugün dünya nasıl olurdu?"
-- "Şöhret mutluluk getirir mi?"
-- "En büyük sporcu kim: yetenek mi, çalışma mı belirler?"
-- "Neden tuvalette en iyi fikirler gelir?"
-
-Kurallar: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, polemik yaratan ama düşündüren konular. Kısa ve çarpıcı. Klişe/ders kitabı havası olmasın.${avoidLine}
+Kurallar: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, günlük ama polemikli konular. Kısa ve çarpıcı. Ders kitabı/akademik havası KESİNLİKLE olmasın.${avoidLine}
 
 Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },

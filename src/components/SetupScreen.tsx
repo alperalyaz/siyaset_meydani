@@ -3,7 +3,9 @@ import type { Guest, Difficulty } from "../types";
 import type { SessionMeta } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas } from "../lib/engine";
-import { TOPIC_POOL } from "../lib/pool";
+import { TOPIC_POOL, DEEP_TOPIC_POOL } from "../lib/pool";
+
+type TopicTab = "gunluk" | "derin";
 
 interface Props {
   onStart: (guests: Guest[], topic: string, difficulty: Difficulty, context?: string | null) => void;
@@ -41,8 +43,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [topic, setTopic] = useState("");
   const [extraTopics, setExtraTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
-  // Hazır havuzdan rastgele bir alt küme — her açılışta farklı sıralama.
-  const [poolTopics] = useState<string[]>(() => shuffleArr(TOPIC_POOL).slice(0, 6));
+  const [topicTab, setTopicTab] = useState<TopicTab>("gunluk");
+  // Her sekme için hazır havuzdan rastgele bir alt küme — açılışta farklı sıralama.
+  const [gunlukTopics] = useState<string[]>(() => shuffleArr(TOPIC_POOL).slice(0, 6));
+  const [derinTopics] = useState<string[]>(() => shuffleArr(DEEP_TOPIC_POOL).slice(0, 6));
+  const poolTopics = topicTab === "derin" ? derinTopics : gunlukTopics;
 
   const [addName, setAddName] = useState("");
   const [adding, setAdding] = useState(false);
@@ -91,14 +96,14 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     if (topic.trim()) void drawForTopic(topic);
   }, [topic, drawForTopic]);
 
-  // Önceden gösterilmiş tüm konular (tekrar üretmemek için).
-  const seenTopicsRef = useRef<string[]>([...TOPIC_POOL]);
+  // Önceden gösterilmiş tüm konular (tekrar üretmemek için) — iki havuz da.
+  const seenTopicsRef = useRef<string[]>([...TOPIC_POOL, ...DEEP_TOPIC_POOL]);
   const loadTopics = useCallback(async () => {
     setLoadingTopics(true);
     try {
-      const fresh = await suggestTopicIdeas(seenTopicsRef.current, apiKey);
+      const fresh = await suggestTopicIdeas(seenTopicsRef.current, apiKey, undefined, topicTab === "derin");
       if (fresh.length) {
-        seenTopicsRef.current = [...seenTopicsRef.current, ...fresh].slice(-60);
+        seenTopicsRef.current = [...seenTopicsRef.current, ...fresh].slice(-80);
         setExtraTopics(fresh.slice(0, 6)); // en fazla 6 göster
       }
     } catch (e) {
@@ -106,7 +111,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     } finally {
       setLoadingTopics(false);
     }
-  }, [apiKey, onError]);
+  }, [apiKey, onError, topicTab]);
+
+  // Sekme değişince üretilmiş (diğer sekmeye ait) taze konuları temizle.
+  const switchTab = useCallback((tab: TopicTab) => {
+    setTopicTab((cur) => {
+      if (cur !== tab) setExtraTopics([]);
+      return tab;
+    });
+  }, []);
 
   const addGuest = useCallback(async () => {
     const q = addName.trim();
@@ -197,6 +210,25 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           <h2>1 · Bugünün Konusu</h2>
           <button className="btn btn--ghost" onClick={() => loadTopics()} disabled={loadingTopics}>
             {loadingTopics ? "Konu üretiliyor…" : "Başka konular öner"}
+          </button>
+        </div>
+
+        <div className="topic-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={topicTab === "gunluk"}
+            className={`topic-tab ${topicTab === "gunluk" ? "topic-tab--active" : ""}`}
+            onClick={() => switchTab("gunluk")}
+          >
+            ☕ Gündelik
+          </button>
+          <button
+            role="tab"
+            aria-selected={topicTab === "derin"}
+            className={`topic-tab ${topicTab === "derin" ? "topic-tab--active" : ""}`}
+            onClick={() => switchTab("derin")}
+          >
+            🧠 Derin / Felsefi
           </button>
         </div>
 

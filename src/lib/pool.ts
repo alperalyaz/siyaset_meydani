@@ -2,22 +2,91 @@ import type { Guest, DebateStyle } from "../types";
 
 // Konu havuzları: kullanıcı yazmak istemezse hazır, kışkırtıcı başlıklar.
 // Her açılışta buradan rastgele bir alt küme gösterilir.
+// NOT: Programın ruhu "sokaktaki adamın konuları" — herkesin masada,
+// çay ocağında, grup sohbetinde tartıştığı gündelik meseleler. Komedi
+// bunları çağlar ötesi şahsiyetlere tartıştırmaktan çıkıyor (Sokrates
+// ananaslı pizzayı savunsun). Ağır felsefe/tarih kasıtlı olarak azınlıkta
+// (~10'da 1); çoğunluk ilişki, para, yemek, komşuluk, telefon, trafik...
 export const TOPIC_POOL: string[] = [
+  // ── İlişkiler / aşk ──
+  "Eski sevgiliyle arkadaş kalınır mı?",
+  "Kıskançlık aşkın kanıtı mı, güvensizliğin mi?",
+  "İlk buluşmada hesabı kim ödemeli?",
+  "Hiç kavga etmeyen çift mi sağlıklıdır, kavga edip barışan mı?",
+  "İlişkide telefon karıştırmak hakkın mı, ihanetin mi?",
+
+  // ── Para / gündelik ekonomi ──
+  "Ev almak mı akıllıca, kirada oturmak mı?",
+  "Pahalı telefona bu kadar para vermeye değer mi?",
+  "Kredi kartı hayatı kolaylaştırır mı, borca mı batırır?",
+  "Borç para veren dostunu da kaybeder mi?",
+  "Ucuz alıp sık değiştirmek mi, pahalı alıp yıllarca kullanmak mı?",
+
+  // ── Yeme / içme ──
+  "Ananasın pizzada ne işi var?",
+  "Çayın yanına şeker atmak çaya hakaret mi?",
+  "Kahvaltı günün en önemli öğünü mü, yoksa abartı mı?",
+  "Dışarıda yemek mi keyifli, evde yemek mi?",
+  "Acılı yemek yiyene neden 'yiğit' gözüyle bakılır?",
+
+  // ── Telefon / sosyal medya alışkanlıkları ──
+  "Yemekte telefon masaya konur mu?",
+  "Grup sohbetinden sessizce çıkmak ayıp mı?",
+  "Doğum gününü sosyal medyada kutlamayan seni unutmuş mu sayılır?",
+  "Çocukların eline telefon vermek şart mı, felaket mi?",
+
+  // ── Komşuluk / sosyal normlar ──
+  "Misafirliğe eli boş gidilir mi?",
+  "Düğünde takı mı takmalı, para mı vermeli?",
+  "Komşuyla ne kadar samimi olunmalı?",
+  "Otobüste yaşlıya yer vermek zorunluluk mu, incelik mi?",
+
+  // ── Nesil / hayat ──
+  "Eskiden her şey gerçekten daha mı güzeldi?",
+  "Gençler gerçekten tembelleşti mi?",
+  "Diploma hâlâ önemli mi, yoksa artık gereksiz mi?",
+  "Erken kalkan mı kazanır, gece çalışan mı?",
+
+  // ── Şehir / trafik ──
+  "İstanbul'da yaşamaya değer mi?",
+  "Trafikte korna çalmak derdi çözer mi, sinir mi bozar?",
+  "Büyük şehir mi huzur verir, küçük kasaba mı?",
+
+  // ── Futbol / eğlence ──
+  "Futbol sadece bir oyun mu, yoksa modern toplumun dini mi?",
+  "Taraftarlık bir kimlik mi, takıntı mı?",
+  "Dizi mi film mi daha çok vakit hırsızı?",
+  "Dublaj mı altyazı mı: bir filmi gerçekten anlamak için hangisi?",
+
+  // ── Ev içi küçük savaşlar ──
+  "Tuvalet kâğıdının ucu öne mi gelmeli, arkaya mı?",
+  "Klima açık mı uyunur, kapalı mı?",
+  "Bulaşık hemen mi yıkanmalı, akşama mı biriktirilmeli?",
+
+  // ── Absürt / mizah ──
+  "Kediler bizi yönetiyor mu?",
+  "Neden en iyi fikirler tuvalette gelir?",
+  "Hayvanlar konuşabilseydi insanlara ne derdi?",
+];
+
+// "Derin" sekmesi: düşünmeye değer, felsefi/tarihî, iki güçlü cepheli
+// konular. Varsayılan değil; kullanıcı sekme değiştirince görünür. Bunlar
+// da çağlar ötesi şahsiyetlerin en iyi kapıştığı, fikir veren başlıklar.
+export const DEEP_TOPIC_POOL: string[] = [
   // ── Felsefe / Toplum ──
   "İyi bir lider sevilmeli mi, korkulmalı mı?",
-  "Adalet mi merhamet mi bir toplumu ayakta tutar?",
-  "Vicdan mı kanun mu üstündür?",
+  "Adalet mi, merhamet mi bir toplumu ayakta tutar?",
+  "Vicdan mı, kanun mu üstündür?",
   "Bir toplumu ileri taşıyan bilim mi, inanç mı?",
   "Tarihi yazan galipler haklı mıdır?",
   "Kader mi vardır, yoksa insan kendi yolunu mu çizer?",
   "İyi niyetli bir diktatör mü, kararsız bir demokrasi mi?",
   "Devlet otoritesi bireysel özgürlüğün karşısında nereye kadar meşrudur?",
-  "Göçebe hayat mı yerleşik hayat mı insanı özgür kılar?",
-
+  "Göçebe hayat mı, yerleşik hayat mı insanı özgür kılar?",
 
   // ── Tarih ──
   "Yeniçeri Ocağı'nın kapatılması doğru muydu?",
-  "Osmanlı'nın çöküşü kaçınılmaz mıydı yoksa bir liderlik hatası mı?",
+  "Osmanlı'nın çöküşü kaçınılmaz mıydı, yoksa bir liderlik hatası mı?",
   "Soğuk Savaş'ı kazanan gerçekten Batı mıydı?",
   "Türkçenin sadeleştirilmesi dili zenginleştirdi mi, fakirleştirdi mi?",
   "Bir milleti millet yapan dili midir, tarihi midir?",
@@ -27,40 +96,31 @@ export const TOPIC_POOL: string[] = [
   // ── Bilim / Teknoloji ──
   "Matematik keşfedilir mi, icat mı edilir?",
   "Yapay zeka insanlığın sonunu mu getirecek, kurtarıcısı mı olacak?",
-  "Evrenin simülasyon olduğunu Mustafa Sandal şarkılarında mı açıkladı?",
   "İnsan beyni tamamen haritalanırsa özgür irade diye bir şey kalır mı?",
   "Mars'a koloni kurmak insanlığın geleceği için şart mı?",
   "Sosyal medya toplumu birleştiriyor mu, kutuplaştırıyor mu?",
 
-  // ── Gündelik Hayat ──
+  // ── İnsan / hayat ──
   "Para insanı özgürleştirir mi, köleleştirir mi?",
-  "Başarı çalışmanın mı yoksa şansın mı eseridir?",
-  "Kahraman tek bir insan olabilir mi, yoksa kahramanlık bir halkın işi midir?",
-  "Aşkın sırrı akılda mı, kalpte mi?",
+  "Başarı çalışmanın mı, yoksa şansın mı eseridir?",
+  "Kahramanlık tek bir insanın işi mi, yoksa bir halkın mı?",
   "İnsanı bozan güç müdür, para mıdır?",
-  "Cesaret mi akıl mı zor zamanda yol gösterir?",
+  "Cesaret mi, akıl mı zor zamanda yol gösterir?",
   "Şöhret mutluluk getirir mi?",
 
   // ── Sanat / Kültür ──
-  "Sanat iktidara hizmet etmeli mi, ona karşı durmalı mı?",
-  "Yapay zeka sanat üretebilir mi?",
+  "Sanat iktidara hizmet mi etmeli, ona karşı mı durmalı?",
+  "Yapay zeka gerçek sanat üretebilir mi?",
+  "Bir sanat eseri neye göre paha biçilmez olur?",
   "Neden eskisi gibi unutulmaz şarkılar çıkmıyor?",
-  "Sanat eseri neye göre paha biçilmez olur?",
-  "Dublaj mı altyazı mı: bir filmi gerçekten anlamak için hangisi?",
 
   // ── Spor ──
-  "Futbol sadece bir oyun mu, yoksa modern toplumun dini mi?",
   "En büyük sporcu kim: yetenek mi, çalışma mı belirler?",
-  "VAR adaleti getirdi mi, yoksa heyecanı mı öldürdü?",
   "Olimpiyatlar birleştirici mi, yoksa devletlerin gövde gösterisi mi?",
 
-  // ── Absürt / Mizah ──
-  "Kediler bizi yönetiyor mu?",
-  "Dünya düz olsaydı sosyal medya daha mı az kullanılırdı?",
-  "Eğer hayvanlar konuşabilseydi insanlara ne derdi?",
-  "Neden tuvalette en iyi fikirler gelir?",
-  "Karıncalar insanlardan daha mı uygardır?",
-  "Zamanda yolculuk yapabilseydin geçmişe mi, geleceğe mi giderdin — ve neden ikisi de felaket?",
+  // ── Düşündüren absürt ──
+  "Karıncalar insanlardan daha mı uygar bir toplum kurdu?",
+  "Zamanda yolculuk yapabilseydin geçmişe mi, geleceğe mi giderdin?",
 ];
 
 // Küratörlü kişi havuzu: çağlar arası çarpışmayı garantilemek için
