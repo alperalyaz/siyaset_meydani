@@ -83,7 +83,10 @@ export function saveProvider(p: ProviderKind): void {
 
 // --- TTS hız tercihi ---
 
-const TTS_RATE_KEY = "siyaset_meydani_tts_rate";
+// v2: varsayılan 1.5x'e geçiş. Eski "..._tts_rate" anahtarındaki (çoğu
+// test kullanıcısında 1.0 kalmış) değer yok sayılır; herkes bir kez 1.5'e
+// döner, sonra kendi seçimi bu yeni anahtarda saklanır.
+const TTS_RATE_KEY = "siyaset_meydani_tts_rate_v2";
 
 export function loadTtsRate(): number {
   try {

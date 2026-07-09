@@ -68,12 +68,31 @@ function cleanForSpeech(text: string): string {
     .trim();
 }
 
-// Metni cümlelere böl (nokta, ünlem, soru işareti, noktalı virgül).
+// Cümle SONU olmayan ama nokta içeren kalıplar: sıra sayısı ("19.", "1."),
+// tek harf/baş harf ("M.", roman "II."), yaygın kısaltmalar ("vb.", "Dr.").
+// Bu kalıplarla biten parça, sonraki parçayla birleştirilir ki TTS orada
+// yanlış yere duraklamasın ("19. yüzyıl" tek nefeste okunsun).
+const NOT_SENTENCE_END =
+  /(?:\d{1,4}|\b[a-zçğıöşü]|\b[IVX]{1,4}|\b(?:vb|Dr|Prof|Doç|bkz|yy|No|Nr|MÖ|MS|St|Sn|vs))\.$/i;
+
+// Metni cümlelere böl (nokta, ünlem, soru işareti, noktalı virgül) ama
+// sıra sayısı / kısaltma noktalarında bölme.
 function splitSentences(text: string): string[] {
-  return text
+  const parts = text
     .split(/(?<=[.!?;])\s+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+
+  const out: string[] = [];
+  for (const part of parts) {
+    const prev = out[out.length - 1];
+    if (prev && NOT_SENTENCE_END.test(prev)) {
+      out[out.length - 1] = `${prev} ${part}`;
+    } else {
+      out.push(part);
+    }
+  }
+  return out;
 }
 
 export function cancelSpeech(): void {

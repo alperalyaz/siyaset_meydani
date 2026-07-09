@@ -256,9 +256,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="topic-board">
           <div className="topic-chips">
             {(extraTopics.length
-              ? interleaveTopics(poolTopics.slice(0, 4), extraTopics)
+              ? interleaveTopics(poolTopics.slice(0, 3), extraTopics.slice(0, 3))
               : poolTopics
-            ).map((t) => (
+            )
+              .slice(0, 6)
+              .map((t) => (
               <button
                 key={t}
                 className={`chip ${extraTopics.length && extraTopics.includes(t) ? "chip--fresh" : ""} ${topic === t ? "chip--active" : ""}`}
