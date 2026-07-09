@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Guest, Difficulty } from "../types";
-import type { SessionMeta, QuickGuest } from "../lib/store";
+import type { SessionMeta, QuickGuest, QuickTab } from "../lib/store";
 import { loadQuickGuests, saveQuickGuests, MAX_QUICK_GUESTS } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas } from "../lib/engine";
@@ -59,19 +59,28 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   // Sessiz hata olmasın: boş sonuç/yedek havuz gibi durumlar kullanıcıya söylenir.
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Hazır konuk rafı (kişisel hızlı-ekle). Fotoğraflar Vikipedi'den lazy çekilir.
-  const [quickGuests, setQuickGuests] = useState<QuickGuest[]>(loadQuickGuests);
-  useEffect(() => saveQuickGuests(quickGuests), [quickGuests]);
-  // İlk açılışta zenginleştirilmemiş raf üyelerinin foto/etiketini çek.
+  // Hazır konuk rafı — her sekmenin kendi listesi. Fotoğraflar Vikipedi'den lazy.
+  const [quickDerin, setQuickDerin] = useState<QuickGuest[]>(() => loadQuickGuests("derin"));
+  const [quickGunluk, setQuickGunluk] = useState<QuickGuest[]>(() => loadQuickGuests("gunluk"));
+  useEffect(() => saveQuickGuests("derin", quickDerin), [quickDerin]);
+  useEffect(() => saveQuickGuests("gunluk", quickGunluk), [quickGunluk]);
+
+  const quickGuests = topicTab === "gunluk" ? quickGunluk : quickDerin;
+  const setQuickGuests = topicTab === "gunluk" ? setQuickGunluk : setQuickDerin;
+
+  // İlk açılışta iki rafın da zenginleştirilmemiş üyelerinin foto/etiketini çek.
   // PARALEL: biri yavaş/takılırsa diğerlerinin fotoğrafı yine gelir.
   useEffect(() => {
     let cancelled = false;
-    const pending = loadQuickGuests().filter((q) => !q.resolved);
-    pending.forEach(async (q) => {
+    const jobs: { tab: QuickTab; q: QuickGuest }[] = [];
+    for (const q of loadQuickGuests("derin")) if (!q.resolved) jobs.push({ tab: "derin", q });
+    for (const q of loadQuickGuests("gunluk")) if (!q.resolved) jobs.push({ tab: "gunluk", q });
+    jobs.forEach(async ({ tab, q }) => {
       try {
         const res = await resolveGuestByName(q.name);
         if (cancelled) return;
-        setQuickGuests((prev) =>
+        const setter = tab === "gunluk" ? setQuickGunluk : setQuickDerin;
+        setter((prev) =>
           prev.map((x) =>
             x.name === q.name
               ? {
@@ -92,6 +101,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Gündelik sekmesinde tüm sayfaya "kadın programı" teması (sıcak renkler).
+  // Sınıf <html>'e konur ki body arkaplanı da değişsin; setup'tan çıkınca kalkar.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (topicTab === "gunluk") root.classList.add("theme-gunluk");
+    else root.classList.remove("theme-gunluk");
+    return () => root.classList.remove("theme-gunluk");
+  }, [topicTab]);
 
   // Daha önce önerilmiş isimler — "Yeniden"de tekrar gelmesinler (çeşitlilik).
   const shownNamesRef = useRef<string[]>([]);
@@ -238,11 +256,13 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const canStart = !!guests && guests.length >= 2 && topic.trim().length > 0 && !loading;
 
   return (
-    <div className="setup">
+    <div className={`setup ${topicTab === "gunluk" ? "setup--gunluk" : ""}`}>
       <header className="setup__hero">
-        <h1>Siyaset Meydanı</h1>
+        <h1>{topicTab === "gunluk" ? "Sohbet Meydanı" : "Siyaset Meydanı"}</h1>
         <p className="setup__tag">
-          Sokaktaki adamın konularını, çağlar ötesi şahsiyetlere tartıştırın. Siz spikersiniz.
+          {topicTab === "gunluk"
+            ? "Günün magazini, dedikodusu, muhabbeti… Yıldızlar masada, mikrofon sizde! ✨"
+            : "Sokaktaki adamın konularını, çağlar ötesi şahsiyetlere tartıştırın. Siz spikersiniz."}
         </p>
       </header>
 

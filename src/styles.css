@@ -12,6 +12,26 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
 }
 
+/* Gündelik (Sohbet Meydanı) teması — sıcak "kadın programı" havası.
+   <html>'e eklenir; CSS değişkenlerini ezerek tüm setup ekranını yeniden
+   renklendirir, body arkaplanını da sıcak tona çevirir. */
+html.theme-gunluk {
+  --bg: #1c0f1c;
+  --bg-2: #2a1526;
+  --bg-3: #351a30;
+  --line: #4d2a48;
+  --accent: #f06bb0;
+  --danger: #ff5c8a;
+  --ok: #e59acb;
+}
+html.theme-gunluk body {
+  background:
+    radial-gradient(1100px 560px at 50% -12%, #4a2247 0%, transparent 60%),
+    radial-gradient(circle at 16% 22%, rgba(240, 107, 176, 0.14) 0%, transparent 46%),
+    radial-gradient(circle at 84% 14%, rgba(255, 176, 120, 0.10) 0%, transparent 46%),
+    var(--bg);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -124,6 +144,13 @@ a {
   pointer-events: none;
   z-index: 0;
 }
+html.theme-gunluk .setup__hero::before {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(240, 107, 176, 0.22) 0%, transparent 60%),
+    radial-gradient(ellipse at 30% 50%, rgba(255, 176, 120, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 50%, rgba(200, 120, 220, 0.12) 0%, transparent 50%);
+}
+
 .setup__hero h1 {
   font-size: clamp(2.2rem, 7vw, 3.4rem);
   margin: 0;

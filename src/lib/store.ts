@@ -116,43 +116,62 @@ export interface QuickGuest {
   resolved?: boolean; // Vikipedi'den zenginleştirme denendi mi (tekrar denemeyi önler)
 }
 
-// v2: varsayılan raf 10 kişiye çıkarıldı (v1'de 4'tü). Anahtar yenilenince
-// mevcut kullanıcılar da dolu rafı görür.
-const QUICK_GUESTS_KEY = "siyaset_meydani_quick_guests_v2";
+// Her sekmenin (Derin / Gündelik) kendi hazır konuk rafı var.
+export type QuickTab = "derin" | "gunluk";
 const MAX_QUICK_GUESTS = 10;
 
-// Varsayılan raf: tartışmaya yatkın, tanınmış 10 fikir insanı/gazeteci.
+const QUICK_GUESTS_KEYS: Record<QuickTab, string> = {
+  derin: "siyaset_meydani_quick_guests_v2",
+  gunluk: "siyaset_meydani_quick_gunluk_v1",
+};
+
+// Derin: tartışmaya yatkın fikir insanları/gazeteciler.
+// Gündelik: magazin/TV yıldızları (kadın programı havası).
 // Kullanıcı istediğini × ile çıkarabilir, kendi ekledikleri eklenir; boş
 // liste de saklanır (varsayılanlar geri gelmez).
-const DEFAULT_QUICK_GUESTS: QuickGuest[] = [
-  { name: "Sevan Nişanyan" },
-  { name: "Celal Şengör" },
-  { name: "İlber Ortaylı" },
-  { name: "Kadir Mısıroğlu" },
-  { name: "Emrah Safa Gürkan" },
-  { name: "Murat Bardakçı" },
-  { name: "Cüneyt Özdemir" },
-  { name: "Fatih Altaylı" },
-  { name: "Cemil Meriç" },
-  { name: "Alev Alatlı" },
-];
+const DEFAULT_QUICK_GUESTS: Record<QuickTab, QuickGuest[]> = {
+  derin: [
+    { name: "Sevan Nişanyan" },
+    { name: "Celal Şengör" },
+    { name: "İlber Ortaylı" },
+    { name: "Kadir Mısıroğlu" },
+    { name: "Emrah Safa Gürkan" },
+    { name: "Murat Bardakçı" },
+    { name: "Cüneyt Özdemir" },
+    { name: "Fatih Altaylı" },
+    { name: "Cemil Meriç" },
+    { name: "Alev Alatlı" },
+  ],
+  gunluk: [
+    { name: "Acun Ilıcalı" },
+    { name: "Cem Yılmaz" },
+    { name: "Hülya Avşar" },
+    { name: "Müge Anlı" },
+    { name: "Ebru Gündeş" },
+    { name: "Seren Serengil" },
+    { name: "İbrahim Tatlıses" },
+    { name: "Bülent Ersoy" },
+    { name: "Gülben Ergen" },
+    { name: "Hadise" },
+  ],
+};
 
-export function loadQuickGuests(): QuickGuest[] {
+export function loadQuickGuests(tab: QuickTab): QuickGuest[] {
   try {
-    const raw = localStorage.getItem(QUICK_GUESTS_KEY);
-    if (raw === null) return [...DEFAULT_QUICK_GUESTS];
+    const raw = localStorage.getItem(QUICK_GUESTS_KEYS[tab]);
+    if (raw === null) return [...DEFAULT_QUICK_GUESTS[tab]];
     const list = JSON.parse(raw) as QuickGuest[];
     return Array.isArray(list)
       ? list.filter((x) => x && typeof x.name === "string").slice(0, MAX_QUICK_GUESTS)
-      : [...DEFAULT_QUICK_GUESTS];
+      : [...DEFAULT_QUICK_GUESTS[tab]];
   } catch {
-    return [...DEFAULT_QUICK_GUESTS];
+    return [...DEFAULT_QUICK_GUESTS[tab]];
   }
 }
 
-export function saveQuickGuests(list: QuickGuest[]): void {
+export function saveQuickGuests(tab: QuickTab, list: QuickGuest[]): void {
   try {
-    localStorage.setItem(QUICK_GUESTS_KEY, JSON.stringify(list.slice(0, MAX_QUICK_GUESTS)));
+    localStorage.setItem(QUICK_GUESTS_KEYS[tab], JSON.stringify(list.slice(0, MAX_QUICK_GUESTS)));
   } catch {
     /* yoksay */
   }
