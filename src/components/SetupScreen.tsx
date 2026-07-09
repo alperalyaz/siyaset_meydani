@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Guest, Difficulty } from "../types";
-import type { SessionMeta } from "../lib/store";
+import type { SessionMeta, QuickGuest } from "../lib/store";
+import { loadQuickGuests, saveQuickGuests, MAX_QUICK_GUESTS } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas } from "../lib/engine";
 import { TOPIC_POOL, DEEP_TOPIC_POOL } from "../lib/pool";
@@ -57,6 +58,40 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [addMsg, setAddMsg] = useState<string | null>(null);
   // Sessiz hata olmasın: boş sonuç/yedek havuz gibi durumlar kullanıcıya söylenir.
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Hazır konuk rafı (kişisel hızlı-ekle). Fotoğraflar Vikipedi'den lazy çekilir.
+  const [quickGuests, setQuickGuests] = useState<QuickGuest[]>(loadQuickGuests);
+  useEffect(() => saveQuickGuests(quickGuests), [quickGuests]);
+  // İlk açılışta zenginleştirilmemiş raf üyelerinin foto/etiketini çek.
+  // PARALEL: biri yavaş/takılırsa diğerlerinin fotoğrafı yine gelir.
+  useEffect(() => {
+    let cancelled = false;
+    const pending = loadQuickGuests().filter((q) => !q.resolved);
+    pending.forEach(async (q) => {
+      try {
+        const res = await resolveGuestByName(q.name);
+        if (cancelled) return;
+        setQuickGuests((prev) =>
+          prev.map((x) =>
+            x.name === q.name
+              ? {
+                  ...x,
+                  resolved: true,
+                  thumbnail: res.status === "ok" ? res.guest.thumbnail : x.thumbnail,
+                  era: res.status === "ok" ? res.guest.era : x.era,
+                }
+              : x,
+          ),
+        );
+      } catch {
+        /* ağ hatası — sessizce baş harflerle kalır */
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Daha önce önerilmiş isimler — "Yeniden"de tekrar gelmesinler (çeşitlilik).
   const shownNamesRef = useRef<string[]>([]);
@@ -146,35 +181,53 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     });
   }, []);
 
-  const addGuest = useCallback(async () => {
-    const q = addName.trim();
-    if (!q) return;
-    setAdding(true);
-    setAddMsg(null);
-    try {
-      const res = await resolveGuestByName(q);
-      if (res.status === "blocked") {
-        setAddMsg("Bu isim konuk olarak eklenemez. Lütfen başka bir isim seçin.");
-        return;
+  // Çözülmüş bir konuğu masaya ekler ve rafa kaydeder (yoksa, 10 sınırıyla).
+  const addResolvedGuest = useCallback((g: Guest) => {
+    setGuests((prev) => {
+      const cur = prev ?? [];
+      if (cur.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return cur;
+      return [...cur, g].slice(0, MAX_GUESTS).map((x, i) => ({ ...x, color: colorAt(i) }));
+    });
+    shownNamesRef.current.push(g.name);
+    setQuickGuests((prev) => {
+      if (prev.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return prev;
+      if (prev.length >= MAX_QUICK_GUESTS) return prev;
+      return [...prev, { name: g.name, thumbnail: g.thumbnail, era: g.era, resolved: true }];
+    });
+  }, []);
+
+  const addGuestByName = useCallback(
+    async (name: string) => {
+      const q = name.trim();
+      if (!q) return;
+      setAdding(true);
+      setAddMsg(null);
+      try {
+        const res = await resolveGuestByName(q);
+        if (res.status === "blocked") {
+          setAddMsg("Bu isim konuk olarak eklenemez. Lütfen başka bir isim seçin.");
+          return;
+        }
+        if (res.status === "notfound") {
+          setAddMsg(`"${q}" Vikipedi'de bir kişi olarak bulunamadı. İsmi tam yazmayı ya da linkini yapıştırmayı deneyin.`);
+          return;
+        }
+        addResolvedGuest(res.guest);
+        setAddName("");
+      } catch (e) {
+        onError(e);
+      } finally {
+        setAdding(false);
       }
-      if (res.status === "notfound") {
-        setAddMsg(`"${q}" Vikipedi'de bir kişi olarak bulunamadı. İsmi tam yazmayı ya da linkini yapıştırmayı deneyin.`);
-        return;
-      }
-      const g = res.guest;
-      setGuests((prev) => {
-        const cur = prev ?? [];
-        if (cur.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return cur;
-        return [...cur, g].slice(0, MAX_GUESTS).map((x, i) => ({ ...x, color: colorAt(i) }));
-      });
-      shownNamesRef.current.push(g.name);
-      setAddName("");
-    } catch (e) {
-      onError(e);
-    } finally {
-      setAdding(false);
-    }
-  }, [addName, onError]);
+    },
+    [addResolvedGuest, onError],
+  );
+
+  const addGuest = useCallback(() => void addGuestByName(addName), [addGuestByName, addName]);
+
+  const removeQuickGuest = useCallback((name: string) => {
+    setQuickGuests((prev) => prev.filter((x) => x.name !== name));
+  }, []);
 
   const removeGuest = useCallback((name: string) => {
     setGuests((prev) =>
@@ -346,6 +399,42 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               </div>
             ))}
         </div>
+
+        {/* Hazır konuk rafı — dokun, masaya gelsin. × ile kaldırılır. */}
+        {quickGuests.length > 0 && (
+          <div className="quickguests">
+            <div className="quickguests__label">Hazır konuklar — dokun, masaya gelsin</div>
+            <div className="quickguests__strip">
+              {quickGuests.map((q) => {
+                const already = !!guests?.some((g) => g.name.toLowerCase() === q.name.toLowerCase());
+                return (
+                  <div key={q.name} className={`qg ${already ? "qg--on" : ""}`}>
+                    <button
+                      className="qg__pick"
+                      onClick={() => void addGuestByName(q.name)}
+                      disabled={adding || already || (guests?.length ?? 0) >= MAX_GUESTS}
+                      title={already ? "Zaten masada" : `${q.name} — masaya ekle`}
+                    >
+                      <span className="qg__avatar">
+                        {q.thumbnail ? <img src={q.thumbnail} alt={q.name} /> : <span>{initials(q.name)}</span>}
+                        {already && <span className="qg__check">✓</span>}
+                      </span>
+                      <span className="qg__name">{q.name}</span>
+                    </button>
+                    <button
+                      className="qg__remove"
+                      onClick={() => removeQuickGuest(q.name)}
+                      title="Raftan çıkar"
+                      aria-label={`${q.name} raftan çıkar`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Kendi konuğunu ekle */}
         <div className="topic-row addguest-row">

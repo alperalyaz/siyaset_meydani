@@ -107,6 +107,50 @@ export function saveTtsRate(rate: number): void {
   }
 }
 
+// --- Hazır konuk rafı (kullanıcının kişisel hızlı-ekle listesi) ---
+
+export interface QuickGuest {
+  name: string;
+  thumbnail?: string;
+  era?: string;
+  resolved?: boolean; // Vikipedi'den zenginleştirme denendi mi (tekrar denemeyi önler)
+}
+
+const QUICK_GUESTS_KEY = "siyaset_meydani_quick_guests_v1";
+const MAX_QUICK_GUESTS = 10;
+
+// Varsayılan raf. Kullanıcı istediğini × ile çıkarabilir, kendi ekledikleri
+// eklenir; boş liste de saklanır (varsayılanlar geri gelmez).
+const DEFAULT_QUICK_GUESTS: QuickGuest[] = [
+  { name: "Sevan Nişanyan" },
+  { name: "Celal Şengör" },
+  { name: "İlber Ortaylı" },
+  { name: "Kadir Mısıroğlu" },
+];
+
+export function loadQuickGuests(): QuickGuest[] {
+  try {
+    const raw = localStorage.getItem(QUICK_GUESTS_KEY);
+    if (raw === null) return [...DEFAULT_QUICK_GUESTS];
+    const list = JSON.parse(raw) as QuickGuest[];
+    return Array.isArray(list)
+      ? list.filter((x) => x && typeof x.name === "string").slice(0, MAX_QUICK_GUESTS)
+      : [...DEFAULT_QUICK_GUESTS];
+  } catch {
+    return [...DEFAULT_QUICK_GUESTS];
+  }
+}
+
+export function saveQuickGuests(list: QuickGuest[]): void {
+  try {
+    localStorage.setItem(QUICK_GUESTS_KEY, JSON.stringify(list.slice(0, MAX_QUICK_GUESTS)));
+  } catch {
+    /* yoksay */
+  }
+}
+
+export { MAX_QUICK_GUESTS };
+
 // --- Eski tekli oturum (geriye uyumlu) ---
 
 export function saveSession(session: SavedSession): void {
