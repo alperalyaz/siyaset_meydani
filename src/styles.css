@@ -25,9 +25,12 @@ html.theme-gunluk {
   --ok: #e59acb;
 }
 html.theme-gunluk body {
-  /* Pürüzsüz dikey geçiş — radial parıltılar uzun sayfada bant/dikiş
-     ("parça parça") yapıyordu; tek yönlü gradient her satırda tekdüze. */
-  background: linear-gradient(180deg, #3a1c3a 0%, #26142a 26%, var(--bg) 55%);
+  /* Kalpli SVG desen (ince, okunurluğu bozmaz) + pürüzsüz dikey geçiş.
+     Desen kod (vektör) olduğu için harici dosya/CDN gerektirmez, çevrimdışı
+     çalışır. Radial parıltılar yerine tek yönlü gradient (bant/dikiş yok). */
+  background:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2290%22%20height%3D%2290%22%20viewBox%3D%220%200%2090%2090%22%3E%3Cg%20fill%3D%22%23ff8dc6%22%3E%3Cpath%20fill-opacity%3D%220.06%22%20transform%3D%22translate(8%2010)%20scale(1.15)%22%20d%3D%22M12%2021.35l-1.45-1.32C5.4%2015.36%202%2012.28%202%208.5%202%205.42%204.42%203%207.5%203c1.74%200%203.41.81%204.5%202.09C13.09%203.81%2014.76%203%2016.5%203%2019.58%203%2022%205.42%2022%208.5c0%203.78-3.4%206.86-8.55%2011.54z%22%2F%3E%3Cpath%20fill-opacity%3D%220.045%22%20transform%3D%22translate(52%2050)%20scale(0.85)%22%20d%3D%22M12%2021.35l-1.45-1.32C5.4%2015.36%202%2012.28%202%208.5%202%205.42%204.42%203%207.5%203c1.74%200%203.41.81%204.5%202.09C13.09%203.81%2014.76%203%2016.5%203%2019.58%203%2022%205.42%2022%208.5c0%203.78-3.4%206.86-8.55%2011.54z%22%2F%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2216%22%20r%3D%221.6%22%20fill-opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2266%22%20r%3D%221.3%22%20fill-opacity%3D%220.09%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat,
+    linear-gradient(180deg, #3a1c3a 0%, #26142a 26%, var(--bg) 55%);
   background-attachment: fixed;
 }
 
