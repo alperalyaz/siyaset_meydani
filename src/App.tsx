@@ -19,7 +19,7 @@ import {
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
-import { speak, cancelSpeech, voiceForGuest, ttsSupported, setActiveRate } from "./lib/tts";
+import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
 import { encodeSession, decodeSession } from "./lib/share";
 
 import {
@@ -130,11 +130,9 @@ export function App() {
   }, [ttsOn]);
 
   const [ttsRate, setTtsRate] = useState<number>(loadTtsRate);
-  const ttsRateRef = useRef(ttsRate);
   useEffect(() => {
-    ttsRateRef.current = ttsRate;
     saveTtsRate(ttsRate);
-    setActiveRate(ttsRate);
+    setSpeechRate(ttsRate); // canlı çarpan — sonraki cümleden itibaren geçerli
   }, [ttsRate]);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
@@ -238,7 +236,8 @@ export function App() {
     ) => {
       if (ttsRef.current && text.trim()) {
         const vopts = voiceForGuest(voiceIdx, gender);
-        await speak(text, { ...vopts, rate: vopts.rate * ttsRateRef.current, signal });
+        // Temel hızı geç; canlı çarpanı speak() her cümlede kendisi uygular.
+        await speak(text, { ...vopts, signal });
       } else {
         await delay(readingDelay(text), signal);
       }

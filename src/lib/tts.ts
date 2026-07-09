@@ -97,19 +97,17 @@ function splitSentences(text: string): string[] {
 
 export function cancelSpeech(): void {
   if (ttsSupported()) window.speechSynthesis.cancel();
-  activeUtterance = null;
 }
 
-// Anlık hız değişimi için şu an çalan utterance referansı
-let activeUtterance: SpeechSynthesisUtterance | null = null;
+// Canlı hız çarpanı (kullanıcı slider'ı). speak() HER cümlede bu güncel
+// değeri okur; böylece slider değişince bir sonraki cümle yeni hızda okunur.
+// (Çalan cümlenin ortasında hız değişmez — tarayıcı buna izin vermez — ama
+// cümleler kısa olduğu için değişim birkaç saniyede duyulur. Eski pause/
+// resume hilesi rakam/kelime atlatıyordu; kaldırıldı.)
+let rateMultiplier = 1;
 
-export function setActiveRate(rate: number): void {
-  if (activeUtterance) {
-    activeUtterance.rate = rate;
-  }
-  if (ttsSupported() && window.speechSynthesis.speaking) {
-    try { window.speechSynthesis.pause(); window.speechSynthesis.resume(); } catch { /* ignore */ }
-  }
+export function setSpeechRate(mult: number): void {
+  rateMultiplier = mult > 0 ? mult : 1;
 }
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
@@ -152,23 +150,23 @@ export function speak(
         resolve();
         return;
       }
+      // Efektif hız = konuğun temel hızı × canlı çarpan (her cümlede güncel).
+      const effRate = Math.max(0.1, Math.min(10, (opts.rate ?? 1) * rateMultiplier));
       const u = new SpeechSynthesisUtterance(sentences[idx]);
       u.lang = opts.voice?.lang || "tr-TR";
       // Rate/pitch voice'tan ÖNCE ayarla — voice ataması asenkron sıfırlamasın
       u.pitch = opts.pitch ?? 1;
-      u.rate = opts.rate ?? 1;
+      u.rate = effRate;
       if (opts.voice) {
         u.voice = opts.voice;
       }
       // onstart fallback: voice yüklendikten sonra bir kez daha ayarla
       u.onstart = () => {
         u.pitch = opts.pitch ?? 1;
-        u.rate = opts.rate ?? 1;
-        activeUtterance = u;
+        u.rate = effRate;
       };
       u.onend = () => { idx++; speakNext(); };
       u.onerror = () => { idx++; speakNext(); };
-      activeUtterance = u; // hemen ata — cümleler arası null kalmasın
       window.speechSynthesis.speak(u);
     };
     speakNext();
