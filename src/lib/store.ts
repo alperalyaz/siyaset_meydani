@@ -120,9 +120,9 @@ export interface QuickGuest {
 export type QuickTab = "derin" | "gunluk";
 const MAX_QUICK_GUESTS = 10;
 
-// v3/v2: varsayılan raf 8 kişiye indirildi (satıra sığsın, ortalansın).
+// derin v4: varsayılan derin kadrosu güncellendi. gunluk v2.
 const QUICK_GUESTS_KEYS: Record<QuickTab, string> = {
-  derin: "siyaset_meydani_quick_guests_v3",
+  derin: "siyaset_meydani_quick_guests_v4",
   gunluk: "siyaset_meydani_quick_gunluk_v2",
 };
 
@@ -133,13 +133,13 @@ const QUICK_GUESTS_KEYS: Record<QuickTab, string> = {
 const DEFAULT_QUICK_GUESTS: Record<QuickTab, QuickGuest[]> = {
   derin: [
     { name: "Sevan Nişanyan" },
-    { name: "Celal Şengör" },
-    { name: "İlber Ortaylı" },
+    { name: "Machiavelli" },
+    { name: "Büyük İskender" },
+    { name: "Halil İnalcık" },
+    { name: "Sun Tzu" },
+    { name: "Büyük Petro" },
+    { name: "Mahatma Gandhi" },
     { name: "Kadir Mısıroğlu" },
-    { name: "Emrah Safa Gürkan" },
-    { name: "Murat Bardakçı" },
-    { name: "Cüneyt Özdemir" },
-    { name: "Fatih Altaylı" },
   ],
   gunluk: [
     { name: "Acun Ilıcalı" },
