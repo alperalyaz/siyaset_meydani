@@ -30,10 +30,18 @@ const FEMALE_HINT =
   /female|kad[ıi]n|woman|\b(yelda|filiz|aylin|zeynep|emel|seda|elif|defne|nilüfer|google türkçe)\b/i;
 const MALE_HINT = /\b(erkek|man|tolga|cem|volkan|burak|onur|ahmet|mehmet|kaan)\b/i;
 
-// Konuk cinsiyetine ve index'ine göre ses seçimi.
-// Türkçe sesler kısıtlıysa cinsiyet PERDE (pitch) ile ayrılır: kadın tiz, erkek
-// pes. Cinsiyetli/farklı ses varsa o da kullanılır. (Not: tek uzak ses varsa
-// tarayıcı perdeyi yok sayabilir; o zaman fark duyulmaz — platform sınırı.)
+// Spiker (moderator) için sabit index — kendine ait belirgin ses profili.
+export const MODERATOR_VOICE_INDEX = 9;
+
+// Konuk cinsiyetine ve index'ine göre ses seçimi. Öncelik sırası:
+//   1) Cinsiyete uygun İSİMLİ ses (birden çoksa index'e göre dağıt — farklı
+//      konuklar farklı ses alsın).
+//   2) Yoksa karşı cinsiyet İSİMLİ OLMAYAN bir ses + güçlü perde ayrımı.
+//   3) Hiç Türkçe ses yoksa mevcut seslerden index'e göre.
+// Perde (pitch) cinsiyeti pekiştirir: kadın tiz, erkek pes. Aynı cinsiyette
+// bile index'e göre perde/hız kayar ki sesler ayrışsın.
+// (Not: cihazda tek UZAK ses varsa tarayıcı perdeyi yok sayabilir; o zaman
+// fark duyulmaz — bu bir platform sınırıdır, kod değil.)
 export function voiceForGuest(
   i: number,
   gender?: "male" | "female",
@@ -41,21 +49,30 @@ export function voiceForGuest(
   const voices = turkishVoices();
   const fem = voices.filter((v) => FEMALE_HINT.test(v.name));
   const mal = voices.filter((v) => MALE_HINT.test(v.name));
+  const isMod = i === MODERATOR_VOICE_INDEX;
 
   let voice: SpeechSynthesisVoice | undefined;
   if (gender === "female") {
-    voice = fem.length ? fem[i % fem.length] : voices.find((v) => !MALE_HINT.test(v.name)) ?? voices[i % (voices.length || 1)];
+    voice =
+      (fem.length && fem[i % fem.length]) ||
+      voices.find((v) => !MALE_HINT.test(v.name)) ||
+      voices[i % (voices.length || 1)];
   } else if (gender === "male") {
-    voice = mal.length ? mal[i % mal.length] : voices.find((v) => !FEMALE_HINT.test(v.name)) ?? voices[i % (voices.length || 1)];
+    voice =
+      (mal.length && mal[i % mal.length]) ||
+      voices.find((v) => !FEMALE_HINT.test(v.name)) ||
+      voices[i % (voices.length || 1)];
   } else {
+    // Nötr/spiker: mümkünse kimsenin kullanmadığı bir sesi seçmeye çalış.
     voice = voices.length ? voices[i % voices.length] : undefined;
   }
 
-  // Güçlü perde ayrımı + aynı cinsiyette bile index'e göre kayma (çeşitlilik).
-  const base = gender === "female" ? 1.5 : gender === "male" ? 0.6 : 1.0;
-  const jitter = ((i % 3) - 1) * 0.12;
+  // Perde: cinsiyet baz + index kayması (çeşitlilik). Spiker nötr-otoriter.
+  const base = gender === "female" ? 1.45 : gender === "male" ? 0.62 : isMod ? 1.0 : 0.95;
+  const jitter = isMod ? 0 : (((i * 7) % 5) - 2) * 0.09; // -0.18..+0.18, index'e özgü
   const pitch = Math.max(0.3, Math.min(2, base + jitter));
-  const rate = 0.9 + (i % 3) * 0.07;
+  // Hız: spiker biraz daha ölçülü; konuklar index'e göre hafif değişir.
+  const rate = isMod ? 0.98 : 0.9 + ((i * 3) % 4) * 0.06;
   return { voice, pitch, rate };
 }
 
