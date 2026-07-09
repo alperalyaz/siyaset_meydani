@@ -257,7 +257,7 @@ export async function runIntro(
     const full = await streamReply(
       msgs as ChatMessage[],
       apiKey,
-      { temperature: 0.85, max_tokens: 180 },
+      { temperature: 0.85, max_tokens: 260 },
       signal,
       onToken,
     );
@@ -265,7 +265,7 @@ export async function runIntro(
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     temperature: 0.85,
-    max_tokens: 180,
+    max_tokens: 260,
     signal,
   });
   return cleanReply(content, guest.name);
@@ -287,7 +287,7 @@ export async function runOpeningStatement(
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
     json: true,
     temperature: 0.85,
-    max_tokens: 240,
+    max_tokens: 340,
     signal,
   });
   const parsed = parseJsonLoose<Partial<OpeningResult>>(content);
@@ -340,14 +340,14 @@ export async function runGuest(
     const full = await streamReply(
       msgs as ChatMessage[],
       apiKey,
-      { temperature: 0.9, max_tokens: 230 },
+      { temperature: 0.9, max_tokens: 460 },
       signal,
       onToken,
     );
     return cleanReply(full, guest.name);
   }
   const { content } = await chat(msgs as ChatMessage[], apiKey, {
-    temperature: 0.9, max_tokens: 230, signal,
+    temperature: 0.9, max_tokens: 460, signal,
   });
   return cleanReply(content, guest.name);
 }

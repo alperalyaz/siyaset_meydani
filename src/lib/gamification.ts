@@ -212,26 +212,25 @@ export function computeSessionResult(
     }
   }
 
-  // En tartışmalı an (reytingin en yüksek olduğu nokta)
+  // En tartışmalı an (reytingin en yüksek olduğu nokta).
+  // Sadece TARTIŞMA fazındaki KONUK replikleri (spiker/sistem hariç) — snapshot'lar
+  // tartışma turunda her konuk turu için sırayla eklendiğinden, zirve snapshot'ın
+  // SIRA numarasını konuk repliği sırasına eşliyoruz (index-uzayı karışmasın diye).
+  const debateGuestUtterances = utterances.filter((u, i) => {
+    if (typeof u.speaker !== "number") return false;
+    const guestIdx = utterances.slice(0, i + 1).filter((x) => typeof x.speaker === "number").length;
+    return guestIdx > warmupSkip;
+  });
   let mostControversialMoment: string | null = null;
   let mostControversialRating = peak;
-  if (ratingSnapshots.length > 0) {
+  if (ratingSnapshots.length > 0 && debateGuestUtterances.length > 0) {
     const best = ratingSnapshots.reduce((a, b) => (a.rating > b.rating ? a : b));
     mostControversialRating = best.rating;
-    // En yakın TARTIŞMA utterance'ını bul (ısınma turu hariç)
-    let closest: Utterance | null = null;
-    let minDiff = Infinity;
-    for (const u of debateUtterances) {
-      const uIdx = utterances.indexOf(u);
-      const snapIdx = ratingSnapshots.indexOf(best);
-      if (Math.abs(uIdx - snapIdx) < minDiff) {
-        minDiff = Math.abs(uIdx - snapIdx);
-        closest = u;
-      }
-    }
-    if (closest) {
-      mostControversialMoment = closest.text.slice(0, 120);
-    }
+    const ord = ratingSnapshots.indexOf(best);
+    const moment =
+      debateGuestUtterances[Math.min(ord, debateGuestUtterances.length - 1)] ??
+      debateGuestUtterances[debateGuestUtterances.length - 1];
+    if (moment) mostControversialMoment = moment.text.slice(0, 120);
   }
 
   return {

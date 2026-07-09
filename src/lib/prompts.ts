@@ -325,10 +325,18 @@ export function ratingDirectorMessages(
 
 Konu: "${topic}"
 
-REYTİNG (0-100):
-- Net fikirler, karşıt görüşler, kıvamında çatışma ve laf sokma reytingi YÜKSELTİR.
-- Muğlaklık, konudan sapma, tekrar, herkesin nazikçe uzlaşması, tek başına uzatma reytingi DÜŞÜRÜR.
-- Bir öncekine göre kademeli değiştir, ani sıçratma.
+REYTİNG (0-100) — CİMRİ OL, tüm aralığı kullan (herkese 85 vermek YASAK):
+- 0-25: sıkıcı; kimse çatışmıyor, herkes uzlaşıyor, konudan sapma, muğlaklık.
+- 26-45: temkinli; ısınıyor ama henüz kıvılcım yok.
+- 46-65: iyi; net karşıt görüşler, sağlam bir tartışma var.
+- 66-82: hararetli; sert laf sokma, doğrudan meydan okuma, kişisel gerginlik.
+- 83-100: SADECE gerçekten patlayıcı an — iğneleyici yakalama, masayı geren
+  doğrudan çatışma. NADİR olmalı; her replikte verilmez.
+- Oturum genelde 40-70 bandında gezinmeli; 85+ istisnadır.
+- İlk turlarda (tanışma/görüş) reyting DÜŞÜK başlar (25-45); tartışma
+  kızıştıkça yükselir. Nazik uzlaşma/tekrar/tek kişinin uzatması DÜŞÜRÜR.
+- Öncekine göre kademeli oynat; ama gerçek bir çatışma ya da uzlaşma varsa
+  belirgin biçimde değiştir (sürekli aynı sayıda takılma).
 
 Sıradaki konuşacak: ${nextName} — rolü: ${roleDesc}.
 
