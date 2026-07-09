@@ -24,6 +24,8 @@ interface Props {
   onDeleteSession?: (id: string) => void;
   sharedSession?: { guests: Guest[]; topic: string; utterances: { id: string; speaker: string | number; text: string; mode: string }[]; rating: number } | null;
   onClearSharedSession?: () => void;
+  /** Aktif sekme gündelik mi — App tema sınıfını yönetsin (oturuma da taşınsın). */
+  onModeChange?: (gunluk: boolean) => void;
 }
 
 const MAX_GUESTS = 50;
@@ -38,7 +40,7 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession, sharedSession, onClearSharedSession }: Props) {
+export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession, sharedSession, onClearSharedSession, onModeChange }: Props) {
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [topic, setTopic] = useState("");
@@ -109,14 +111,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Gündelik sekmesinde tüm sayfaya "kadın programı" teması (sıcak renkler).
-  // Sınıf <html>'e konur ki body arkaplanı da değişsin; setup'tan çıkınca kalkar.
+  // Gündelik teması App'te yönetilir ki oturum (panel) ekranına da taşınsın.
+  // SetupScreen sadece aktif sekmeyi App'e bildirir; sınıfı App <html>'e koyar.
   useEffect(() => {
-    const root = document.documentElement;
-    if (topicTab === "gunluk") root.classList.add("theme-gunluk");
-    else root.classList.remove("theme-gunluk");
-    return () => root.classList.remove("theme-gunluk");
-  }, [topicTab]);
+    onModeChange?.(topicTab === "gunluk");
+  }, [topicTab, onModeChange]);
 
   // Daha önce önerilmiş isimler — "Yeniden"de tekrar gelmesinler (çeşitlilik).
   const shownNamesRef = useRef<string[]>([]);

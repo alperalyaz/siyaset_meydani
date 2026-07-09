@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Guest, Utterance, SessionPhase, Difficulty, SessionResult, SessionEvent, Badge } from "./types";
 import type { GuestRole } from "./lib/prompts";
+import { setSessionMode } from "./lib/prompts";
+import { modLines } from "./lib/moderatorLines";
 import { SetupScreen } from "./components/SetupScreen";
 import { ChatStream } from "./components/ChatStream";
 import { RatingMeter } from "./components/RatingMeter";
@@ -121,6 +123,16 @@ export function App() {
   const [leaveModal, setLeaveModal] = useState(false);
   const [closingSequence, setClosingSequence] = useState(false);
   const [modPending, setModPending] = useState(false);
+
+  // Gündelik ("Sohbet Meydanı") teması — App'te tutulur ki oturum ekranına da
+  // taşınsın. Kurulumda SetupScreen aktif sekmeyi bildirir; oturum başlayınca
+  // SetupScreen unmount olur ama değer korunur (o yüzden panelde de geçerli).
+  const [gunlukTheme, setGunlukTheme] = useState(false);
+  const gunlukRef = useRef(gunlukTheme);
+  useEffect(() => {
+    gunlukRef.current = gunlukTheme;
+    document.documentElement.classList.toggle("theme-gunluk", gunlukTheme);
+  }, [gunlukTheme]);
 
   const [ttsOn, setTtsOn] = useState(ttsSupported());
   const ttsRef = useRef(ttsOn);
@@ -431,7 +443,7 @@ export function App() {
           append({
             id: uid(),
             speaker: "moderator",
-            text: `Teşekkür ederim. Şimdi asıl meselemize gelelim: ${t} Bu konudaki görüşlerinizi sırayla alalım, buyurun.`,
+            text: modLines(gunlukRef.current).toOpening(t),
             mode: "normal",
           });
           progressRef.current = { phase: "opening", i: 0 };
@@ -464,7 +476,7 @@ export function App() {
             append({
               id: uid(),
               speaker: "moderator",
-              text: "Konuklar bu konuda net bir fikir beyan etmedi; oturum burada duruyor.",
+              text: modLines(gunlukRef.current).noStance,
               mode: "system",
             });
             {
@@ -571,7 +583,7 @@ export function App() {
             append({
               id: uid(),
               speaker: "moderator",
-              text: `🎉 Tebrikler! Reytingler ${goal} üzerinde ${cfg.holdSeconds} saniyedir seyrediyor! Şimdi FİNAL bölümüne girdik — reytingi ${cfg.finalGoal} üzerine çıkarın, oturum şampiyon bitsin!`,
+              text: modLines(gunlukRef.current).final(goal, cfg.holdSeconds, cfg.finalGoal),
               mode: "system",
             });
             await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
@@ -583,7 +595,7 @@ export function App() {
           append({
             id: uid(),
             speaker: "moderator",
-            text: `Harika bir oturum oldu! Reytinglerimiz final hedefi olan ${cfg.finalGoal}'i aştı ve seyircimiz coştu. Değerli konuklarımıza ve siz sevgili spikerimize teşekkür ediyorum. Yayınımız burada sona eriyor — bir sonraki oturumda görüşmek üzere! 👋🎬`,
+            text: modLines(gunlukRef.current).win(cfg.finalGoal),
             mode: "system",
           });
           await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
@@ -753,10 +765,13 @@ export function App() {
     setSessionResult(null);
     setComboToast(null);
 
+    // Oturum boyu personaların ve yönetmenin tonunu belirler (gündelik = gevşek).
+    setSessionMode(gunlukRef.current);
+
     const welcome: Utterance = {
       id: uid(),
       speaker: "moderator",
-      text: "Merhaba, oturumumuza hoş geldiniz. Öncelikle sizleri tanıyalım — buyurun, sırayla kısaca kendinizi tanıtın.",
+      text: modLines(gunlukRef.current).welcome,
       mode: "normal",
     };
     utterRef.current = [welcome];
@@ -855,7 +870,7 @@ export function App() {
     append({
       id: uid(),
       speaker: "moderator",
-      text: "Sayın konuklar, programımızın sonuna geldik. Hepinize katılımınız ve değerli katkılarınız için çok teşekkür ederiz. Bir sonraki programda görüşmek üzere, hoşçakalın.",
+      text: modLines(gunlukRef.current).closing,
       mode: "system",
     });
 
@@ -1100,6 +1115,7 @@ export function App() {
           onDeleteSession={handleDeleteSession}
           sharedSession={sharedSession}
           onClearSharedSession={() => setSharedSession(null)}
+          onModeChange={setGunlukTheme}
         />
         <ApiKeyModal
           open={keyModal}
