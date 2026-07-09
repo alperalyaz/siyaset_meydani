@@ -100,8 +100,22 @@ a {
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
 .btn--big {
-  padding: 0.9rem 2rem;
-  font-size: 1.05rem;
+  padding: 1.15rem 3.4rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  border-radius: 16px;
+  letter-spacing: 0.01em;
+  min-width: min(360px, 82vw);
+  /* Temaya uyan renkli parıltı (accent amber/pembe) — negatif yayılım. */
+  box-shadow: 0 12px 34px -8px var(--accent), 0 3px 10px rgba(0, 0, 0, 0.3);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.btn--big:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 18px 44px -8px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.btn--big:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
 }
 .btn--pause {
   background: var(--danger);
