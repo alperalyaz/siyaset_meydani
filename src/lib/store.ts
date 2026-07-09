@@ -116,16 +116,25 @@ export interface QuickGuest {
   resolved?: boolean; // Vikipedi'den zenginleştirme denendi mi (tekrar denemeyi önler)
 }
 
-const QUICK_GUESTS_KEY = "siyaset_meydani_quick_guests_v1";
+// v2: varsayılan raf 10 kişiye çıkarıldı (v1'de 4'tü). Anahtar yenilenince
+// mevcut kullanıcılar da dolu rafı görür.
+const QUICK_GUESTS_KEY = "siyaset_meydani_quick_guests_v2";
 const MAX_QUICK_GUESTS = 10;
 
-// Varsayılan raf. Kullanıcı istediğini × ile çıkarabilir, kendi ekledikleri
-// eklenir; boş liste de saklanır (varsayılanlar geri gelmez).
+// Varsayılan raf: tartışmaya yatkın, tanınmış 10 fikir insanı/gazeteci.
+// Kullanıcı istediğini × ile çıkarabilir, kendi ekledikleri eklenir; boş
+// liste de saklanır (varsayılanlar geri gelmez).
 const DEFAULT_QUICK_GUESTS: QuickGuest[] = [
   { name: "Sevan Nişanyan" },
   { name: "Celal Şengör" },
   { name: "İlber Ortaylı" },
   { name: "Kadir Mısıroğlu" },
+  { name: "Emrah Safa Gürkan" },
+  { name: "Murat Bardakçı" },
+  { name: "Cüneyt Özdemir" },
+  { name: "Fatih Altaylı" },
+  { name: "Cemil Meriç" },
+  { name: "Alev Alatlı" },
 ];
 
 export function loadQuickGuests(): QuickGuest[] {
