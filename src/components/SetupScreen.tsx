@@ -470,7 +470,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="topic-row addguest-row">
           <input
             className="topic-input"
-            placeholder="Kendi konuğunuzu ekleyin: bir isim yazın (ör. Sevan Nişanyan) ya da Vikipedi linki"
+            placeholder={`Kendi konuğunuzu ekleyin: bir isim yazın (ör. ${
+              topicTab === "gunluk" ? "İbrahim Tatlıses" : "Sevan Nişanyan"
+            }) ya da Vikipedi linki`}
             value={addName}
             onChange={(e) => setAddName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addGuest()}
