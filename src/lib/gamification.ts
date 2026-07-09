@@ -337,7 +337,13 @@ export function evaluateBadges(
     maybeAward("galibiyet");
   }
 
-  return earned;
+  // `earned` yalnızca BU oturumda YENİ kazanılanlar (toast için kullanılabilir).
+  // Sonuç ekranı KÜMÜLATİF durumu göstermeli: önceki oturumlarda kazanılanlar
+  // da "açık" görünsün. Bu yüzden localStorage'daki tüm kazanılmış rozetleri
+  // döndürüyoruz (yeniler zaten yukarıda maybeAward ile kaydedildi).
+  void earned;
+  const allEarned = earnedBadgeIds();
+  return ALL_BADGES.filter((b) => allEarned.has(b.id));
 }
 
 /** SessionPhase için etiket */
