@@ -17,6 +17,8 @@ interface Props {
   onToggleTts: () => void;
   ttsRate?: number;
   onTtsRateChange?: (rate: number) => void;
+  hdOn?: boolean;
+  onToggleHd?: () => void;
 }
 
 // Spiker kontrol çubuğu: müdahale, duraklat/devam, hazır soru önerileri.
@@ -37,6 +39,8 @@ export function ModeratorBar({
   onToggleTts,
   ttsRate,
   onTtsRateChange,
+  hdOn,
+  onToggleHd,
 }: Props) {
   const [text, setText] = useState("");
 
@@ -83,6 +87,16 @@ export function ModeratorBar({
             title={ttsOn ? "Seslendirme açık" : "Seslendirme kapalı"}
           >
             {ttsOn ? "🔊" : "🔇"}
+          </button>
+        )}
+
+        {ttsSupported && ttsOn && onToggleHd && (
+          <button
+            className={`btn btn--ghost btn--icon ${hdOn ? "btn--on" : ""}`}
+            onClick={onToggleHd}
+            title={hdOn ? "HD sesler açık (ElevenLabs)" : "HD sesler kapalı — açmak için dokunun"}
+          >
+            🎧
           </button>
         )}
 

@@ -22,6 +22,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted } from "./lib/elevenTts";
 import { encodeSession, decodeSession } from "./lib/share";
 
 import {
@@ -147,6 +148,16 @@ export function App() {
     setSpeechRate(ttsRate); // canlı çarpan — sonraki cümleden itibaren geçerli
   }, [ttsRate]);
 
+  // HD sesler (ElevenLabs). Açıkken önce HD denenir, kota/hata olursa tarayıcı
+  // sesine düşülür. Kullanıcı tercihi kalıcı (localStorage).
+  const [hdTts, setHdTts] = useState<boolean>(loadHdEnabled);
+  const hdRef = useRef(hdTts);
+  useEffect(() => {
+    hdRef.current = hdTts;
+    saveHdEnabled(hdTts);
+    if (hdTts) resetHdExhausted(); // kullanıcı yeniden açtıysa bir şans daha ver
+  }, [hdTts]);
+
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
   const guestsRef = useRef<Guest[]>([]);
@@ -239,6 +250,42 @@ export function App() {
 
   // Tempo: ses açıksa replik seslendirilir ve bitene kadar beklenir; kapalıysa
   // okuma süresi kadar beklenir. Böylece akış okunabilir/dinlenebilir hızda.
+  // Tek seslendirme noktası: HD (ElevenLabs) açık ve kullanılabilirse önce onu
+  // dener; kota dolar / hata olursa TARAYICI sesine (speak) düşer. Böylece
+  // "HD süresi bitince eski moda dönme" tek yerde çözülür.
+  const speakVoice = useCallback(
+    async (
+      text: string,
+      voiceIdx: number,
+      gender: "male" | "female" | undefined,
+      signal: AbortSignal,
+    ) => {
+      if (hdRef.current && !isHdExhausted()) {
+        try {
+          await elevenSpeak(text, { voiceIdx, gender, signal });
+          return;
+        } catch (e) {
+          if (signal.aborted) return;
+          // Kota/anahtar sorunu → HD'yi bu oturumda kapat ve kullanıcıyı bilgilendir.
+          if (e instanceof ElevenError && (e.code === "QUOTA" || e.code === "NO_KEY")) {
+            markHdExhausted();
+            setHdTts(false);
+            setError(
+              e.code === "QUOTA"
+                ? "🎧 Günlük HD ses hakkı doldu — normal seslere geçildi."
+                : "🎧 HD sesler şu an kapalı — normal seslere geçildi.",
+            );
+          }
+          // Diğer hatalarda sessizce tarayıcı sesine düş (aşağı devam).
+        }
+      }
+      const vopts = voiceForGuest(voiceIdx, gender);
+      // Temel hızı geç; canlı çarpanı speak() her cümlede kendisi uygular.
+      await speak(text, { ...vopts, signal });
+    },
+    [],
+  );
+
   const pace = useCallback(
     async (
       text: string,
@@ -247,14 +294,12 @@ export function App() {
       signal: AbortSignal,
     ) => {
       if (ttsRef.current && text.trim()) {
-        const vopts = voiceForGuest(voiceIdx, gender);
-        // Temel hızı geç; canlı çarpanı speak() her cümlede kendisi uygular.
-        await speak(text, { ...vopts, signal });
+        await speakVoice(text, voiceIdx, gender, signal);
       } else {
         await delay(readingDelay(text), signal);
       }
     },
-    [],
+    [speakVoice],
   );
 
   const lastGuestSpeaker = useCallback((): number | null => {
@@ -535,7 +580,7 @@ export function App() {
           modNoteRef.current = modText;
           if (ttsRef.current && modText.trim()) {
             const mctrl = new AbortController();
-            speak(modText, { ...voiceForGuest(9, undefined), signal: mctrl.signal });
+            void speakVoice(modText, 9, undefined, mctrl.signal);
           }
         }
 
@@ -735,7 +780,7 @@ export function App() {
         append({ id: uid(), speaker: "moderator", text, mode: "normal" });
         if (ttsRef.current && text.trim()) {
           const ctrl = new AbortController();
-          speak(text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
+          void speakVoice(text, 9, undefined, ctrl.signal);
         }
         modNoteRef.current = text;
         if (!runningRef.current && phase === "panel") drive();
@@ -879,7 +924,7 @@ export function App() {
       const last = utterRef.current[utterRef.current.length - 1];
       const ctrl = new AbortController();
       // fire-and-forget: sonuç ekranı görünmeden seslendir
-      speak(last.text, { ...voiceForGuest(9, undefined), signal: ctrl.signal });
+      void speakVoice(last.text, 9, undefined, ctrl.signal);
     }
 
     // Sezon sonucu hesapla
@@ -1216,6 +1261,8 @@ export function App() {
         onToggleTts={() => setTtsOn((v) => !v)}
         ttsRate={ttsRate}
         onTtsRateChange={setTtsRate}
+        hdOn={hdTts}
+        onToggleHd={() => setHdTts((v) => !v)}
       />
 
       {savedToast && <div className="save-toast">✅ Oturum kaydedildi</div>}

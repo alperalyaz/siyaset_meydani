@@ -125,9 +125,22 @@ let rateMultiplier = 1;
 let activeRestart: (() => void) | null = null; // mevcut cümleyi yeni hızda başlat
 let activeStop: (() => void) | null = null; // çalan speak döngüsünü durdur
 
+// Hız değişimini dinleyenler (ElevenLabs HD sesi çalan katman da hızı canlı
+// uygulasın diye). Slider tek noktadan setSpeechRate çağırır; hem tarayıcı
+// TTS hem HD ses aynı çarpanı okur.
+const rateListeners = new Set<(m: number) => void>();
+export function onSpeechRate(fn: (m: number) => void): () => void {
+  rateListeners.add(fn);
+  return () => rateListeners.delete(fn);
+}
+export function getSpeechRate(): number {
+  return rateMultiplier;
+}
+
 export function setSpeechRate(mult: number): void {
   rateMultiplier = mult > 0 ? mult : 1;
   activeRestart?.();
+  rateListeners.forEach((fn) => fn(rateMultiplier));
 }
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
