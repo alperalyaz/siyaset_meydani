@@ -46,8 +46,10 @@ body,
 }
 
 body {
-  /* Pürüzsüz dikey geçiş (radial parıltılar bant/dikiş yapıyordu). */
-  background: linear-gradient(180deg, #171d33 0%, #0e1120 30%, var(--bg) 58%);
+  /* İnce altın yıldız/fikir deseni (SVG, çevrimdışı) + pürüzsüz dikey geçiş. */
+  background:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22120%22%20viewBox%3D%220%200%20120%20120%22%3E%3Cg%20fill%3D%22%23f2c76a%22%3E%3Cpath%20fill-opacity%3D%220.055%22%20transform%3D%22translate(24%2028)%22%20d%3D%22M0%20-7%20L2%20-2%207%200%202%202%200%207%20-2%202%20-7%200%20-2%20-2%20z%22%2F%3E%3Cpath%20fill-opacity%3D%220.04%22%20transform%3D%22translate(88%2084)%20scale(0.8)%22%20d%3D%22M0%20-7%20L2%20-2%207%200%202%202%200%207%20-2%202%20-7%200%20-2%20-2%20z%22%2F%3E%3Ccircle%20cx%3D%2298%22%20cy%3D%2224%22%20r%3D%221.5%22%20fill-opacity%3D%220.09%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2298%22%20r%3D%221.2%22%20fill-opacity%3D%220.08%22%2F%3E%3Ccircle%20cx%3D%2270%22%20cy%3D%2260%22%20r%3D%221%22%20fill-opacity%3D%220.06%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat,
+    linear-gradient(180deg, #171d33 0%, #0e1120 30%, var(--bg) 58%);
   background-attachment: fixed;
   color: var(--text);
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -581,11 +583,17 @@ a {
   position: relative;
 }
 .guest-empty::before {
-  content: "🏛️";
+  content: "";
   display: block;
-  font-size: 2.2rem;
-  margin-bottom: 0.8rem;
-  opacity: 0.5;
+  width: 108px;
+  height: 96px;
+  margin: 0 auto 1rem;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22104%22%20viewBox%3D%220%200%20120%20104%22%3E%3Cg%20stroke%3D%22%23f2b134%22%20stroke-width%3D%222.4%22%20fill%3D%22none%22%20stroke-opacity%3D%220.55%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2034%20L60%2010%20L110%2034%22%2F%3E%3Cline%20x1%3D%2216%22%20y1%3D%2240%22%20x2%3D%22104%22%20y2%3D%2240%22%2F%3E%3Cline%20x1%3D%2224%22%20y1%3D%2245%22%20x2%3D%2224%22%20y2%3D%2286%22%2F%3E%3Cline%20x1%3D%2242%22%20y1%3D%2245%22%20x2%3D%2242%22%20y2%3D%2286%22%2F%3E%3Cline%20x1%3D%2260%22%20y1%3D%2245%22%20x2%3D%2260%22%20y2%3D%2286%22%2F%3E%3Cline%20x1%3D%2278%22%20y1%3D%2245%22%20x2%3D%2278%22%20y2%3D%2286%22%2F%3E%3Cline%20x1%3D%2296%22%20y1%3D%2245%22%20x2%3D%2296%22%20y2%3D%2286%22%2F%3E%3Cline%20x1%3D%2216%22%20y1%3D%2291%22%20x2%3D%22104%22%20y2%3D%2291%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+}
+html.theme-gunluk .guest-empty::before {
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22110%22%20height%3D%22104%22%20viewBox%3D%220%200%20110%20104%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f06bb0%22%20stroke-width%3D%222.6%22%20stroke-opacity%3D%220.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%2244%22%20y%3D%2214%22%20width%3D%2222%22%20height%3D%2240%22%20rx%3D%2211%22%2F%3E%3Cpath%20d%3D%22M34%2044%20a21%2021%200%200%200%2042%200%22%2F%3E%3Cline%20x1%3D%2255%22%20y1%3D%2265%22%20x2%3D%2255%22%20y2%3D%2282%22%2F%3E%3Cline%20x1%3D%2241%22%20y1%3D%2284%22%20x2%3D%2269%22%20y2%3D%2284%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23f06bb0%22%20fill-opacity%3D%220.5%22%3E%3Cpath%20transform%3D%22translate(18%2022)%22%20d%3D%22M0%20-7%20L2%20-2%207%200%202%202%200%207%20-2%202%20-7%200%20-2%20-2%20z%22%2F%3E%3Cpath%20transform%3D%22translate(92%2034)%20scale(0.8)%22%20d%3D%22M0%20-7%20L2%20-2%207%200%202%202%200%207%20-2%202%20-7%200%20-2%20-2%20z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
 }
 .trend-chips {
   margin-bottom: 0.9rem;

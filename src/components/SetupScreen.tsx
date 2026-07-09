@@ -272,7 +272,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <p className="setup__tag">
           {topicTab === "gunluk"
             ? "Günün magazini, dedikodusu, muhabbeti… Yıldızlar masada, mikrofon sizde! ✨"
-            : "Sokaktaki adamın konularını, çağlar ötesi şahsiyetlere tartıştırın. Siz spikersiniz."}
+            : "Çağların en keskin zihinlerini aynı masada buluşturun. Büyük soruların spikeri sizsiniz."}
         </p>
       </header>
 
