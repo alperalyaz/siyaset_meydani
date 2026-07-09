@@ -113,18 +113,21 @@ function splitSentences(text: string): string[] {
 }
 
 export function cancelSpeech(): void {
+  activeStop?.(); // çalan speak()'in döngüsünü de durdur (yoksa sonraki cümleye geçer)
   if (ttsSupported()) window.speechSynthesis.cancel();
 }
 
 // Canlı hız çarpanı (kullanıcı slider'ı). speak() HER cümlede bu güncel
-// değeri okur; böylece slider değişince bir sonraki cümle yeni hızda okunur.
-// (Çalan cümlenin ortasında hız değişmez — tarayıcı buna izin vermez — ama
-// cümleler kısa olduğu için değişim birkaç saniyede duyulur. Eski pause/
-// resume hilesi rakam/kelime atlatıyordu; kaldırıldı.)
+// değeri okur. Ayrıca hız değişince çalan cümle ANINDA yeni hızla yeniden
+// başlatılır (activeRestart) — değişim hemen duyulur. (Çalan cümlenin tam
+// ortasında değil, baştan; tarayıcı ortadan değiştirmeye izin vermez.)
 let rateMultiplier = 1;
+let activeRestart: (() => void) | null = null; // mevcut cümleyi yeni hızda başlat
+let activeStop: (() => void) | null = null; // çalan speak döngüsünü durdur
 
 export function setSpeechRate(mult: number): void {
   rateMultiplier = mult > 0 ? mult : 1;
+  activeRestart?.();
 }
 
 // Metni seslendirir; bitince (ya da iptalde) çözülür. Sinyal iptal ederse durur.
@@ -151,20 +154,35 @@ export function speak(
     if (sentences.length === 0) { resolve(); return; }
 
     let cancelled = false;
-    const onAbort = () => {
+    let restarting = false; // hız değişimi için mevcut cümleyi yeniden başlatma
+    const selfStop = () => {
       cancelled = true;
       window.speechSynthesis.cancel();
     };
+    activeStop = selfStop;
     if (opts.signal) {
       if (opts.signal.aborted) { resolve(); return; }
-      opts.signal.addEventListener("abort", onAbort);
+      opts.signal.addEventListener("abort", selfStop);
     }
 
+    // Hız değişince: mevcut cümleyi iptal edip aynı index'ten yeni hızla söyle.
+    const selfRestart = () => {
+      if (cancelled || idx >= sentences.length) return;
+      restarting = true;
+      window.speechSynthesis.cancel(); // onend/onerror → restarting → aynı idx
+    };
+    activeRestart = selfRestart;
+
     let idx = 0;
+    const finish = () => {
+      opts.signal?.removeEventListener("abort", selfStop);
+      if (activeRestart === selfRestart) activeRestart = null;
+      if (activeStop === selfStop) activeStop = null;
+      resolve();
+    };
     const speakNext = () => {
       if (cancelled || idx >= sentences.length) {
-        opts.signal?.removeEventListener("abort", onAbort);
-        resolve();
+        finish();
         return;
       }
       // Efektif hız = konuğun temel hızı × canlı çarpan (her cümlede güncel).
@@ -182,8 +200,13 @@ export function speak(
         u.pitch = opts.pitch ?? 1;
         u.rate = effRate;
       };
-      u.onend = () => { idx++; speakNext(); };
-      u.onerror = () => { idx++; speakNext(); };
+      const advance = () => {
+        if (restarting) { restarting = false; speakNext(); return; } // aynı cümle, yeni hız
+        idx++;
+        speakNext();
+      };
+      u.onend = advance;
+      u.onerror = advance;
       window.speechSynthesis.speak(u);
     };
     speakNext();
