@@ -66,7 +66,14 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   useEffect(() => saveQuickGuests("gunluk", quickGunluk), [quickGunluk]);
 
   const quickGuests = topicTab === "gunluk" ? quickGunluk : quickDerin;
-  const setQuickGuests = topicTab === "gunluk" ? setQuickGunluk : setQuickDerin;
+  // Aktif sekmenin setter'ını ÇAĞRI ANINDA seç (ref üzerinden), yoksa
+  // [] bağımlılıklı callback'ler hep ilk sekmenin (derin) rafını değiştirir.
+  const setActiveQuick = useCallback(
+    (updater: (prev: QuickGuest[]) => QuickGuest[]) => {
+      (topicTabRef.current === "gunluk" ? setQuickGunluk : setQuickDerin)(updater);
+    },
+    [],
+  );
 
   // İlk açılışta iki rafın da zenginleştirilmemiş üyelerinin foto/etiketini çek.
   // PARALEL: biri yavaş/takılırsa diğerlerinin fotoğrafı yine gelir.
@@ -207,12 +214,12 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       return [...cur, g].slice(0, MAX_GUESTS).map((x, i) => ({ ...x, color: colorAt(i) }));
     });
     shownNamesRef.current.push(g.name);
-    setQuickGuests((prev) => {
+    setActiveQuick((prev) => {
       if (prev.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return prev;
       if (prev.length >= MAX_QUICK_GUESTS) return prev;
       return [...prev, { name: g.name, thumbnail: g.thumbnail, era: g.era, resolved: true }];
     });
-  }, []);
+  }, [setActiveQuick]);
 
   const addGuestByName = useCallback(
     async (name: string) => {
@@ -243,9 +250,12 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
 
   const addGuest = useCallback(() => void addGuestByName(addName), [addGuestByName, addName]);
 
-  const removeQuickGuest = useCallback((name: string) => {
-    setQuickGuests((prev) => prev.filter((x) => x.name !== name));
-  }, []);
+  const removeQuickGuest = useCallback(
+    (name: string) => {
+      setActiveQuick((prev) => prev.filter((x) => x.name !== name));
+    },
+    [setActiveQuick],
+  );
 
   const removeGuest = useCallback((name: string) => {
     setGuests((prev) =>
