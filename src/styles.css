@@ -25,11 +25,10 @@ html.theme-gunluk {
   --ok: #e59acb;
 }
 html.theme-gunluk body {
-  background:
-    radial-gradient(1100px 560px at 50% -12%, #4a2247 0%, transparent 60%),
-    radial-gradient(circle at 16% 22%, rgba(240, 107, 176, 0.14) 0%, transparent 46%),
-    radial-gradient(circle at 84% 14%, rgba(255, 176, 120, 0.10) 0%, transparent 46%),
-    var(--bg);
+  /* Pürüzsüz dikey geçiş — radial parıltılar uzun sayfada bant/dikiş
+     ("parça parça") yapıyordu; tek yönlü gradient her satırda tekdüze. */
+  background: linear-gradient(180deg, #3a1c3a 0%, #26142a 26%, var(--bg) 55%);
+  background-attachment: fixed;
 }
 
 * {
