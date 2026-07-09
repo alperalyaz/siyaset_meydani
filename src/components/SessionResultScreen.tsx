@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { SessionResult } from "../types";
 import { ALL_BADGES } from "../lib/gamification";
+import { renderShareCard, shareOrDownloadCard } from "../lib/shareCard";
 
 interface Props {
   result: SessionResult;
@@ -22,6 +24,40 @@ const DIFF_LABELS: Record<string, string> = {
 
 export function SessionResultScreen({ result, topic, guestNames, onBack }: Props) {
   const totalBadges = ALL_BADGES.length;
+  const [sharing, setSharing] = useState(false);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+
+  const shareKarne = async () => {
+    setSharing(true);
+    setShareMsg(null);
+    try {
+      const blob = await renderShareCard({
+        kind: "karne",
+        topic,
+        guests: guestNames.join(", "),
+        averageRating: result.averageRating,
+        peak: result.peakRating,
+        trough: result.troughRating,
+        badges: result.badges.length,
+        totalBadges,
+        moment: result.mostControversialMoment ?? undefined,
+        won: result.ended === "win",
+      });
+      if (!blob) {
+        setShareMsg("Görsel oluşturulamadı, tekrar deneyin.");
+        return;
+      }
+      const res = await shareOrDownloadCard(
+        blob,
+        "siyaset-meydani-karne.png",
+        `"${topic}" — Reyting ${result.averageRating}. Sen de tarihi tartıştır!`,
+      );
+      if (res === "downloaded") setShareMsg("📥 Görsel indirildi — paylaşabilirsin!");
+      else if (res === "failed") setShareMsg("Paylaşım başarısız oldu.");
+    } finally {
+      setSharing(false);
+    }
+  };
 
   return (
     <div className="result">
@@ -105,9 +141,13 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
       </div>
 
       <div className="result__actions">
-        <button className="btn btn--primary" onClick={onBack}>
+        <button className="btn btn--primary result__share" onClick={shareKarne} disabled={sharing}>
+          {sharing ? "🎨 Görsel hazırlanıyor…" : "📸 Karneyi Paylaş"}
+        </button>
+        <button className="btn btn--ghost" onClick={onBack}>
           Ana Ekrana Dön
         </button>
+        {shareMsg && <p className="result__sharemsg">{shareMsg}</p>}
         <p className="result__hint">
           Rozetlerin tarayıcında saklanır — biriktirmeye devam et!
         </p>

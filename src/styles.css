@@ -1533,17 +1533,30 @@ a {
 
 .result__actions {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
 }
 
 .result__actions .btn {
   padding: 0.8rem 2.5rem;
   font-size: 1rem;
 }
+.result__share {
+  font-weight: 800;
+}
+
+.result__sharemsg {
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin: 0;
+}
 
 .result__hint {
   font-size: 0.75rem;
   color: var(--muted);
-  margin-top: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 /* Responsive: stat grid */
