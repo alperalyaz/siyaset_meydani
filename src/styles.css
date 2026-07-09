@@ -696,6 +696,7 @@ a {
   margin-left: 1rem;
 }
 .turn__avatar {
+  position: relative; /* ::after parlamasını avatara hapset (yoksa tüm sayfaya yayılıyordu) */
   width: 42px;
   height: 42px;
   border-radius: 50%;
