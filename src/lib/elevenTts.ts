@@ -198,3 +198,17 @@ export async function elevenSpeak(
 export function markHdExhausted(): void {
   hdExhausted = true;
 }
+
+// HD gerçekten çalışıyor mu? Kısa bir örnek sentezleyip sonucu döndürür (blob
+// önbelleğe girer, sonra tekrar kullanılır). Kullanıcı 🎧'i açınca çağrılır ki
+// "neden dandik?" belirsizliği kalmasın: anahtar yok / kota dolu / çalışıyor
+// açıkça söylenir.
+export async function probeEleven(): Promise<{ ok: boolean; code?: string; message?: string }> {
+  try {
+    await synthesize("Merhaba, hoş geldiniz.", MODERATOR_VOICE);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ElevenError) return { ok: false, code: e.code, message: e.message };
+    return { ok: false, code: "ERROR", message: String(e) };
+  }
+}

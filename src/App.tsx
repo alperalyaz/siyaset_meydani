@@ -22,7 +22,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted } from "./lib/elevenTts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven } from "./lib/elevenTts";
 import { quickTopicBlock } from "./lib/safety";
 import { encodeSession, decodeSession } from "./lib/share";
 
@@ -161,6 +161,42 @@ export function App() {
     saveHdEnabled(hdTts);
     if (hdTts) resetHdExhausted(); // kullanıcı yeniden açtıysa bir şans daha ver
   }, [hdTts]);
+  // HD durum bildirimi (açıkça: çalışıyor / anahtar yok / kota dolu).
+  const [hdMsg, setHdMsg] = useState<string | null>(null);
+  const hdMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showHdMsg = useCallback((m: string) => {
+    setHdMsg(m);
+    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
+    hdMsgTimer.current = setTimeout(() => setHdMsg(null), 5000);
+  }, []);
+
+  // 🎧 aç/kapa: açarken HD'nin GERÇEKTEN çalışıp çalışmadığını sınar ve net
+  // geri bildirim verir (sessizce tarayıcı sesine düşüp "dandik" görünmesin).
+  const toggleHd = useCallback(async () => {
+    const next = !hdRef.current;
+    if (!next) {
+      setHdTts(false);
+      showHdMsg("🎧 HD sesler kapatıldı — normal (tarayıcı) sesler kullanılıyor.");
+      return;
+    }
+    setHdTts(true);
+    resetHdExhausted();
+    showHdMsg("🎧 HD sesler sınanıyor…");
+    const p = await probeEleven();
+    if (p.ok) {
+      showHdMsg("🎧 HD sesler açık — yüksek kaliteli seslendirme aktif.");
+    } else {
+      setHdTts(false);
+      markHdExhausted();
+      showHdMsg(
+        p.code === "NO_KEY"
+          ? "🎧 HD çalışmıyor: sunucuda ElevenLabs anahtarı yok. Vercel'e ELEVENLABS_API_KEY ekleyince açılır. Şimdilik normal sesler."
+          : p.code === "QUOTA"
+            ? "🎧 Günlük HD ses hakkı dolmuş — normal sesler kullanılıyor."
+            : "🎧 HD seslere ulaşılamadı — normal sesler kullanılıyor.",
+      );
+    }
+  }, [showHdMsg]);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
@@ -1389,9 +1425,14 @@ export function App() {
         ttsRate={ttsRate}
         onTtsRateChange={setTtsRate}
         hdOn={hdTts}
-        onToggleHd={() => setHdTts((v) => !v)}
+        onToggleHd={toggleHd}
       />
 
+      {hdMsg && (
+        <div className="save-toast" style={{ background: "linear-gradient(135deg, #7c4dff, #b06bff)" }}>
+          {hdMsg}
+        </div>
+      )}
       {savedToast && <div className="save-toast">✅ Oturum kaydedildi</div>}
       {shareToast && <div className="save-toast" style={{ background: "linear-gradient(135deg, #3fb6c9, #268fa8)" }}>🔗 Paylaşım linki kopyalandı!</div>}
 

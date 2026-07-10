@@ -7,7 +7,9 @@
 // Hata/kota durumunda JSON gövde ({error, code}) döner ki istemci tarayıcı
 // sesine düşebilsin.
 
-const MODEL_ID = process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5"; // Türkçe + ucuz
+// Türkçe kalitesi için en iyi model: eleven_multilingual_v2 (flash ucuz ama
+// "dandik" duyuluyordu). Env ile değiştirilebilir (ucuz istenirse flash_v2_5).
+const MODEL_ID = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
 const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "6000"); // IP/gün
 const MAX_TEXT = 600; // tek istekte azami karakter (kötüye kullanım/uzun metin freni)
 
@@ -107,7 +109,9 @@ export async function handleTts(
   const payload = {
     text,
     model_id: MODEL_ID,
-    voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true },
+    // Canlı yayın tadında: orta stabilite (monoton değil), yüksek benzerlik
+    // (net ses kimliği), bir tık stil (ifade). multilingual_v2 bunları onurlandırır.
+    voice_settings: { stability: 0.4, similarity_boost: 0.85, style: 0.35, use_speaker_boost: true },
   };
 
   let upstream: Response | undefined;
