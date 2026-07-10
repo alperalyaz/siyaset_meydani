@@ -155,6 +155,13 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           setLoading(false);
           return;
         }
+        // Tartışmaya kapalı (tek doğrusu olan) konu: engellemeyiz ama uyarırız —
+        // konuklar boş yere karşıt uydurmaz, dürüstçe hemfikir olur.
+        if (!verdict.debatable) {
+          setNotice(
+            "ℹ️ Bu konunun tek bir doğru cevabı var, pek tartışmaya açık değil (ör. 2×2=4). Konukları getiriyorum ama büyük ölçüde hemfikir olacaklar — çekişmeli bir oturum için iki tarafı olan bir başlık deneyin.",
+          );
+        }
 
         // Gündelik sekmesindeyken kadro TAMAMEN güncel/magazinel isimlerden
         // kurulur (tarihî figür karışmaz); Derin sekmesinde eski çağlar-arası

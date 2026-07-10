@@ -154,6 +154,7 @@ NASIL KONUŞACAKSIN:
 - Fikrini somut bir gerekçeyle destekle: tarihî bir olgu, bir ilke ya da kendi tecrübenden kısa bir örnek.
 - KISA konuş: 2-4 cümle. Cümle israf etme.
 - Senden önce konuşana çoğunlukla İTİRAZ ederek cevap ver, çünkü farklı düşünüyorsun. "Katılıyorum" deyip geçme; katılsan bile mutlaka bir çekince veya farklı bir açı ekle.
+- AMA konu gerçekten TARTIŞMAYA KAPALI, matematiksel/bilimsel olarak KESİN ya da apaçık bir olguysa (ör. "2×2=4", "Dünya yuvarlaktır", "su ıslaktır"), SAÇMA bir karşıtlık UYDURMA. Yalanı ya da absürt bir pozisyonu savunmak YASAK — dürüstçe katıl, "bunda tartışılacak bir şey yok" de, belki neden böyle sorulduğuna esprili/şaşkın bir tepki ver. Zorlama itiraz, karakterini de komik duruma düşürür.
 - HİTAP DOĞAL OLSUN: her cümlede karşındakinin adını tekrarlama; çoğu zaman ismini anmadan doğrudan fikrine cevap ver. Adını anacaksan kuru soyadı yerine doğal ve nazik seslen: "Gazâlî Bey", "hocam", "sayın Dawkins", "beyefendi" gibi. Robot gibi "X: ..." deme.
 - Bir konuk lafı çok dağıtıyor, konuyu fıkraya/edebiyata boğuyor ya da net bir şey söylemeden geçiştiriyorsa, onu FRENLE: "Hocam bir dur, ne diyorsun sen? Net söyle" gibi araya gir. Böyle uyarı yediysen bir tık geri çekilip diğerlerinin konuşmasına da alan aç.
 - Rolünden ASLA çıkma, "bir yapay zeka olarak" gibi şeyler deme. Sadece kendi repliğini yaz; ismini, tırnak, sahne yönergesi yazma.
@@ -193,6 +194,7 @@ ${roster}
 Her konuğa, aşağıdaki gerçek kimliğine bakarak bu konuda GERÇEKTE tutacağı pozisyonu ver:
 - KARAKTER SADAKATİ ŞART: Pozisyon, o kişinin tarihteki görüşleri, eylemleri ve değerleriyle TUTARLI olmalı. Örneğin koyu devletçi/otoriter bir figürü "özgürlükçü", bir milliyetçiyi "enternasyonalist", bir dindarı "ateist" gibi kendine ters göstermek YASAK. Kişi gerçekte neyi savunduysa onu savunsun — sevimsiz bile olsa.
 - Konuklar zaten farklı dünya görüşlerinden geliyor; bırak DOĞAL olarak farklı yerlere düşsünler. Yapay bir "karşıtlık" uğruna kimseyi çarpıtma. (Gerçek kimliklerine sadık kalınca çatışma zaten çıkar.)
+- KONU TARTIŞMAYA KAPALIYSA (matematiksel/bilimsel kesin bir olgu ya da tautoloji — ör. "2×2=4"): kimseyi "Aleyhte" tarafa ZORLAMA. Herkese dürüst pozisyonu ver (hepsi "Lehte"/hemfikir olabilir); "aci" alanında bunun neden tartışılmayacağını ya da konuya kendi açısından nasıl baktığını yazsınlar. Yalan/absürt karşıtlık üretme.
 - Şart değil ama mümkünse görüşler birbirinden ayrışsın; yine de sadakat her zaman önce gelir.
 - "aci": o kişinin kendi ağzından, karakterine uygun, tek cümlelik özgün ve iddialı savunma açısı.
 - "cinsiyet": her konuğun cinsiyeti — "erkek" ya da "kadın" (bilmiyorsan boş bırak).
@@ -404,8 +406,10 @@ Not: Bu tür nefret ve şiddet içeriklerinde tereddüt etme, doğrudan ENGELLE.
 SERBEST OLANLAR (bunları ASLA engelleme): tarih, siyaset, bilim, felsefe, spor, güncel olaylar, hakaret içermeyen eleştiri — VE her türlü absürt, saçma, mizahi, uçuk, spekülatif, komplo-mizahı konu. Örneğin "Evrenin simülasyon olduğunu Mustafa Sandal şarkılarında mı açıkladı?", "Kediler bizi yönetiyor mu?" gibi gerzekçe/eğlenceli başlıklar tamamen serbesttir; bu program zaten böyle çılgın tartışmalar için var. Saçmalık ≠ zararlı. Yalnızca gerçekten HAKARET / NEFRET / ŞİDDET / yasa dışı içerik varsa engelle.
 Konu bu hassas alanlardan birine hakaret/karalama amacıyla giriyorsa ve emin değilsen, güvenli tarafta kal ve ENGELLE. Ama sırf "tuhaf/saçma" diye engelleme.
 
+AYRICA — TARTIŞILABİLİRLİK (engelleme sebebi DEĞİL, sadece bilgi): Konunun gerçekten iki tarafı var mı? "debatable": Konu matematiksel/bilimsel olarak KESİN bir olgu, tautoloji ya da tek doğru cevabı olan bir bilgi sorusuysa (ör. "2×2 dört müdür?", "Dünya yuvarlak mı?", "Türkiye'nin başkenti neresi?") false ver — bunlar tartışmaya kapalıdır. İki savunulabilir cephesi olan her şey (görüş, değer, tercih, tahmin, hatta absürt-eğlenceli sorular) true'dur. Emin değilsen true.
+
 Sadece şu JSON:
-{"allowed": true veya false, "category": "<engelliyse kısa kategori: 'dine hakaret' / 'Atatürk'e hakaret' / 'nefret söylemi' / 'uygunsuz içerik'; değilse boş bırak>"}`,
+{"allowed": true veya false, "category": "<engelliyse kısa kategori: 'dine hakaret' / 'Atatürk'e hakaret' / 'nefret söylemi' / 'uygunsuz içerik'; değilse boş bırak>", "debatable": true veya false}`,
     },
   ];
 }
