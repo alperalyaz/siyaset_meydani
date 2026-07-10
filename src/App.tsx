@@ -84,6 +84,9 @@ export function App() {
 
   const [utterances, setUtterances] = useState<Utterance[]>([]);
   const [rating, setRating] = useState(50);
+  useEffect(() => {
+    ratingRef.current = rating;
+  }, [rating]);
   const [ratingNote, setRatingNote] = useState("");
   const [thinking, setThinking] = useState<number | null>(null);
   const [streamingText, setStreamingText] = useState<string>("");
@@ -187,6 +190,43 @@ export function App() {
   // true kalır. "thinking" ise pace() başlamadan ÖNCE null'a döner; spiker
   // müdahalesinin sesin üstüne binip binmeyeceğine bununla karar verilir.
   const speakingRef = useRef(false);
+
+  // Otomatik kayıt: aktif oturumun kalıcı id'si. Oturum boyunca aynı kayıt
+  // güncellenir (yeni kopya oluşmaz). Yeni oturumda boşalır → ilk kayıtta id alır.
+  const activeSessionIdRef = useRef<string>("");
+  const ratingRef = useRef(50); // persistSession güncel reytingi ref'ten okusun
+
+  // Boşta kalma (idle) takibi: kullanıcı 3 dk hiç hareket etmezse oturum
+  // kendiliğinden duraklatılır (token israfını önler) ve spiker soru önerir.
+  const IDLE_MS = 180_000;
+  const lastActivityRef = useRef<number>(Date.now());
+  const idleFiredRef = useRef(false);
+  const markActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    idleFiredRef.current = false;
+  }, []);
+
+  // Aktif oturumu kalıcı listeye yaz (otomatik kayıt). Ref'lerden EN GÜNCEL
+  // hali okur; aynı oturum id'sini kullanarak var olan kaydı GÜNCELLER (kopya
+  // oluşturmaz). Böylece kullanıcı "kaydet"e basmadan çıksa bile konuşma
+  // "önceki oturumlar"da en son haliyle durur. İçerik yoksa (sadece açılış)
+  // kayıt yapmaz. Döndürdüğü değer: kaydedildi mi.
+  const persistSession = useCallback((): boolean => {
+    const utts = utterRef.current;
+    if (!guestsRef.current.length || utts.length <= 1) return false; // boş/anlamsız
+    const session: SavedSession = {
+      guests: guestsRef.current,
+      topic: topicRef.current,
+      utterances: utts,
+      rating: ratingRef.current,
+      savedAt: Date.now(),
+      ended: sessionPhaseRef.current === "ended",
+    };
+    const id = saveSessionAndIndex(session, activeSessionIdRef.current || undefined);
+    if (id) activeSessionIdRef.current = id;
+    setSessionMetas(listSessionMetas());
+    return Boolean(id);
+  }, []);
 
   useEffect(() => {
     apiKeyRef.current = apiKey;
@@ -753,6 +793,7 @@ export function App() {
 
   // Oturumu sürdür (boot / devam / müdahale sonrası tek giriş noktası).
   const drive = useCallback(() => {
+    markActivity(); // devam = etkileşim; boşta sayacı sıfırla
     pausedRef.current = false;
     runningRef.current = true;
     setRunning(true);
@@ -771,6 +812,7 @@ export function App() {
   // Spiker müdahalesi: mevcut konuşmayı KESMEDEN kuyruğa al, konuk bitirince devreye gir.
   const moderate = useCallback(
     (text: string) => {
+      markActivity(); // spiker söz aldı = etkileşim
       setError(null);
       setSuggestions([]);
       // Konuşma yoksa direkt ekle, yoksa kuyruğa al. "thinking === null" tek
@@ -813,6 +855,9 @@ export function App() {
 
     // Oturum boyu personaların ve yönetmenin tonunu belirler (gündelik = gevşek).
     setSessionMode(gunlukRef.current);
+
+    activeSessionIdRef.current = ""; // yeni oturum → ilk otomatik kayıtta id alır
+    markActivity();
 
     const welcome: Utterance = {
       id: uid(),
@@ -894,6 +939,7 @@ export function App() {
 
   const leave = useCallback(() => {
     pause();
+    persistSession(); // kaydetmeden çıksa bile konuşma "önceki oturumlar"da kalsın
     cancelSpeech();
     setPhase("setup");
     setUtterances([]);
@@ -904,7 +950,7 @@ export function App() {
     setSessionResult(null);
     setComboToast(null);
     setLeaveModal(false);
-  }, [pause]);
+  }, [pause, persistSession]);
 
   const endSession = useCallback(() => {
     setLeaveModal(false);
@@ -949,25 +995,18 @@ export function App() {
     const newBadges = evaluateBadges(result, utterRef.current, g, ratingTracker.current.allSnapshots());
     result.badges = newBadges;
     setSessionResult(result);
+    sessionPhaseRef.current = "ended";
+    persistSession(); // biten oturumu "önceki oturumlar"a (ended işaretiyle) yaz
     setPhase("result");
     setClosingSequence(false);
-  }, [closingSequence, leave, pause, append]);
+  }, [closingSequence, leave, pause, append, persistSession]);
 
   const doSave = useCallback(() => {
-    const session: SavedSession = {
-      guests,
-      topic,
-      utterances,
-      rating,
-      savedAt: Date.now(),
-      ended: sessionPhaseRef.current === "ended",
-    };
-    saveSessionAndIndex(session);
-    setSessionMetas(listSessionMetas());
+    if (!persistSession()) return;
     setSavedToast(true);
     if (savedToastTimer.current) clearTimeout(savedToastTimer.current);
     savedToastTimer.current = setTimeout(() => setSavedToast(false), 2000);
-  }, [guests, topic, utterances, rating]);
+  }, [persistSession]);
 
   const handleShare = useCallback(async () => {
     const encoded = encodeSession(guests, topic, utterances, rating);
@@ -1007,6 +1046,9 @@ export function App() {
   const handleContinueSession = useCallback((id: string) => {
     const s = loadSessionById(id);
     if (!s) return;
+
+    activeSessionIdRef.current = id; // devam eden oturum aynı kaydı günceller
+    markActivity();
 
     setGuests(s.guests);
     setTopic(s.topic);
@@ -1071,6 +1113,66 @@ export function App() {
     setReplayData(null);
     setPhase("setup");
   }, []);
+
+  // ── Otomatik kayıt ── Oturum ekranındayken konuşma her değiştiğinde (yeni
+  // replik) kısa bir gecikmeyle kalıcıya yazılır. Böylece kullanıcı "kaydet"e
+  // basmasa da "önceki oturumlar" listesi hep en güncel hali tutar.
+  useEffect(() => {
+    if (phase !== "panel" || utterances.length <= 1) return;
+    const t = setTimeout(() => persistSession(), 1500);
+    return () => clearTimeout(t);
+  }, [phase, utterances, persistSession]);
+
+  // Sekme/pencere kapanırken son hali senkron yaz (debounce'ı bekleyemeyiz).
+  useEffect(() => {
+    const onLeaveTab = () => {
+      if (phase === "panel") persistSession();
+    };
+    window.addEventListener("beforeunload", onLeaveTab);
+    window.addEventListener("pagehide", onLeaveTab);
+    return () => {
+      window.removeEventListener("beforeunload", onLeaveTab);
+      window.removeEventListener("pagehide", onLeaveTab);
+    };
+  }, [phase, persistSession]);
+
+  // ── Boşta kalma koruması ── Oturum ekranında, kullanıcı 3 dk hiç etkileşimde
+  // bulunmazsa (dokunma/tıklama/tuş/kaydırma/fare) oturum kendiliğinden
+  // duraklatılır — terk edilen bir sohbetin kendi kendine token yakması önlenir.
+  // Duraklarken spiker gevşek bir "hazır mısınız?" der ve soru önerileri gelir.
+  useEffect(() => {
+    if (phase !== "panel") return;
+    const events: (keyof DocumentEventMap)[] = [
+      "pointerdown",
+      "keydown",
+      "touchstart",
+      "wheel",
+      "mousemove",
+    ];
+    events.forEach((e) => document.addEventListener(e, markActivity, { passive: true }));
+
+    const iv = setInterval(() => {
+      if (!runningRef.current || idleFiredRef.current) return;
+      if (Date.now() - lastActivityRef.current < IDLE_MS) return;
+      idleFiredRef.current = true;
+      pause();
+      persistSession(); // duraklarken güncel hali de kaydet
+      append({
+        id: uid(),
+        speaker: "moderator",
+        text: gunlukRef.current
+          ? "Ay canlarım, bir sessizlik oldu — boşa gitmesin diye ufak bir mola verdim. 🌸 Hazırsanız aşağıdan bir soru seçin ya da ▶ Devam deyin, kaldığımız yerden coşalım!"
+          : "Bir süredir sessizlik var; boşuna sürmesin diye oturuma ara verdim. Hazır olduğunuzda aşağıdaki sorulardan birini seçin ya da ▶ Devam ile sürdürün.",
+        mode: "system",
+      });
+      void doSuggest();
+    }, 20_000);
+
+    return () => {
+      events.forEach((e) => document.removeEventListener(e, markActivity));
+      clearInterval(iv);
+    };
+  }, [phase, markActivity, pause, persistSession, append, doSuggest]);
 
   const saveKey = useCallback((k: string, p: ProviderKind) => {
     saveApiKey(k);
