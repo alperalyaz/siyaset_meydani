@@ -23,6 +23,7 @@ import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
 import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted } from "./lib/elevenTts";
+import { quickTopicBlock } from "./lib/safety";
 import { encodeSession, decodeSession } from "./lib/share";
 
 import {
@@ -841,6 +842,13 @@ export function App() {
   const beginSession = useCallback(
     async (g: Guest[], t: string, diff: Difficulty, context?: string | null) => {
       setBlockedMsg(null);
+      // Deterministik ön-filtre (sıfır token): bariz karalama → LLM'e gitme.
+      if (quickTopicBlock(t).blocked) {
+        setBlockedMsg(
+          "Bu konuyla ilgili açık oturum düzenlenemiyor 🌱 Hakaret/karalama içeren başlıklara konuk çağrılmaz; lütfen farklı bir konu seçin.",
+        );
+        return;
+      }
       setChecking(true);
       try {
         const verdict = await moderateTopic(t, apiKeyRef.current);

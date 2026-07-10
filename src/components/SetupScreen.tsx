@@ -3,7 +3,8 @@ import type { Guest, Difficulty } from "../types";
 import type { SessionMeta, QuickGuest, QuickTab } from "../lib/store";
 import { loadQuickGuests, saveQuickGuests, MAX_QUICK_GUESTS } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
-import { suggestGuestNames, suggestTopicIdeas } from "../lib/engine";
+import { suggestGuestNames, suggestTopicIdeas, moderateTopic } from "../lib/engine";
+import { quickTopicBlock } from "../lib/safety";
 import { TOPIC_POOL, DEEP_TOPIC_POOL } from "../lib/pool";
 
 type TopicTab = "gunluk" | "derin";
@@ -124,11 +125,35 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     async (t: string) => {
       const q = t.trim();
       if (!q) return;
+      // İçerik güvenliği kapısı — konuk GETİRMEDEN önce. Hakaret/karalama
+      // (ör. Atatürk'e iftira, nefret söylemi) içeren konularda ne konuk ne
+      // token harcanır; masa hiç kurulmaz.
+      // 1) Deterministik ön-filtre: bariz karalama → SIFIR token, LLM'e bile gitme.
+      const quick = quickTopicBlock(q);
+      if (quick.blocked) {
+        setGuests(null);
+        setNotice(
+          "🚫 Bu başlıkla açık oturum düzenlenemiyor (hakaret/karalama). Konuk getirilmedi — lütfen konuyu saygılı bir dille yeniden yazın.",
+        );
+        return;
+      }
+
       setLoading(true);
       setGuests(null);
       setAddMsg(null);
       setNotice(null);
       try {
+        // 2) Yapay zekâ moderasyonu (daha ince durumlar) — yine konuk getirmeden.
+        const verdict = await moderateTopic(q, apiKey);
+        if (!verdict.allowed) {
+          setGuests(null);
+          setNotice(
+            "🚫 Bu konuyla açık oturum düzenlenemiyor — hakaret/karalama içeren başlıklar için konuk getirilmez. Lütfen konuyu tartışmaya uygun, saygılı bir dille yeniden yazın.",
+          );
+          setLoading(false);
+          return;
+        }
+
         // Gündelik sekmesindeyken kadro TAMAMEN güncel/magazinel isimlerden
         // kurulur (tarihî figür karışmaz); Derin sekmesinde eski çağlar-arası
         // çeşitlilik kuralı geçerli.

@@ -395,7 +395,7 @@ export function moderationMessages(topic: string) {
 
 Bu konuyla canlı bir tartışma programı yapılabilir mi? Aşağıdakilerden birini AMAÇLIYORSA engelle:
 - Din, peygamberler veya kutsal değerlere HAKARET, aşağılama, alay. (MEŞRU dinî/felsefi/teolojik tartışma SERBEST: "Allah var mı?", "din ve bilim", "laiklik" gibi. Ama peygamberi/kutsalı aşağılamayı hedefleyen başlıklar YASAK.)
-- Atatürk'e hakaret, karalama, iftira (5816 sayılı kanun). (Atatürk'ün icraatlarını/tarihini tartışmak SERBEST; "Atatürk hain/sabetayisttir" gibi karalamalar YASAK.)
+- Atatürk'e hakaret, karalama, iftira (5816 sayılı kanun). Atatürk'ün icraatlarını/tarihini/reformlarını tartışmak SERBEST; ama kişiliğini, soyunu, dinini, ahlakını hedef alan karalamalar YASAK — SORU biçiminde sorulsa bile ("... mıydı?"). Örnek YASAK başlıklar: "Atatürk Sabetaist miydi?", "Atatürk gayrimeşru muydu?", "Atatürk hain/sabetayisttir", "annesi hakkında ...", "Atatürk gerçekten Türk müydü?", "Atatürk alkolik miydi?" gibi soy/din/ahlak karalaması amaçlı her başlık. Bu tür bir iftirayı "acaba/mıydı" diye soruya çevirmek onu meşru YAPMAZ; yine ENGELLE.
 - Bir etnik/dinî/cinsel/ulusal gruba yönelik ırkçılık, nefret söylemi, aşağılama, komplo teorisi ya da o grubu şeytanlaştırma (örn. "Yahudiler tüm kötülüklerin arkasında", "X halkı aşağıdır").
 - Bir gruba veya kişiye yönelik ŞİDDET, zarar, sürgün veya YOK ETME çağrısı/planı (örn. "Kürtleri nasıl yok etmeliyiz", "X'lerden nasıl kurtuluruz"). Bunlar kesinlikle YASAK.
 - Çocuk istismarı, cinsel istismar, terör övgüsü/teşviki, belirli bir kişiyi hedef gösterme/karalama.
@@ -542,11 +542,11 @@ export function guestSuggestMessages(
 - 8 ismin HEPSİ Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan/spordan bildiği YAŞAYAN ünlüler olsun.
 - TARİHÎ/ÇAĞLAR ÖTESİ figür KARIŞTIRMA — bu listede sadece güncel, yaşayan isimler olsun; tarihî figürler ayrı bir bölümde zaten var.
 - Hepsinin Türkçe Vikipedi'de maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
-    : `ÇOK ÖNEMLİ — ÇEŞİTLİLİK:
-- FARKLI ÇAĞLARDAN seç: en az biri antik/orta çağ, en az biri son 200 yıl. Hepsi aynı dönemden/aynı ekolden OLMASIN.
-- Birbirine çok benzeyen (aynı okul, aynı görüş) 3 kişi seçme. Beklenmedik, ilk bakışta alakasız görünen ama konuya farklı bir açıdan dokunan isimleri tercih et.
-- Örnek çeşitlilik (konu 'devlet otoritesi' olsaydı): Sun Tzu, Machiavelli, İbn Haldun, Napolyon, Gandhi, Hannah Arendt gibi çok farklı çağ ve cepheler.
-- Farklı milletlerden ve farklı mesleklerden olabilirler; yeter ki konuya güçlü bir sözleri olsun.`;
+    : `ÇOK ÖNEMLİ — ÖNCE KONUYLA GERÇEK BAĞ, SONRA ÇEŞİTLİLİK:
+- 1) KONUYLA BAĞ ŞART (en kritik): Her ismin bu SPESİFİK konuyla somut, gerçek bir bağı olmalı — ya konunun uzmanı/otoritesi, ya o dönemi/kişiyi/olayı bizzat yaşamış/yönetmiş, ya da bu mesele üzerine bilinen güçlü bir görüşü olan biri. Test: isim masaya gelince "bunun bu konuyla ne alakası var?" denecekse o ismi ELE. Sırf "ünlü filozof" olması YETMEZ.
+- 2) KONU BELLİ BİR ÜLKE/KİŞİ/DÖNEMLE İLGİLİYSE (ör. Osmanlı, Türk tarihi, belirli bir padişah/lider, bir ülkenin siyaseti): konukların EN AZ YARISI o ülkeden/dönemden ya da o konunun UZMANI (tarihçi, siyaset bilimci, o coğrafyadan düşünür) olsun. Türk tarihi/siyaseti konusuysa Türk tarihçi/düşünür/devlet adamlarını (ör. Halil İnalcık, İlber Ortaylı, Kemal Karpat, İbn Haldun, ilgili dönemin aktörleri) öne al; alakasız Batılı filozofları (Locke, Hume, Gandhi vb.) SIRF ünlü diye masaya OTURTMA.
+- 3) Bu bağı koruyarak çeşitlilik kat: mümkünse farklı çağlardan/cephelerden ama HEPSİ konuya gerçekten temas eden isimler seç; aynı okuldan 3 klon olmasın.
+- Örnek (konu 'devlet otoritesi' gibi GENEL bir kavramsa): Sun Tzu, Machiavelli, İbn Haldun, Hobbes, Hannah Arendt — hepsi tam da bu konuda söz sahibi. (Genel kavramlarda çağ çeşitliliği serbest; ama spesifik/yerel konuda relevans önce gelir.)`;
   return [
     {
       role: "system" as const,
