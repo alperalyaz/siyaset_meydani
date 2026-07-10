@@ -201,9 +201,17 @@ export function App() {
   const IDLE_MS = 180_000;
   const lastActivityRef = useRef<number>(Date.now());
   const idleFiredRef = useRef(false);
+  // Süre dolunca hemen kesmeyiz; bu bayrağı koyarız. Tartışma döngüsü, çalan
+  // repliği BİTİRİP bir sonraki tura geçmeden (yani konuşma biter bitmez)
+  // duraklar — cümle ortasında kesilmez.
+  const pendingIdlePauseRef = useRef(false);
+  // Molayı fiilen uygulayan işlev (duraklat+kaydet+spiker araya girsin+öneri).
+  // Ref üzerinden çağrılır ki runSession tanımından önce erişilebilsin.
+  const performIdlePauseRef = useRef<() => void>(() => {});
   const markActivity = useCallback(() => {
     lastActivityRef.current = Date.now();
     idleFiredRef.current = false;
+    pendingIdlePauseRef.current = false; // spiker katıldı → bekleyen molayı iptal et
   }, []);
 
   // Aktif oturumu kalıcı listeye yaz (otomatik kayıt). Ref'lerden EN GÜNCEL
@@ -613,6 +621,13 @@ export function App() {
       // --- SERBEST TARTIŞMA ---
       while (runningRef.current && progressRef.current.phase === "debate") {
         try {
+        // Boşta molası bekliyorsa: bir önceki replik/seslendirme TAM bittiği
+        // için tur ortasında kesmeden burada, nazikçe duraklat.
+        if (pendingIdlePauseRef.current) {
+          pendingIdlePauseRef.current = false;
+          performIdlePauseRef.current();
+          return;
+        }
         // Bekleyen spiker mesajını devreye sok
         if (pendingModNoteRef.current) {
           const modText = pendingModNoteRef.current;
@@ -1137,12 +1152,30 @@ export function App() {
     };
   }, [phase, persistSession]);
 
+  // Süre dolunca yapılacak "nazik mola": konuşma bittiği an döngü çağırır.
+  // Duraklar, güncel hali kaydeder, spiker araya girer ve soru önerileri gelir.
+  const performIdlePause = useCallback(() => {
+    pause();
+    persistSession();
+    append({
+      id: uid(),
+      speaker: "moderator",
+      text: gunlukRef.current
+        ? "Ay canlarım, siz bir şey demeyince muhabbet başıboş kaldı — boşa gitmesin diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
+        : "Bir süredir söz almadınız; oturum kendi başına sürmesin diye ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
+      mode: "system",
+    });
+    void doSuggest();
+  }, [pause, persistSession, append, doSuggest]);
+  useEffect(() => {
+    performIdlePauseRef.current = performIdlePause;
+  }, [performIdlePause]);
+
   // ── Spiker katılımı koruması ── Ölçtüğümüz şey SPİKERİN (kullanıcının)
   // tartışmaya müdahalesidir; sayfada gezinmek/kaydırmak değil. Spiker 3 dk
-  // boyunca hiç söz almazsa (moderate) oturum duraklatılır: terk edilen sohbet
-  // boşa token yakmasın diye. Duraklarken spiker araya girer ("mola verdim,
-  // hazırsanız devam") ve soru önerileri gelir. Sayaç yalnızca gerçek müdahale
-  // (moderate) ve ▶ Devam (drive) ile sıfırlanır; salt kaydırma/tıklama SIFIRLAMAZ.
+  // boyunca hiç söz almazsa (moderate) mola BAYRAĞI konur — ama TAK diye
+  // kesilmez: tartışma döngüsü çalan repliği bitirince duraklar (aşağıda).
+  // Sayaç yalnızca gerçek müdahale (moderate) ve ▶ Devam (drive) ile sıfırlanır.
   useEffect(() => {
     if (phase !== "panel") return;
     const iv = setInterval(() => {
@@ -1152,21 +1185,11 @@ export function App() {
       if (sessionPhaseRef.current === "warmup") return;
       if (Date.now() - lastActivityRef.current < IDLE_MS) return;
       idleFiredRef.current = true;
-      pause();
-      persistSession(); // duraklarken güncel hali de kaydet
-      append({
-        id: uid(),
-        speaker: "moderator",
-        text: gunlukRef.current
-          ? "Ay canlarım, siz bir şey demeyince muhabbet başıboş kaldı — boşa gitmesin diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
-          : "Bir süredir söz almadınız; oturum kendi başına sürmesin diye ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
-        mode: "system",
-      });
-      void doSuggest();
+      pendingIdlePauseRef.current = true; // döngü, sıradaki tur başında uygular
     }, 20_000);
 
     return () => clearInterval(iv);
-  }, [phase, pause, persistSession, append, doSuggest]);
+  }, [phase]);
 
   const saveKey = useCallback((k: string, p: ProviderKind) => {
     saveApiKey(k);
