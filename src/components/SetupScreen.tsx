@@ -96,6 +96,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               ? {
                   ...x,
                   resolved: true,
+                  // Kanonik adı sakla ki tıklayınca mükerrer chip oluşmasın.
+                  resolvedName: res.status === "ok" ? res.guest.name : x.resolvedName,
                   thumbnail: res.status === "ok" ? res.guest.thumbnail : x.thumbnail,
                   era: res.status === "ok" ? res.guest.era : x.era,
                 }
@@ -231,7 +233,10 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   }, []);
 
   // Çözülmüş bir konuğu masaya ekler ve rafa kaydeder (yoksa, 10 sınırıyla).
-  const addResolvedGuest = useCallback((g: Guest) => {
+  // sourceName: eğer bu ekleme bir "hazır konuk" chip'ine tıklamayla geldiyse,
+  // o chip'in RAFTAKİ görünen adı. Kanonik ad farklı çıksa bile (ör. "Machiavelli"
+  // → "Niccolò Machiavelli") yeni bir chip yaratmayıp mevcut chip'i günceller.
+  const addResolvedGuest = useCallback((g: Guest, sourceName?: string) => {
     setGuests((prev) => {
       const cur = prev ?? [];
       if (cur.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return cur;
@@ -239,14 +244,26 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     });
     shownNamesRef.current.push(g.name);
     setActiveQuick((prev) => {
-      if (prev.some((x) => x.name.toLowerCase() === g.name.toLowerCase())) return prev;
+      const low = (s: string) => s.toLocaleLowerCase("tr").trim();
+      const gl = low(g.name);
+      const src = sourceName ? low(sourceName) : null;
+      // Mevcut chip'i bul: tıklanan chip ya da adı/kanonik adı bu kişiyle eşleşen.
+      const idx = prev.findIndex(
+        (x) => (src && low(x.name) === src) || low(x.name) === gl || (x.resolvedName && low(x.resolvedName) === gl),
+      );
+      if (idx >= 0) {
+        // Var olanı YERİNDE güncelle (kanonik ad + foto), yeni chip EKLEME.
+        const next = [...prev];
+        next[idx] = { ...next[idx], resolved: true, resolvedName: g.name, thumbnail: g.thumbnail ?? next[idx].thumbnail, era: g.era ?? next[idx].era };
+        return next;
+      }
       if (prev.length >= MAX_QUICK_GUESTS) return prev;
-      return [...prev, { name: g.name, thumbnail: g.thumbnail, era: g.era, resolved: true }];
+      return [...prev, { name: g.name, resolvedName: g.name, thumbnail: g.thumbnail, era: g.era, resolved: true }];
     });
   }, [setActiveQuick]);
 
   const addGuestByName = useCallback(
-    async (name: string) => {
+    async (name: string, sourceName?: string) => {
       const q = name.trim();
       if (!q) return;
       setAdding(true);
@@ -261,7 +278,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           setAddMsg(`"${q}" Vikipedi'de bir kişi olarak bulunamadı. İsmi tam yazmayı ya da linkini yapıştırmayı deneyin.`);
           return;
         }
-        addResolvedGuest(res.guest);
+        addResolvedGuest(res.guest, sourceName);
         setAddName("");
       } catch (e) {
         onError(e);
@@ -460,12 +477,16 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             <div className="quickguests__label">Hazır konuklar — dokun, masaya gelsin</div>
             <div className="quickguests__strip">
               {quickGuests.map((q) => {
-                const already = !!guests?.some((g) => g.name.toLowerCase() === q.name.toLowerCase());
+                // Masada mı: chip'in görünen adı VEYA kanonik adı kadrodaysa.
+                const already = !!guests?.some((g) => {
+                  const gl = g.name.toLowerCase();
+                  return gl === q.name.toLowerCase() || (!!q.resolvedName && gl === q.resolvedName.toLowerCase());
+                });
                 return (
                   <div key={q.name} className={`qg ${already ? "qg--on" : ""}`}>
                     <button
                       className="qg__pick"
-                      onClick={() => void addGuestByName(q.name)}
+                      onClick={() => void addGuestByName(q.name, q.name)}
                       disabled={adding || already || (guests?.length ?? 0) >= MAX_GUESTS}
                       title={already ? "Zaten masada" : `${q.name} — masaya ekle`}
                     >

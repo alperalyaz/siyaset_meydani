@@ -110,21 +110,43 @@ export function saveTtsRate(rate: number): void {
 // --- Hazır konuk rafı (kullanıcının kişisel hızlı-ekle listesi) ---
 
 export interface QuickGuest {
-  name: string;
+  name: string; // rafta gösterilen ad (kullanıcı dostu olabilir, ör. "Büyük Petro")
   thumbnail?: string;
   era?: string;
   resolved?: boolean; // Vikipedi'den zenginleştirme denendi mi (tekrar denemeyi önler)
+  resolvedName?: string; // Vikipedi'nin kanonik adı (ör. "I. Petro") — mükerrer önler
 }
 
 // Her sekmenin (Derin / Gündelik) kendi hazır konuk rafı var.
 export type QuickTab = "derin" | "gunluk";
 const MAX_QUICK_GUESTS = 10;
 
-// derin v4: varsayılan derin kadrosu güncellendi. gunluk v2.
+// derin v5 / gunluk v3: mükerrer (aynı kişinin iki adı) sorununu temizlemek ve
+// kanonik-ad takibini (resolvedName) devreye almak için sürüm yükseltildi.
 const QUICK_GUESTS_KEYS: Record<QuickTab, string> = {
-  derin: "siyaset_meydani_quick_guests_v4",
-  gunluk: "siyaset_meydani_quick_gunluk_v2",
+  derin: "siyaset_meydani_quick_guests_v5",
+  gunluk: "siyaset_meydani_quick_gunluk_v3",
 };
+
+// Aynı kişinin farklı adlarla (ör. "Machiavelli" ve "Niccolò Machiavelli") iki
+// kez rafta durmasını önler. Kimlik anahtarı: kanonik ad varsa o, yoksa görünen ad.
+function quickKey(q: QuickGuest): string {
+  return (q.resolvedName || q.name).toLocaleLowerCase("tr").trim();
+}
+function dedupeQuick(list: QuickGuest[]): QuickGuest[] {
+  const seen = new Set<string>();
+  const out: QuickGuest[] = [];
+  for (const q of list) {
+    // Hem görünen ad hem kanonik ad anahtarını kontrol et (biri daha önce geçtiyse ele).
+    const k1 = q.name.toLocaleLowerCase("tr").trim();
+    const k2 = quickKey(q);
+    if (seen.has(k1) || seen.has(k2)) continue;
+    seen.add(k1);
+    seen.add(k2);
+    out.push(q);
+  }
+  return out;
+}
 
 // Derin: tartışmaya yatkın fikir insanları/gazeteciler.
 // Gündelik: magazin/TV yıldızları (kadın programı havası).
@@ -159,7 +181,7 @@ export function loadQuickGuests(tab: QuickTab): QuickGuest[] {
     if (raw === null) return [...DEFAULT_QUICK_GUESTS[tab]];
     const list = JSON.parse(raw) as QuickGuest[];
     return Array.isArray(list)
-      ? list.filter((x) => x && typeof x.name === "string").slice(0, MAX_QUICK_GUESTS)
+      ? dedupeQuick(list.filter((x) => x && typeof x.name === "string")).slice(0, MAX_QUICK_GUESTS)
       : [...DEFAULT_QUICK_GUESTS[tab]];
   } catch {
     return [...DEFAULT_QUICK_GUESTS[tab]];
