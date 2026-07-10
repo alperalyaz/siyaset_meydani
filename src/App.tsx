@@ -579,6 +579,7 @@ export function App() {
           progressRef.current = { phase: "debate", i: 0 };
           // Gamification: warming up is done, enter debate phase
           sessionPhaseRef.current = "debate";
+          markActivity(); // serbest tartışma başladı — spikere temiz 3 dk pencere
           eventQueueRef.current.push(phaseChangeEvent("debate", Date.now()));
           flushEvent();
           continue;
@@ -1136,23 +1137,19 @@ export function App() {
     };
   }, [phase, persistSession]);
 
-  // ── Boşta kalma koruması ── Oturum ekranında, kullanıcı 3 dk hiç etkileşimde
-  // bulunmazsa (dokunma/tıklama/tuş/kaydırma/fare) oturum kendiliğinden
-  // duraklatılır — terk edilen bir sohbetin kendi kendine token yakması önlenir.
-  // Duraklarken spiker gevşek bir "hazır mısınız?" der ve soru önerileri gelir.
+  // ── Spiker katılımı koruması ── Ölçtüğümüz şey SPİKERİN (kullanıcının)
+  // tartışmaya müdahalesidir; sayfada gezinmek/kaydırmak değil. Spiker 3 dk
+  // boyunca hiç söz almazsa (moderate) oturum duraklatılır: terk edilen sohbet
+  // boşa token yakmasın diye. Duraklarken spiker araya girer ("mola verdim,
+  // hazırsanız devam") ve soru önerileri gelir. Sayaç yalnızca gerçek müdahale
+  // (moderate) ve ▶ Devam (drive) ile sıfırlanır; salt kaydırma/tıklama SIFIRLAMAZ.
   useEffect(() => {
     if (phase !== "panel") return;
-    const events: (keyof DocumentEventMap)[] = [
-      "pointerdown",
-      "keydown",
-      "touchstart",
-      "wheel",
-      "mousemove",
-    ];
-    events.forEach((e) => document.addEventListener(e, markActivity, { passive: true }));
-
     const iv = setInterval(() => {
       if (!runningRef.current || idleFiredRef.current) return;
+      // Tanışma/görüş turları (warmup) sonlu ve senaryolu — orada araya girme;
+      // sadece kendi kendine sürüp token yakan serbest tartışmada devreye gir.
+      if (sessionPhaseRef.current === "warmup") return;
       if (Date.now() - lastActivityRef.current < IDLE_MS) return;
       idleFiredRef.current = true;
       pause();
@@ -1161,18 +1158,15 @@ export function App() {
         id: uid(),
         speaker: "moderator",
         text: gunlukRef.current
-          ? "Ay canlarım, bir sessizlik oldu — boşa gitmesin diye ufak bir mola verdim. 🌸 Hazırsanız aşağıdan bir soru seçin ya da ▶ Devam deyin, kaldığımız yerden coşalım!"
-          : "Bir süredir sessizlik var; boşuna sürmesin diye oturuma ara verdim. Hazır olduğunuzda aşağıdaki sorulardan birini seçin ya da ▶ Devam ile sürdürün.",
+          ? "Ay canlarım, siz bir şey demeyince muhabbet başıboş kaldı — boşa gitmesin diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
+          : "Bir süredir söz almadınız; oturum kendi başına sürmesin diye ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
         mode: "system",
       });
       void doSuggest();
     }, 20_000);
 
-    return () => {
-      events.forEach((e) => document.removeEventListener(e, markActivity));
-      clearInterval(iv);
-    };
-  }, [phase, markActivity, pause, persistSession, append, doSuggest]);
+    return () => clearInterval(iv);
+  }, [phase, pause, persistSession, append, doSuggest]);
 
   const saveKey = useCallback((k: string, p: ProviderKind) => {
     saveApiKey(k);
