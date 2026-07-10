@@ -22,7 +22,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven } from "./lib/elevenTts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel } from "./lib/elevenTts";
 import { quickTopicBlock } from "./lib/safety";
 import { encodeSession, decodeSession } from "./lib/share";
 
@@ -555,6 +555,9 @@ export function App() {
         cast.genders.forEach((gd, idx) => {
           if (gd && g[idx] && !g[idx].gender) g[idx].gender = gd;
         });
+        // HD sesleri: cinsiyet + dönem + üsluba göre her konuğa AYRI, kişiliğine
+        // uygun ElevenLabs sesi ata (panelde tekrar yok). Konuşmadan ÖNCE olmalı.
+        assignVoicesForPanel(g);
         syncMeta();
       }
 
@@ -1101,6 +1104,7 @@ export function App() {
 
     activeSessionIdRef.current = id; // devam eden oturum aynı kaydı günceller
     markActivity();
+    assignVoicesForPanel(s.guests); // kayıtlı konuklar için de HD ses ataması
 
     setGuests(s.guests);
     setTopic(s.topic);

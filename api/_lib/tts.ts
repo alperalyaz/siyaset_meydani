@@ -16,6 +16,24 @@ const MAX_TEXT = 600; // tek istekte azami karakter (kötüye kullanım/uzun met
 export interface TtsRequestBody {
   text?: string;
   voiceId?: string;
+  settings?: {
+    stability?: number;
+    similarity_boost?: number;
+    style?: number;
+    use_speaker_boost?: boolean;
+  };
+}
+
+// İstemciden gelen ses ayarlarını güvenli aralığa sıkıştır (kötü değer gelmesin).
+function sanitizeSettings(s: TtsRequestBody["settings"]) {
+  const clamp = (v: unknown, d: number) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d;
+  return {
+    stability: clamp(s?.stability, 0.4),
+    similarity_boost: clamp(s?.similarity_boost, 0.85),
+    style: clamp(s?.style, 0.3),
+    use_speaker_boost: s?.use_speaker_boost !== false,
+  };
 }
 
 export interface TtsResult {
@@ -109,9 +127,9 @@ export async function handleTts(
   const payload = {
     text,
     model_id: MODEL_ID,
-    // Canlı yayın tadında: orta stabilite (monoton değil), yüksek benzerlik
-    // (net ses kimliği), bir tık stil (ifade). multilingual_v2 bunları onurlandırır.
-    voice_settings: { stability: 0.4, similarity_boost: 0.85, style: 0.35, use_speaker_boost: true },
+    // Konuğun üslubuna göre istemciden gelen ayarlar (yoksa dengeli varsayılan).
+    // multilingual_v2 stability/style/similarity'yi onurlandırır.
+    voice_settings: sanitizeSettings(body?.settings),
   };
 
   let upstream: Response | undefined;

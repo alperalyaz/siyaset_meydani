@@ -6,6 +6,7 @@
 // - Canlı hız: audio.playbackRate (slider setSpeechRate → onSpeechRate ile canlı).
 // - Basit önbellek: aynı (ses+metin) tekrar sentezlenmez (kota ve hız için).
 
+import type { Guest } from "../types";
 import { API_BASE } from "./deepseek";
 import { onSpeechRate, getSpeechRate, voiceForGuest, MODERATOR_VOICE_INDEX } from "./tts";
 
@@ -52,31 +53,121 @@ export class ElevenError extends Error {
   }
 }
 
-// ElevenLabs hazır (premade) ses kimlikleri — çok dilli modelde Türkçe okur.
-// Kadın ve erkek havuzları; konuk index'ine göre dağıtılır ki sesler ayrışsın.
-const FEMALE_VOICES = [
-  "EXAVITQu4vr4xnSDxMaL", // Sarah — sıcak
-  "XB0fDUnXU5powFXDhCwa", // Charlotte
-  "XrExE9yKIg1WjnnlVkGX", // Matilda
-  "ThT5KcBeYPX3keUQqHPh", // Dorothy
-  "AZnzlk1XvdvUeBnXmlld", // Domi
-  "MF3mGyEYCl7XYWbV9V6O", // Elli
-];
-const MALE_VOICES = [
-  "pNInz6obpgDQGcFmaJgB", // Adam
-  "ErXwobaYiN019PkySvjV", // Antoni
-  "VR6AewLTigWG4xSOukaG", // Arnold
-  "TxGEqnHWrfWFTfGW9XjX", // Josh
-  "JBFqnCBsd6RMkjVDRZzb", // George
-  "onwK4e9ZLuTAKqWW03F9", // Daniel
-];
-// Spiker: konuklardan ayrışan kendine has bir ses (sıcak kadın sunucu tonu).
+// ElevenLabs hazır (premade) sesleri — TON'a göre gruplu (multilingual_v2
+// hepsini Türkçe okur). Amaç: her konuğa AYRI ve KİŞİLİĞİNE UYGUN ses.
+// olgun = derin/otoriter/yaşlı; dengeli = orta; genç = enerjik/parlak.
+type Tone = "mature" | "mid" | "young";
+const VOICES: Record<"male" | "female", Record<Tone, string[]>> = {
+  male: {
+    mature: [
+      "VR6AewLTigWG4xSOukaG", // Arnold — güçlü, kararlı
+      "onwK4e9ZLuTAKqWW03F9", // Daniel — otoriter, sunucu/haber
+      "JBFqnCBsd6RMkjVDRZzb", // George — sıcak, olgun
+      "2EiwWnXFnvU5JabPnv8n", // Clyde — sert, yaşlı
+    ],
+    mid: [
+      "pNInz6obpgDQGcFmaJgB", // Adam — dengeli, anlatıcı
+      "ErXwobaYiN019PkySvjV", // Antoni — yumuşak, orta yaş
+      "IKne3meq5aSn9XLyUdCD", // Charlie — rahat
+      "bVMeCyTHy58xNoL34h3p", // Jeremy — hevesli
+    ],
+    young: [
+      "TxGEqnHWrfWFTfGW9XjX", // Josh — genç, derin
+      "yoZ06aMxZJJ28mfd3POQ", // Sam — genç, hafif çatallı
+      "TX3LPaxmHKxFdv7VOQHJ", // Liam — genç, net
+      "N2lVS1w4EtoT3dr4eOWO", // Callum — karakterli
+    ],
+  },
+  female: {
+    mature: [
+      "XB0fDUnXU5powFXDhCwa", // Charlotte — olgun, kendinden emin
+      "ThT5KcBeYPX3keUQqHPh", // Dorothy — sakin, olgun
+      "21m00Tcm4TlvDq8ikWAM", // Rachel — dingin, otoriter
+    ],
+    mid: [
+      "EXAVITQu4vr4xnSDxMaL", // Sarah — sıcak, dengeli
+      "XrExE9yKIg1WjnnlVkGX", // Matilda — samimi
+      "oWAxZDx7w5VEj9dCyTzz", // Grace — nazik
+    ],
+    young: [
+      "MF3mGyEYCl7XYWbV9V6O", // Elli — genç, duygusal
+      "AZnzlk1XvdvUeBnXmlld", // Domi — genç, güçlü
+      "jsCqWAovK2LkecY7zXl4", // Freya — enerjik
+    ],
+  },
+};
+// Spiker: konuklardan ayrışan kendine has, sıcak sunucu sesi (havuzlarda yok).
 const MODERATOR_VOICE = "pFZP5JQG7iQjIQuC4Bku"; // Lily
+
+// Konuğun dönemi + tartışma üslubundan ses TONU çıkar (kişiye uygun eşleştirme).
+function toneForGuest(g: Guest): Tone {
+  const era = (g.era || "").toLocaleLowerCase("tr");
+  const style = g.debateStyle || "";
+  const old = /antik|m[öo]\b|milattan|orta ?çağ|osmanl|selçuk|rönesans|klasik|1[3-8]\d\d|padişah|sultan|kağan|imparator|hükümdar|çar/.test(era);
+  const modern = /modern|günümüz|çağdaş|20\.|21\.|19[5-9]\d|20\d\d/.test(era);
+  const authoritative = /otoriter|bilgiç|soğukkanlı/.test(style);
+  const youthful = /nükteli|alaycı|provokatör|duygusal/.test(style);
+  if (authoritative || old) return "mature";
+  if (youthful || modern) return "young";
+  return "mid";
+}
+
+// Üsluba göre ElevenLabs voice_settings — ifade/dinamizm kişiye göre değişsin.
+function settingsForGuest(g: Guest): { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean } {
+  const style = g.debateStyle || "";
+  if (/agresif|provokat[öo]r|otoriter/.test(style))
+    return { stability: 0.3, similarity_boost: 0.85, style: 0.55, use_speaker_boost: true }; // dinamik, sert
+  if (/soğukkanlı|bilgiç|arabulucu/.test(style))
+    return { stability: 0.6, similarity_boost: 0.9, style: 0.12, use_speaker_boost: true }; // ölçülü, dingin
+  if (/duygusal|nükteli|alaycı/.test(style))
+    return { stability: 0.35, similarity_boost: 0.85, style: 0.45, use_speaker_boost: true }; // renkli
+  return { stability: 0.42, similarity_boost: 0.85, style: 0.3, use_speaker_boost: true };
+}
+
+type VoiceSettings = ReturnType<typeof settingsForGuest>;
+
+// Panel için ses ATAMASI: her konuğa (index'ine) AYRI ve kişiliğine uygun ses.
+// Aynı panelde iki konuk aynı sesi almaz (havuz yetmezse en yakın tondan devam).
+// App, konukların cinsiyeti belli olduktan sonra çağırır.
+let assignedVoices: (string | undefined)[] = [];
+let assignedSettings: (VoiceSettings | undefined)[] = [];
+
+export function assignVoicesForPanel(guests: Guest[]): void {
+  assignedVoices = [];
+  assignedSettings = [];
+  const used = new Set<string>();
+  guests.forEach((g, i) => {
+    const gender: "male" | "female" = g.gender === "female" ? "female" : "male";
+    const tone = toneForGuest(g);
+    assignedVoices[i] = pickVoice(gender, tone, used);
+    assignedSettings[i] = settingsForGuest(g);
+  });
+}
+
+// İstenen tondan başlayıp, kullanılmamış ilk sesi seç; o ton biterse komşu
+// tonlara geç; hepsi kullanıldıysa istenen tonun ilk sesine dön (deterministik).
+function pickVoice(gender: "male" | "female", tone: Tone, used: Set<string>): string {
+  const groups = VOICES[gender];
+  const order: Tone[] =
+    tone === "mature" ? ["mature", "mid", "young"] : tone === "young" ? ["young", "mid", "mature"] : ["mid", "mature", "young"];
+  for (const t of order) {
+    for (const v of groups[t]) {
+      if (!used.has(v)) {
+        used.add(v);
+        return v;
+      }
+    }
+  }
+  return groups[order[0]][0];
+}
 
 function voiceIdFor(i: number, gender?: "male" | "female"): string {
   if (i === MODERATOR_VOICE_INDEX) return MODERATOR_VOICE;
-  const pool = gender === "male" ? MALE_VOICES : gender === "female" ? FEMALE_VOICES : MALE_VOICES;
-  return pool[i % pool.length];
+  if (assignedVoices[i]) return assignedVoices[i]!;
+  // Atama yoksa (emniyet): tona bakmadan cinsiyet havuzunu düzleştirip index'e göre.
+  const gp = VOICES[gender === "female" ? "female" : "male"];
+  const flat = [...gp.mature, ...gp.mid, ...gp.young];
+  return flat[i % flat.length];
 }
 
 // Basit LRU önbellek: (voiceId|text) → blob URL. Kota ve gecikmeyi azaltır.
@@ -118,7 +209,12 @@ onSpeechRate((mult) => {
   }
 });
 
-async function synthesize(text: string, voiceId: string, signal?: AbortSignal): Promise<string> {
+async function synthesize(
+  text: string,
+  voiceId: string,
+  signal?: AbortSignal,
+  settings?: VoiceSettings,
+): Promise<string> {
   const key = `${voiceId}|${text}`;
   const hit = cacheGet(key);
   if (hit) return hit;
@@ -126,7 +222,7 @@ async function synthesize(text: string, voiceId: string, signal?: AbortSignal): 
   const res = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voiceId }),
+    body: JSON.stringify(settings ? { text, voiceId, settings } : { text, voiceId }),
     signal,
   });
 
@@ -165,7 +261,8 @@ export async function elevenSpeak(
   if (opts.signal?.aborted) return;
 
   const voiceId = voiceIdFor(opts.voiceIdx, opts.gender);
-  const url = await synthesize(t, voiceId, opts.signal); // hata → yukarı fırlar
+  const settings = opts.voiceIdx === MODERATOR_VOICE_INDEX ? undefined : assignedSettings[opts.voiceIdx];
+  const url = await synthesize(t, voiceId, opts.signal, settings); // hata → yukarı fırlar
 
   if (opts.signal?.aborted) return;
 
