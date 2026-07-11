@@ -1,10 +1,11 @@
-// Metin-ses (TTS) proxy'si — İKİ motor:
-//   • DEMO motoru: Google Gemini TTS (GEMINI_API_KEY). Üst düzey kalite +
-//     ücretsiz/cömert katman + 70+ dil + üsluba göre doğal-dil yönlendirme.
-//   • BYOK motoru: ElevenLabs — kullanıcı "x-eleven-key" başlığıyla kendi
-//     anahtarını verirse tüm oturum onunla (limitsiz).
-// Motor seçimi: BYOK ElevenLabs anahtarı varsa ElevenLabs; yoksa GEMINI_API_KEY
-// varsa Gemini (demo); o da yoksa ELEVENLABS_API_KEY varsa ElevenLabs demo.
+// Metin-ses (TTS) proxy'si — ÜÇ motor:
+//   • DEMO motoru (tercih): Cloud TTS Chirp 3 HD (GOOGLE_TTS_API_KEY).
+//     Gemini TTS ile aynı sesler ama üretim ürünü — günlük istek tavanı yok,
+//     ayda 1M karakter ücretsiz, sonrası $30/1M.
+//   • DEMO yedeği: Google Gemini TTS (GEMINI_API_KEY) — önizleme modeli,
+//     Tier 1'de 100 istek/gün tavanı var; Chirp anahtarı yoksa kullanılır.
+//   • BYOK: kullanıcı "x-gemini-key" (Gemini) ya da "x-eleven-key"
+//     (ElevenLabs) başlığıyla kendi anahtarını verirse tüm oturum onunla.
 // Demo modunda IP başına GÜNLÜK KARAKTER limiti (Supabase RPC; yoksa bellek).
 //
 // Yanıt: audio (mp3=ElevenLabs / wav=Gemini) + "x-tts-remaining"; hata/kota
@@ -140,19 +141,27 @@ export async function handleTts(
 
   const userGemini = keys.gemini && keys.gemini.trim() ? keys.gemini.trim() : "";
   const userEleven = keys.eleven && keys.eleven.trim() ? keys.eleven.trim() : "";
+  // Cloud TTS (Chirp 3 HD): Gemini TTS ile AYNI sesler ama önizleme değil,
+  // üretim ürünü — günlük istek tavanı yok, ayda 1M karakter ücretsiz.
+  // Ayarlıysa demo motoru olarak ÖNCELİKLİDİR (Gemini'nin 100 istek/gün
+  // tavanına takılmamak için).
+  const chirpDemoKey = process.env.GOOGLE_TTS_API_KEY;
   const geminiDemoKey = process.env.GEMINI_API_KEY;
   const elevenDemoKey = process.env.ELEVENLABS_API_KEY;
 
   // Motor + anahtar seçimi. Kullanıcının KENDİ anahtarı varsa (BYOK) demo
   // limiti uygulanmaz ve o kullanılır. Öncelik: kullanıcı Gemini > kullanıcı
-  // ElevenLabs > sunucu Gemini (demo) > sunucu ElevenLabs (demo).
-  let engine: "eleven" | "gemini";
+  // ElevenLabs > sunucu Chirp3-HD (demo) > sunucu Gemini (demo) > sunucu
+  // ElevenLabs (demo).
+  let engine: "eleven" | "gemini" | "chirp";
   let apiKey: string;
   let byok: boolean;
   if (userGemini) {
     engine = "gemini"; apiKey = userGemini; byok = true;
   } else if (userEleven) {
     engine = "eleven"; apiKey = userEleven; byok = true;
+  } else if (chirpDemoKey) {
+    engine = "chirp"; apiKey = chirpDemoKey; byok = false;
   } else if (geminiDemoKey) {
     engine = "gemini"; apiKey = geminiDemoKey; byok = false;
   } else if (elevenDemoKey) {
@@ -180,15 +189,69 @@ export async function handleTts(
   headers["x-tts-engine"] = engine;
 
   const result =
-    engine === "gemini"
-      ? await geminiGenerate(text, body.gemini, apiKey, headers)
-      : await elevenGenerate(text, voiceId, sanitizeSettings(body?.settings), apiKey, headers);
+    engine === "chirp"
+      ? await chirpGenerate(text, body.gemini, apiKey, headers)
+      : engine === "gemini"
+        ? await geminiGenerate(text, body.gemini, apiKey, headers)
+        : await elevenGenerate(text, voiceId, sanitizeSettings(body?.settings), apiKey, headers);
   // BYOK anahtarı reddedildiyse bunu NO_KEY (sunucuda anahtar yok) ile
   // KARIŞTIRMA: istemci "girdiğin anahtar geçersiz" diyebilsin.
   if (byok && result.status !== 200 && (result.body as { code?: string } | undefined)?.code === "NO_KEY") {
     (result.body as { code: string }).code = "BAD_KEY";
   }
   return result;
+}
+
+// Cloud Text-to-Speech (Chirp 3 HD). Gemini TTS ile aynı hazır sesler
+// (Aoede, Puck, Charon...) — ses adı "{locale}-Chirp3-HD-{Ad}" biçiminde
+// yerelle birleştirilir. Yerel, metnin dilinden kabaca tespit edilir
+// (Türkçe karakter → tr-TR, değilse en-US). Üslup talimatı desteklenmediği
+// için stil ön-eki KULLANILMAZ (sesler zaten karakterli).
+async function chirpGenerate(
+  text: string,
+  gemini: TtsRequestBody["gemini"],
+  apiKey: string,
+  headers: Record<string, string>,
+): Promise<TtsResult> {
+  const voice = gemini?.voice && GEMINI_VOICES.has(gemini.voice) ? gemini.voice : "Kore";
+  const locale = /[çğıİöşüÇĞİÖŞÜ]/.test(text) ? "tr-TR" : "en-US";
+  const payload = {
+    input: { text },
+    voice: { languageCode: locale, name: `${locale}-Chirp3-HD-${voice}` },
+    audioConfig: { audioEncoding: "MP3" },
+  };
+
+  let upstream: Response | undefined;
+  const maxRetries = 1;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      upstream = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      if (attempt < maxRetries) { await new Promise((r) => setTimeout(r, 800)); continue; }
+      return { status: 502, body: { error: "Cloud TTS'e ulaşılamadı.", code: "UPSTREAM", detail: String(err) } };
+    }
+    if (upstream.ok) break;
+    if ((upstream.status === 429 || upstream.status === 503) && attempt < maxRetries) {
+      await new Promise((r) => setTimeout(r, 900));
+      continue;
+    }
+    const detail = await upstream.text().catch(() => "");
+    const invalidKey = upstream.status === 401 || upstream.status === 403 || /API_KEY_INVALID|API key not valid/i.test(detail);
+    const quota = upstream.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail);
+    const code = invalidKey ? "NO_KEY" : quota ? "QUOTA" : "UPSTREAM";
+    return { status: upstream.status, body: { error: "HD ses üretilemedi.", code, detail: detail.slice(0, 300) } };
+  }
+  if (!upstream) return { status: 502, body: { error: "Beklenmeyen hata.", code: "UPSTREAM" } };
+
+  const data = (await upstream.json()) as { audioContent?: string };
+  if (!data.audioContent) {
+    return { status: 502, body: { error: "Cloud TTS ses döndürmedi.", code: "UPSTREAM" } };
+  }
+  return { status: 200, audio: b64ToBytes(data.audioContent), contentType: "audio/mpeg", headers };
 }
 
 async function geminiGenerate(
