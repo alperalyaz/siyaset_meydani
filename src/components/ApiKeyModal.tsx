@@ -123,10 +123,9 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
             <h3>{t("key.eleven.title")}</h3>
             <p className="modal__desc">
               {t("key.eleven.desc")}{" "}
-              <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noreferrer">
-                elevenlabs.io
-              </a>{" "}
-              → Developers → API Keys.
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">
+                aistudio.google.com/app/apikey
+              </a>
             </p>
             <input
               type="password"

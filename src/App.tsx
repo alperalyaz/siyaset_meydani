@@ -21,7 +21,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
 import { loadElevenKey, saveElevenKey, clearElevenKey, loadGeminiKey, saveGeminiKey, clearGeminiKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { useT, ct, detectTopicLang } from "./lib/i18n";
@@ -337,10 +337,10 @@ export function App() {
         } catch (e) {
           if (signal.aborted) return;
           // Kota/anahtar sorunu → HD'yi bu oturumda kapat ve kullanıcıyı bilgilendir.
-          if (e instanceof ElevenError && (e.code === "QUOTA" || e.code === "NO_KEY")) {
+          if (e instanceof ElevenError && (e.code === "QUOTA" || e.code === "NO_KEY" || e.code === "BAD_KEY")) {
             markHdExhausted();
             setHdTts(false);
-            setError(ct(e.code === "QUOTA" ? "hd.quotaFell" : "hd.offFell"));
+            setError(ct(e.code === "QUOTA" ? "hd.quotaFell" : e.code === "BAD_KEY" ? "hd.badKey" : "hd.noKey"));
           }
           // Diğer hatalarda sessizce tarayıcı sesine düş (aşağı devam).
         }
@@ -1198,30 +1198,39 @@ export function App() {
     setApiKey(null);
     setKeyModal(false);
   }, []);
+  const showHd = useCallback((m: string, ms = 8000) => {
+    setHdMsg(m);
+    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
+    hdMsgTimer.current = setTimeout(() => setHdMsg(null), ms);
+  }, []);
   // HD anahtarı kaydet — türü ön-eke göre yönlendir: "AIza..." → Google Gemini,
   // diğer ("sk_..." vb.) → ElevenLabs. Diğer slotu temizler (tek anahtar aktif).
+  // Kaydettikten sonra anahtar HEMEN sınanır ve sonuç açıkça bildirilir
+  // ("girdim ama çalışmıyor" belirsizliği kalmasın).
   const saveHdKeyCb = useCallback((k: string) => {
     const key = k.trim();
     if (/^AIza/i.test(key)) {
-      saveGeminiKey(key); setGeminiKeyState(key);
-      clearElevenKey(); setElevenKeyState(null);
+      saveGeminiKey(key); setGeminiKeyState(key); setGeminiKey(key);
+      clearElevenKey(); setElevenKeyState(null); setElevenKey(null);
     } else {
-      saveElevenKey(key); setElevenKeyState(key);
-      clearGeminiKey(); setGeminiKeyState(null);
+      saveElevenKey(key); setElevenKeyState(key); setElevenKey(key);
+      clearGeminiKey(); setGeminiKeyState(null); setGeminiKey(null);
     }
     resetHdExhausted(); // yeni anahtar → HD'ye tekrar şans ver
     setHdTts(true);
-    setHdMsg(ct("hd.keySaved"));
-    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
-    hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
-  }, []);
+    showHd(ct("hd.probing"));
+    void probeEleven().then((p) => {
+      if (p.ok) showHd(ct("hd.keyWorks"));
+      else if (p.code === "BAD_KEY" || p.code === "NO_KEY") showHd(ct("hd.badKey"), 12000);
+      else if (p.code === "QUOTA") showHd(ct("hd.keyQuota"), 12000);
+      else showHd(ct("hd.unreachable"));
+    });
+  }, [showHd]);
   const clearHdKeyCb = useCallback(() => {
-    clearElevenKey(); setElevenKeyState(null);
-    clearGeminiKey(); setGeminiKeyState(null);
-    setHdMsg(ct("hd.keyCleared"));
-    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
-    hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
-  }, []);
+    clearElevenKey(); setElevenKeyState(null); setElevenKey(null);
+    clearGeminiKey(); setGeminiKeyState(null); setGeminiKey(null);
+    showHd(ct("hd.keyCleared"));
+  }, [showHd]);
 
   if (phase === "replay" && replayData) {
     return (

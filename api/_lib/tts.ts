@@ -176,10 +176,16 @@ export async function handleTts(
   headers["x-tts-byok"] = byok ? "1" : "0";
   headers["x-tts-engine"] = engine;
 
-  if (engine === "gemini") {
-    return geminiGenerate(text, body.gemini, apiKey, headers);
+  const result =
+    engine === "gemini"
+      ? await geminiGenerate(text, body.gemini, apiKey, headers)
+      : await elevenGenerate(text, voiceId, sanitizeSettings(body?.settings), apiKey, headers);
+  // BYOK anahtarı reddedildiyse bunu NO_KEY (sunucuda anahtar yok) ile
+  // KARIŞTIRMA: istemci "girdiğin anahtar geçersiz" diyebilsin.
+  if (byok && result.status !== 200 && (result.body as { code?: string } | undefined)?.code === "NO_KEY") {
+    (result.body as { code: string }).code = "BAD_KEY";
   }
-  return elevenGenerate(text, voiceId, sanitizeSettings(body?.settings), apiKey, headers);
+  return result;
 }
 
 async function geminiGenerate(

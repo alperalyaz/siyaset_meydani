@@ -314,8 +314,12 @@ async function synthesize(
     } catch {
       /* gövde JSON değil */
     }
-    if (res.status === 429) code = "QUOTA";
-    if (res.status === 503) code = "NO_KEY";
+    // Sunucu özel kod verdiyse (BAD_KEY vb.) ona dokunma; sadece kod yoksa
+    // durumdan tahmin et.
+    if (code === "TTS_ERROR") {
+      if (res.status === 429) code = "QUOTA";
+      if (res.status === 503) code = "NO_KEY";
+    }
     throw new ElevenError(msg, res.status, code);
   }
 
@@ -375,13 +379,16 @@ export function markHdExhausted(): void {
   hdExhausted = true;
 }
 
-// HD gerçekten çalışıyor mu? Kısa bir örnek sentezleyip sonucu döndürür (blob
-// önbelleğe girer, sonra tekrar kullanılır). Kullanıcı 🎧'i açınca çağrılır ki
-// "neden dandik?" belirsizliği kalmasın: anahtar yok / kota dolu / çalışıyor
-// açıkça söylenir.
+// HD gerçekten çalışıyor mu? Kısa bir örnek sentezleyip sonucu döndürür.
+// Kullanıcı anahtar kaydedince çağrılır ki "girdim ama çalışmıyor" belirsizliği
+// kalmasın: anahtar geçersiz / kota dolu / çalışıyor açıkça söylenir.
+const PROBE_TEXT = "Merhaba, hoş geldiniz.";
 export async function probeEleven(): Promise<{ ok: boolean; code?: string; message?: string }> {
   try {
-    await synthesize("Merhaba, hoş geldiniz.", MODERATOR_VOICE, undefined, undefined, {
+    // Önbellekteki eski (ör. demo anahtarıyla üretilmiş) sonucu at ki sınama
+    // GERÇEKTEN yeni anahtarla sunucuya gitsin.
+    cache.delete(`${MODERATOR_VOICE}|${PROBE_TEXT}`);
+    await synthesize(PROBE_TEXT, MODERATOR_VOICE, undefined, undefined, {
       voice: GEMINI_MODERATOR,
       style: "in a warm, friendly tone",
     });
