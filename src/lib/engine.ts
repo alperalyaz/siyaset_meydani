@@ -12,6 +12,7 @@ import {
   moderationMessages,
   trendTopicsMessages,
   topicIdeasMessages,
+  clashMessages,
   type GuestRole,
 } from "./prompts";
 
@@ -353,6 +354,28 @@ export async function runGuest(
     temperature: 0.9, max_tokens: 460, signal,
   });
   return cleanReply(content, guest.name);
+}
+
+// Kızışma: bir konuğun söz kesişi + kesilenin tersleyişi (tek çağrı, JSON).
+export async function runClash(
+  interrupter: Guest,
+  speaker: Guest,
+  topic: string,
+  lastText: string,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<{ interrupt: string; retort: string }> {
+  const { content } = await chat(clashMessages(interrupter, speaker, topic, lastText) as ChatMessage[], apiKey, {
+    json: true,
+    temperature: 0.95,
+    max_tokens: 240,
+    signal,
+  });
+  const parsed = parseJsonLoose<{ interrupt?: string; retort?: string }>(content);
+  return {
+    interrupt: typeof parsed?.interrupt === "string" ? parsed.interrupt.trim() : "",
+    retort: typeof parsed?.retort === "string" ? parsed.retort.trim() : "",
+  };
 }
 
 // Konuya göre kışkırtıcı spiker soruları.

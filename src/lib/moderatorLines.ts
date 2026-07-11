@@ -35,6 +35,9 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
       idlePause: gunluk
         ? "Aww dears, since you went quiet the chat drifted off — I took a little break so it wouldn't go to waste. 🌸 Come pick a question below or hit ▶ Resume, let's have fun together!"
         : "You've been quiet for a while; I paused so the session wouldn't run on its own. Jump in with one of the questions below, or continue with ▶ Resume.",
+      clashChaos: gunluk
+        ? "Sweethearts, please, one at a time! 😅 Everyone's talking over each other, I can't hear a thing!"
+        : "Dear guests, please! Everyone is talking at once and nothing can be heard — order in the studio, please! 🗯️",
     };
   }
   return {
@@ -66,5 +69,8 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
     idlePause: gunluk
       ? "Ay canlarım, siz bir şey demeyince muhabbet başıboş kaldı — boşa gitmesin diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
       : "Bir süredir söz almadınız; oturum kendi başına sürmesin diye ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
+    clashChaos: gunluk
+      ? "Ayy canlarım, birbirinize girmeyin! 😅 Herkes aynı anda konuşuyor, hiçbir şey anlamıyorum ki!"
+      : "Sayın konuklar, lütfen! Herkes aynı anda konuşuyor, hiçbir şey anlaşılmıyor — stüdyoya bir sükûnet lütfen! 🗯️",
   };
 }

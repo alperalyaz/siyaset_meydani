@@ -273,10 +273,13 @@ function cacheSet(key: string, url: string): void {
 }
 
 // Emoji/markdown temizliği (tarayıcı TTS ile aynı mantık; HD ses de okumasın).
+// Ayrıca telaffuz düzeltmeleri: TTS "spiker"i İngilizce sanıp "spaykır" diye
+// okuyor — SADECE seslendirilen metinde "sunucu"ya çevrilir (ekran aynı kalır).
 function clean(text: string): string {
   return text
     .replace(/[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}☀-➿️]/gu, "")
     .replace(/[*_]/g, "")
+    .replace(/\bspiker\b/gi, "sunucu")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -16,6 +16,7 @@ import {
   suggestQuestions,
   assignStances,
   moderateTopic,
+  runClash,
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
@@ -129,7 +130,9 @@ export function App() {
   const [comboToast, setComboToast] = useState<SessionEvent | null>(null);
 
   const [leaveModal, setLeaveModal] = useState(false);
-  const [idleModal, setIdleModal] = useState(false);
+  // Zorunlu spiker müdahale ekranı: "idle" = 3 dk sessizlik molası,
+  // "clash" = kızışma (konuklar birbirinin sözünü kesti, stüdyo karıştı).
+  const [interjectModal, setInterjectModal] = useState<null | "idle" | "clash">(null);
   // Oturum açılış hazırlığı göstergesi: 0 = gizli, 1 = kadrolama, 2 = ses/ilk
   // görüş hazırlığı. İlk konuk repliği ekrana düşünce kapanır.
   const [bootStage, setBootStage] = useState<0 | 1 | 2>(0);
@@ -212,6 +215,8 @@ export function App() {
     aheadRef.current?.ctrl.abort();
     aheadRef.current = null;
   }, []);
+  // Son kızışmanın olduğu andaki utterance sayısı (soğuma süresi için).
+  const lastClashRef = useRef(0);
   const activeRef = useRef<number[]>([]); // net fikri olan konuklar
   const threadRef = useRef<Thread | null>(null);
   const modNoteRef = useRef<string | undefined>(undefined);
@@ -694,6 +699,8 @@ export function App() {
         if (!pre) setPrepping(true);
         await prepareVoice(text, i, g[i].gender, ctrl.signal);
         setPrepping(false);
+        // Doğal nefes: görüşler arasında kısa, rastgele bir duraksama.
+        if (i > 0) await delay(500 + Math.random() * 900, ctrl.signal);
         // Sıradaki konuğun görüşü, bu konuk konuşurken hazırlansın.
         startOpeningAhead(i + 1);
         setThinking(null);
@@ -857,6 +864,9 @@ export function App() {
           if (!pre) setPrepping(true);
           await prepareVoice(text, speaker, g[speaker].gender, ctrl.signal);
           setPrepping(false);
+          // Doğal nefes: gerçek oturumda cevap ANINDA gelmez — önceki sözü
+          // tarttığını hissettiren kısa, rastgele bir duraksama.
+          await delay(600 + Math.random() * 1100, ctrl.signal);
         }
         setThinking(null);
         setStreamingText("");
@@ -872,6 +882,65 @@ export function App() {
           });
         }
         advanceThread(speaker, role);
+
+        // ── KIZIŞMA ── Tansiyon tavan yapınca (yüksek reyting) ara sıra rakip
+        // konuk konuşmacının SÖZÜNÜ ORTASINDAN KESER: ses gerçekten yarıda
+        // kesilir, kesilen tersler, stüdyo karışır ve spikerin zorunlu
+        // müdahale ekranı açılır. Gündelik modda kapalı; soğuma süresi var.
+        const clashNow =
+          !gunlukRef.current &&
+          text.trim().length > 80 &&
+          role === "continue" &&
+          dec.rating >= 75 &&
+          activeRef.current.length >= 2 &&
+          utterRef.current.length - lastClashRef.current >= 8 &&
+          Math.random() < 0.5;
+        if (clashNow) {
+          const rival = opponentOf(speaker, activeRef.current);
+          if (rival !== speaker) {
+            lastClashRef.current = utterRef.current.length;
+            discardAhead(); // hazırlanan normal tur geçersiz — akış değişiyor
+            // Kesme replikleri, konuşmacı konuşurken arkada yazılır.
+            const clashPromise = runClash(g[rival], g[speaker], t, text, apiKeyRef.current, ctrl.signal).catch(() => null);
+            // Konuşmacının sesi sözünün ~%60'ında kesilir (gerçek söz kesme).
+            speakingRef.current = true;
+            const cutCtrl = new AbortController();
+            const onAbort = () => cutCtrl.abort();
+            ctrl.signal.addEventListener("abort", onAbort);
+            const cutTimer = setTimeout(() => cutCtrl.abort(), Math.max(3500, Math.min(16000, text.length * 62 * 0.6)));
+            await pace(text, speaker, g[speaker].gender, cutCtrl.signal);
+            clearTimeout(cutTimer);
+            ctrl.signal.removeEventListener("abort", onAbort);
+            const clash = runningRef.current && !ctrl.signal.aborted ? await clashPromise : null;
+            if (clash?.interrupt) {
+              append({ id: uid(), speaker: rival, text: clash.interrupt, mode: "interrupt" });
+              await prepareVoice(clash.interrupt, rival, g[rival].gender, ctrl.signal);
+              await pace(clash.interrupt, rival, g[rival].gender, ctrl.signal);
+              if (clash.retort && runningRef.current) {
+                append({ id: uid(), speaker, text: clash.retort, mode: "interrupt" });
+                await prepareVoice(clash.retort, speaker, g[speaker].gender, ctrl.signal);
+                await pace(clash.retort, speaker, g[speaker].gender, ctrl.signal);
+              }
+              speakingRef.current = false;
+              if (!runningRef.current) return;
+              // Spiker mecburen duruma el koyar: kaos repliği + müdahale ekranı.
+              const chaosLine = modLines(gunlukRef.current, sessionLangRef.current).clashChaos;
+              append({ id: uid(), speaker: "moderator", text: chaosLine, mode: "normal" });
+              {
+                const mctrl = new AbortController();
+                void speakVoice(chaosLine, 9, undefined, mctrl.signal);
+              }
+              pause();
+              persistSession();
+              setInterjectModal("clash");
+              void doSuggest();
+              return;
+            }
+            // Kesme üretilemedi → sessizce normal akışa dön (konuşma zaten çaldı).
+            speakingRef.current = false;
+            continue;
+          }
+        }
 
         // ── AKIŞ BORUSU (üretici): sıradaki tur, bu konuşma çalarken arkada
         // hazırlanır (yönetmen kararı + replik + ses). Spiker notu beklemede
@@ -1351,7 +1420,7 @@ export function App() {
       text: modLines(gunlukRef.current, sessionLangRef.current).idlePause,
       mode: "system",
     });
-    setIdleModal(true);
+    setInterjectModal("idle");
     void doSuggest();
   }, [pause, persistSession, append, doSuggest]);
   useEffect(() => {
@@ -1656,11 +1725,11 @@ export function App() {
         </div>
       )}
 
-      {idleModal && (
-        <div className="modal__backdrop" onClick={() => setIdleModal(false)}>
+      {interjectModal && (
+        <div className="modal__backdrop" onClick={() => setInterjectModal(null)}>
           <div className="modal modal--idle" onClick={(e) => e.stopPropagation()}>
-            <h2>{t("idle.title")}</h2>
-            <p className="modal__desc">{t("idle.body")}</p>
+            <h2>{t(interjectModal === "clash" ? "clash.title" : "idle.title")}</h2>
+            <p className="modal__desc">{t(interjectModal === "clash" ? "clash.body" : "idle.body")}</p>
 
             {loadingSuggestions ? (
               <p className="idle-loading">{t("idle.loading")}</p>
@@ -1671,7 +1740,7 @@ export function App() {
                     key={i}
                     className="idle-q"
                     onClick={() => {
-                      setIdleModal(false);
+                      setInterjectModal(null);
                       moderate(s);
                     }}
                   >
@@ -1682,18 +1751,18 @@ export function App() {
             )}
 
             <div className="modal__actions">
-              <button className="btn btn--ghost" onClick={() => setIdleModal(false)}>
+              <button className="btn btn--ghost" onClick={() => setInterjectModal(null)}>
                 {t("idle.stay")}
               </button>
               <button
                 className="btn btn--primary"
                 onClick={() => {
-                  setIdleModal(false);
+                  setInterjectModal(null);
                   setSuggestions([]);
                   drive();
                 }}
               >
-                {t("idle.silent")}
+                {t(interjectModal === "clash" ? "clash.silent" : "idle.silent")}
               </button>
             </div>
           </div>

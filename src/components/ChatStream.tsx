@@ -66,7 +66,7 @@ export function ChatStream({ utterances, guests, thinking, streamingText, preppi
         const g = guests[u.speaker as number];
         if (!g) return null;
         return (
-          <div key={u.id} className={`turn ${u.mode === "redirect" ? "turn--cut" : ""}`}>
+          <div key={u.id} className={`turn ${u.mode === "redirect" || u.mode === "interrupt" ? "turn--cut" : ""}`}>
             <div className="turn__avatar" style={{ background: g.color }}>
               {g.thumbnail ? (
                 <img src={g.thumbnail} alt={g.name} />
@@ -77,7 +77,8 @@ export function ChatStream({ utterances, guests, thinking, streamingText, preppi
             <div className="turn__body">
               <div className="turn__name" style={{ color: g.color }}>
                 {g.name}
-                {u.mode === "redirect" && <span className="turn__cut">— sözü alır</span>}
+                {u.mode === "redirect" && <span className="turn__cut">{t("stream.takesFloor")}</span>}
+                {u.mode === "interrupt" && <span className="turn__cut">{t("stream.interrupts")}</span>}
               </div>
               <p className="turn__text">{renderRich(u.text)}</p>
             </div>
