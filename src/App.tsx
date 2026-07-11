@@ -129,6 +129,7 @@ export function App() {
   const [comboToast, setComboToast] = useState<SessionEvent | null>(null);
 
   const [leaveModal, setLeaveModal] = useState(false);
+  const [idleModal, setIdleModal] = useState(false);
   const [closingSequence, setClosingSequence] = useState(false);
   const [modPending, setModPending] = useState(false);
 
@@ -1199,7 +1200,8 @@ export function App() {
   }, [phase, persistSession]);
 
   // Süre dolunca yapılacak "nazik mola": konuşma bittiği an döngü çağırır.
-  // Duraklar, güncel hali kaydeder, spiker araya girer ve soru önerileri gelir.
+  // Duraklar, güncel hali kaydeder, spiker araya girer ve EKRANIN ÖNÜNE soru
+  // önerileriyle bir modal çıkar (kullanıcının dikkatini kaçırmasın diye).
   const performIdlePause = useCallback(() => {
     pause();
     persistSession();
@@ -1209,6 +1211,7 @@ export function App() {
       text: modLines(gunlukRef.current, sessionLangRef.current).idlePause,
       mode: "system",
     });
+    setIdleModal(true);
     void doSuggest();
   }, [pause, persistSession, append, doSuggest]);
   useEffect(() => {
@@ -1494,6 +1497,50 @@ export function App() {
             <div className="modal__actions">
               <button className="btn btn--ghost" onClick={() => setLeaveModal(false)}>{t("leave.cancel")}</button>
               <button className="btn btn--primary" onClick={endSession}>{t("leave.confirm")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {idleModal && (
+        <div className="modal__backdrop" onClick={() => setIdleModal(false)}>
+          <div className="modal modal--idle" onClick={(e) => e.stopPropagation()}>
+            <h2>{t("idle.title")}</h2>
+            <p className="modal__desc">{t("idle.body")}</p>
+
+            {loadingSuggestions ? (
+              <p className="idle-loading">{t("idle.loading")}</p>
+            ) : (
+              <div className="idle-qs">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    className="idle-q"
+                    onClick={() => {
+                      setIdleModal(false);
+                      moderate(s);
+                    }}
+                  >
+                    🎤 {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="modal__actions">
+              <button className="btn btn--ghost" onClick={() => setIdleModal(false)}>
+                {t("idle.stay")}
+              </button>
+              <button
+                className="btn btn--primary"
+                onClick={() => {
+                  setIdleModal(false);
+                  setSuggestions([]);
+                  drive();
+                }}
+              >
+                {t("idle.silent")}
+              </button>
             </div>
           </div>
         </div>

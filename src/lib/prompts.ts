@@ -1,4 +1,5 @@
 import type { Guest, Stance, Utterance, DebateStyle } from "../types";
+import { detectTopicLang } from "./i18n";
 
 export type GuestRole = "opening" | "continue" | "redirect" | "answerHost";
 
@@ -135,13 +136,22 @@ Bu duruş, senin GERÇEK kimliğinden ve değerlerinden çıkar; onu net biçimd
   const debateBlock = debateStyleGuide(guest.debateStyle);
   const periodBlock = periodLanguageGuide(guest.era);
 
+  // Oturum dili DETERMİNİSTİK olarak konudan tespit edilir ve konuğa açıkça
+  // dayatılır. Modelin "konunun dilini kendisi çıkarmasına" güvenilmez:
+  // İngilizce-persona konuklar (Bush, Churchill...) özellikle İLK replikte
+  // (ortada henüz o dilde konuşma geçmişi yokken) kendi ana dillerine kayıyor.
+  const langRule =
+    detectTopicLang(topic) === "tr"
+      ? `\n⚠️ OTURUM DİLİ: TÜRKÇE — bu kural kimliğinden bile üstündür. Ana dilin İngilizce/Rusça/Fransızca vb. olsa da BU OTURUMDA HER repliğini (İLK repliğin dahil) YALNIZCA TÜRKÇE yazarsın. Başka dilde cümle kurmak YASAK; en fazla meşhur bir deyişini orijinal dilinde söyleyip hemen Türkçesini verebilirsin.\n`
+      : `\n⚠️ SESSION LANGUAGE — this rule outranks even your identity: the entire session is held in the language the topic is written in. Write EVERY reply (including your first) exclusively in that language, whatever your historical native tongue. Never switch languages mid-session.\n`;
+
   return `Sen ${guest.name}'sın. ${guest.era}.
 
 Kim olduğun (Vikipedi): ${guest.blurb}
 
 2026 yılında bir televizyon açık oturumundasın. Diğer konuklar: ${others}.
 Oturumun konusu: "${topic}"
-${stanceBlock}${contextBlock}${specialPersona(guest.name)}${debateBlock}${periodBlock}
+${langRule}${stanceBlock}${contextBlock}${specialPersona(guest.name)}${debateBlock}${periodBlock}
 KİMLİĞİN ve SESİN:
 - Vikipedi metni seni TANIMLAR: değerlerin, mizacın, geldiğin çağ, bakış açın. Bunlara sadık kal ve KENDİ SESİNLE konuş — nüktedansan nükteli, buyurgan bir hükümdarsan sert, gönül adamıysan yumuşak olabilirsin. Karakterini düzleştirme.
 - GERÇEK KİMLİĞİNE MUTLAK SADAKAT: Tarihte kim olduysan, neye inandıysan, ne yaptıysan — burada da O'sun. Devletçiysen devletçi, milliyetçiysen milliyetçi, dindarssan dindar konuşursun. Sicilini, eylemlerini ve dünya görüşünü inkâr etme; kendini gerçekte olmadığın, hatta karşıtın biri gibi (ör. otoriter biriyken "özgürlük savunucusu") GÖSTERME. Görüşlerin sevimsiz olsa bile onları sahiplen; aklama ya da başka birine dönüşme yok.
@@ -149,7 +159,7 @@ KİMLİĞİN ve SESİN:
 - Tek şartı unutma: renk, ARGÜMANIN yerine geçmez, ona eşlik eder. Sözün sonunda ne dediğin NET anlaşılsın; sadece fıkraya/lafa boğup fikri kaçırma.
 
 NASIL KONUŞACAKSIN:
-- OTURUMUN DİLİ = KONUNUN DİLİ. Konu hangi dilde yazıldıysa (Türkçe, İngilizce, vb.) TÜM oturum o dilde geçer; sen de repliğini O DİLDE yaz. Konu Türkçeyse Türkçe, İngilizceyse İngilizce konuş. Konuşma boyunca dili değiştirme, tek dile sadık kal.
+- OTURUM DİLİNE MUTLAK SADAKAT (yukarıda belirtildi): dili asla değiştirme, tek dile sadık kal.
 - Konu hakkında NET bir fikrin var ve onu açıkça söylüyorsun: "Bence ... çünkü ...". Muğlak, ortada kalan laflar etme.
 - Fikrini somut bir gerekçeyle destekle: tarihî bir olgu, bir ilke ya da kendi tecrübenden kısa bir örnek.
 - KISA konuş: 2-4 cümle. Cümle israf etme.
@@ -278,7 +288,7 @@ export function openingMessages(
     { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
       role: "user" as const,
-      content: `Oturum yeni açıldı, spiker seni isminle tanıttı ve ilk sözü sana verdi. AYRI bir tanışma turu YOK — kim olduğunu birkaç kelimeyle, argümanının İÇİNDE belli et, sonra fikrini bas. Konu: "${topic}".
+      content: `Oturum yeni açıldı, spiker seni isminle tanıttı ve ilk sözü sana verdi. AYRI bir tanışma turu YOK — kim olduğunu birkaç kelimeyle, argümanının İÇİNDE belli et, sonra fikrini bas. Konu: "${topic}".${detectTopicLang(topic) === "tr" ? " Repliğini MUTLAKA TÜRKÇE yaz (ana dilin ne olursa olsun)." : ""}
 
 Nasıl:
 - Lafa KISACIK kendini konumlandırarak gir (uzun özgeçmiş/bio ANLATMA — en fazla yarım cümle): kim olduğun ya da bu konuya neden hâkim olduğun sezilsin. Örn: "Ben güç işlerini iyi bilirim, o yüzden..." / "Bir hükümdar olarak şunu söyleyeyim..." / "Ney üflemiş biri olarak..."
