@@ -12,11 +12,22 @@ import { onSpeechRate, getSpeechRate, voiceForGuest, MODERATOR_VOICE_INDEX } fro
 
 const HD_KEY = "siyaset_meydani_hd_tts_v1";
 
+// Kullanıcının kendi ElevenLabs anahtarı (BYOK) — varsa isteklerde header'a
+// eklenir ve sunucu demo karakter limitini UYGULAMAZ (sınırsız HD).
+let userElevenKey: string | null = null;
+export function setElevenKey(key: string | null): void {
+  userElevenKey = key && key.trim() ? key.trim() : null;
+}
+export function hasElevenKey(): boolean {
+  return !!userElevenKey;
+}
+
 export function loadHdEnabled(): boolean {
   try {
-    return localStorage.getItem(HD_KEY) === "1";
+    const v = localStorage.getItem(HD_KEY);
+    return v === null ? true : v === "1"; // ilk açılışta HD (ElevenLabs) VARSAYILAN AÇIK
   } catch {
-    return false;
+    return true;
   }
 }
 export function saveHdEnabled(on: boolean): void {
@@ -219,9 +230,11 @@ async function synthesize(
   const hit = cacheGet(key);
   if (hit) return hit;
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (userElevenKey) headers["x-eleven-key"] = userElevenKey;
   const res = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(settings ? { text, voiceId, settings } : { text, voiceId }),
     signal,
   });

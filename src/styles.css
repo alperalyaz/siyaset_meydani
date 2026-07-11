@@ -1153,6 +1153,16 @@ html.theme-gunluk .panel {
   color: var(--muted);
   line-height: 1.5;
 }
+/* HD (ElevenLabs) anahtar bölümü — LLM anahtarından ayrı, ince çizgiyle ayrık. */
+.modal__eleven {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+.modal__eleven h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.98rem;
+}
 .modal__providers {
   display: grid;
   grid-template-columns: 1fr 1fr;

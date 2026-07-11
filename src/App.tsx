@@ -22,7 +22,8 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel } from "./lib/elevenTts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, hasElevenKey } from "./lib/elevenTts";
+import { loadElevenKey, saveElevenKey, clearElevenKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { encodeSession, decodeSession } from "./lib/share";
 
@@ -161,6 +162,13 @@ export function App() {
     saveHdEnabled(hdTts);
     if (hdTts) resetHdExhausted(); // kullanıcı yeniden açtıysa bir şans daha ver
   }, [hdTts]);
+  // Kullanıcının kendi ElevenLabs anahtarı (BYOK). Varsa: tüm oturum HD +
+  // sınırsız. Yoksa (demo): HD yalnızca tanışma turunda, sonra normale döner.
+  const [elevenKey, setElevenKeyState] = useState<string | null>(loadElevenKey);
+  useEffect(() => {
+    setElevenKey(elevenKey); // elevenTts modülüne bildir (header + limitsiz)
+  }, [elevenKey]);
+
   // HD durum bildirimi (açıkça: çalışıyor / anahtar yok / kota dolu).
   const [hdMsg, setHdMsg] = useState<string | null>(null);
   const hdMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -345,7 +353,13 @@ export function App() {
       gender: "male" | "female" | undefined,
       signal: AbortSignal,
     ) => {
-      if (hdRef.current && !isHdExhausted()) {
+      // Demo (kendi anahtarı yok): HD yalnızca TANIŞMA turunda çalışır — sonra
+      // "ücretsiz demo bitti" ve normale döner. Kendi anahtarı olan: hep HD.
+      const hdAllowed =
+        hdRef.current &&
+        !isHdExhausted() &&
+        (hasElevenKey() || progressRef.current.phase === "intro");
+      if (hdAllowed) {
         try {
           await elevenSpeak(text, { voiceIdx, gender, signal });
           return;
@@ -584,6 +598,15 @@ export function App() {
           const ctrl = new AbortController();
           abortRef.current = ctrl;
           await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
+          // Demo kullanıcısı (kendi anahtarı yok) + HD açık: tanışma turu bitti,
+          // ücretsiz HD demo burada sona erer; gerisi normal seslerle sürer.
+          if (hdRef.current && !hasElevenKey() && !isHdExhausted()) {
+            setHdMsg(
+              "🎧 Ücretsiz HD ses demosu tanışma turuyla sınırlı — oturumun geri kalanı normal seslerle sürecek. Sınırsız HD için ⚙️ ayarlardan ElevenLabs anahtarınızı girebilirsiniz.",
+            );
+            if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
+            hdMsgTimer.current = setTimeout(() => setHdMsg(null), 8000);
+          }
           continue;
         }
         const ctrl = new AbortController();
@@ -1248,6 +1271,22 @@ export function App() {
     setApiKey(null);
     setKeyModal(false);
   }, []);
+  const saveElevenKeyCb = useCallback((k: string) => {
+    saveElevenKey(k);
+    setElevenKeyState(k);
+    resetHdExhausted(); // yeni anahtar → HD'ye tekrar şans ver
+    setHdTts(true);
+    setHdMsg("🎧 ElevenLabs anahtarı kaydedildi — artık tüm oturum boyunca sınırsız HD ses.");
+    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
+    hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
+  }, []);
+  const clearElevenKeyCb = useCallback(() => {
+    clearElevenKey();
+    setElevenKeyState(null);
+    setHdMsg("🎧 ElevenLabs anahtarı silindi — HD ses yeniden tanışma turuyla sınırlı.");
+    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
+    hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
+  }, []);
 
   if (phase === "replay" && replayData) {
     return (
@@ -1337,6 +1376,9 @@ export function App() {
           onSave={saveKey}
           onClear={removeKey}
           onClose={() => setKeyModal(false)}
+          currentElevenKey={elevenKey}
+          onSaveEleven={saveElevenKeyCb}
+          onClearEleven={clearElevenKeyCb}
         />
         {blockedMsg && (
           <div className="modal__backdrop" onClick={() => setBlockedMsg(null)}>
@@ -1461,6 +1503,9 @@ export function App() {
         onSave={saveKey}
         onClear={removeKey}
         onClose={() => setKeyModal(false)}
+        currentElevenKey={elevenKey}
+        onSaveEleven={saveElevenKeyCb}
+        onClearEleven={clearElevenKeyCb}
       />
     </div>
   );

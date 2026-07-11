@@ -9,6 +9,9 @@ interface Props {
   onSave: (key: string, provider: ProviderKind) => void;
   onClear: () => void;
   onClose: () => void;
+  currentElevenKey?: string | null;
+  onSaveEleven?: (key: string) => void;
+  onClearEleven?: () => void;
 }
 
 const PROVIDERS: { id: ProviderKind; label: string; prefix: string; desc: string; link: string; linkText: string; placeholder: string }[] = [
@@ -50,9 +53,10 @@ const PROVIDERS: { id: ProviderKind; label: string; prefix: string; desc: string
   },
 ];
 
-export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave, onClear, onClose }: Props) {
+export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave, onClear, onClose, currentElevenKey, onSaveEleven, onClearEleven }: Props) {
   const [value, setValue] = useState(currentKey ?? "");
   const [provider, setProvider] = useState<ProviderKind>(currentProvider ?? "deepseek");
+  const [elevenVal, setElevenVal] = useState(currentElevenKey ?? "");
 
   if (!open) return null;
 
@@ -114,6 +118,41 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
             Kaydet
           </button>
         </div>
+
+        {onSaveEleven && (
+          <div className="modal__eleven">
+            <h3>🎧 HD Ses (ElevenLabs) — opsiyonel</h3>
+            <p className="modal__desc">
+              Ücretsiz demoda HD ses yalnızca tanışma turuyla sınırlıdır. Kendi ElevenLabs
+              anahtarınızı girerseniz tüm oturum boyunca sınırsız HD ses alırsınız. Anahtar
+              yalnızca bu tarayıcıda saklanır.{" "}
+              <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noreferrer">
+                elevenlabs.io
+              </a>{" "}
+              → Developers → API Keys.
+            </p>
+            <input
+              type="password"
+              placeholder="sk_... (ElevenLabs)"
+              value={elevenVal}
+              onChange={(e) => setElevenVal(e.target.value)}
+            />
+            <div className="modal__actions">
+              {currentElevenKey && onClearEleven && (
+                <button className="btn btn--ghost" onClick={() => { setElevenVal(""); onClearEleven(); }}>
+                  HD anahtarını sil
+                </button>
+              )}
+              <button
+                className="btn btn--primary"
+                disabled={!elevenVal.trim()}
+                onClick={() => onSaveEleven(elevenVal.trim())}
+              >
+                HD anahtarını kaydet
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -63,6 +63,31 @@ export function clearApiKey(): void {
   }
 }
 
+// --- ElevenLabs HD ses anahtarı (opsiyonel BYOK — sınırsız HD ses) ---
+const ELEVEN_KEY = "siyaset_meydani_eleven_key";
+
+export function loadElevenKey(): string | null {
+  try {
+    return localStorage.getItem(ELEVEN_KEY);
+  } catch {
+    return null;
+  }
+}
+export function saveElevenKey(key: string): void {
+  try {
+    localStorage.setItem(ELEVEN_KEY, key.trim());
+  } catch {
+    /* yoksay */
+  }
+}
+export function clearElevenKey(): void {
+  try {
+    localStorage.removeItem(ELEVEN_KEY);
+  } catch {
+    /* yoksay */
+  }
+}
+
 export function loadProvider(): ProviderKind {
   try {
     const raw = localStorage.getItem(PROVIDER_KEY);
