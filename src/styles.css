@@ -1163,6 +1163,28 @@ html.theme-gunluk .panel {
   margin: 0 0 0.4rem;
   font-size: 0.98rem;
 }
+/* Dil değiştirici — sabit sağ üst köşe, her ekranda görünür. */
+.lang-toggle {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  color: var(--text);
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.8;
+  transition: opacity 0.15s ease, transform 0.08s ease;
+}
+.lang-toggle:hover {
+  opacity: 1;
+}
+.lang-toggle:active {
+  transform: scale(0.96);
+}
 .modal__providers {
   display: grid;
   grid-template-columns: 1fr 1fr;

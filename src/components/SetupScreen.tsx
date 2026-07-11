@@ -6,6 +6,7 @@ import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas, moderateTopic } from "../lib/engine";
 import { quickTopicBlock } from "../lib/safety";
 import { TOPIC_POOL, DEEP_TOPIC_POOL } from "../lib/pool";
+import { useT } from "../lib/i18n";
 
 type TopicTab = "gunluk" | "derin";
 
@@ -42,6 +43,7 @@ function formatDate(ts: number): string {
 }
 
 export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession, sharedSession, onClearSharedSession, onModeChange }: Props) {
+  const { t } = useT();
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [topic, setTopic] = useState("");
@@ -124,8 +126,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const shownNamesRef = useRef<string[]>([]);
 
   const drawForTopic = useCallback(
-    async (t: string) => {
-      const q = t.trim();
+    async (topicText: string) => {
+      const q = topicText.trim();
       if (!q) return;
       // İçerik güvenliği kapısı — konuk GETİRMEDEN önce. Hakaret/karalama
       // (ör. Atatürk'e iftira, nefret söylemi) içeren konularda ne konuk ne
@@ -134,9 +136,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       const quick = quickTopicBlock(q);
       if (quick.blocked) {
         setGuests(null);
-        setNotice(
-          "🚫 Bu başlıkla açık oturum düzenlenemiyor (hakaret/karalama). Konuk getirilmedi — lütfen konuyu saygılı bir dille yeniden yazın.",
-        );
+        setNotice(t("notice.blockHate"));
         return;
       }
 
@@ -149,27 +149,21 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         const verdict = await moderateTopic(q, apiKey);
         if (!verdict.allowed) {
           setGuests(null);
-          setNotice(
-            "🚫 Bu konuyla açık oturum düzenlenemiyor — hakaret/karalama içeren başlıklar için konuk getirilmez. Lütfen konuyu tartışmaya uygun, saygılı bir dille yeniden yazın.",
-          );
+          setNotice(t("notice.blockHate2"));
           setLoading(false);
           return;
         }
         // Anlamsız girdi (klavye yığını "sdkfj" vb.): boşuna konuk/token harcama.
         if (!verdict.meaningful) {
           setGuests(null);
-          setNotice(
-            "🤔 Bunu bir tartışma konusu olarak anlayamadım. Lütfen gerçek bir başlık yazın (ör. \"Ev almak mı akıllıca, kirada oturmak mı?\").",
-          );
+          setNotice(t("notice.gibberish"));
           setLoading(false);
           return;
         }
         // Tartışmaya kapalı (tek doğrusu olan) konu: engellemeyiz ama uyarırız —
         // konuklar boş yere karşıt uydurmaz, dürüstçe hemfikir olur.
         if (!verdict.debatable) {
-          setNotice(
-            "ℹ️ Bu konunun tek bir doğru cevabı var, pek tartışmaya açık değil (ör. 2×2=4). Konukları getiriyorum ama büyük ölçüde hemfikir olacaklar — çekişmeli bir oturum için iki tarafı olan bir başlık deneyin.",
-          );
+          setNotice(t("notice.notDebatable"));
         }
 
         // Gündelik sekmesindeyken kadro TAMAMEN güncel/magazinel isimlerden
@@ -185,9 +179,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           popularMode,
         );
         if (names.length === 0) {
-          setNotice(
-            "⚠️ Yapay zekâ bu konu için konuk öneremedi; hazır havuzdan konuk getirildi. Tekrar denemek için ↻ Başkaları'na basın.",
-          );
+          setNotice(t("notice.noGuests"));
         }
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
         const g = await buildGuestsFromNames(names, DEFAULT_COUNT);
@@ -199,7 +191,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         setLoading(false);
       }
     },
-    [apiKey, onError],
+    [apiKey, onError, t],
   );
 
   const pickTopic = useCallback(
@@ -231,7 +223,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         seenTopicsRef.current = [...seenTopicsRef.current, ...fresh].slice(-80);
         setExtraTopics(fresh.slice(0, 6)); // en fazla 6 göster
       } else {
-        setNotice("⚠️ Konu üretilemedi — yapay zekâ beklenmedik biçimde yanıt verdi. Tekrar deneyin.");
+        setNotice(t("notice.topicFail"));
       }
     } catch (e) {
       onError(e);
@@ -287,11 +279,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       try {
         const res = await resolveGuestByName(q);
         if (res.status === "blocked") {
-          setAddMsg("Bu isim konuk olarak eklenemez. Lütfen başka bir isim seçin.");
+          setAddMsg(t("notice.blockedName"));
           return;
         }
         if (res.status === "notfound") {
-          setAddMsg(`"${q}" Vikipedi'de bir kişi olarak bulunamadı. İsmi tam yazmayı ya da linkini yapıştırmayı deneyin.`);
+          setAddMsg(t("notice.notFound", { q }));
           return;
         }
         addResolvedGuest(res.guest, sourceName);
@@ -325,28 +317,26 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   return (
     <div className={`setup ${topicTab === "gunluk" ? "setup--gunluk" : ""}`}>
       <header className="setup__hero">
-        <h1>{topicTab === "gunluk" ? "Sohbet Meydanı" : "Siyaset Meydanı"}</h1>
+        <h1>{topicTab === "gunluk" ? t("setup.title.gunluk") : t("setup.title.derin")}</h1>
         <p className="setup__tag">
-          {topicTab === "gunluk"
-            ? "Günün magazini, dedikodusu, muhabbeti… Yıldızlar masada, mikrofon sizde! ✨"
-            : "Çağların en keskin zihinlerini aynı masada buluşturun. Büyük soruların spikeri sizsiniz."}
+          {topicTab === "gunluk" ? t("setup.tag.gunluk") : t("setup.tag.derin")}
         </p>
       </header>
 
       {savedSession && (
         <section className="setup__block setup__block--saved">
           <div className="setup__block-head">
-            <h2>💾 Kaydedilmiş Oturum</h2>
-            <button className="btn btn--ghost" onClick={onClearSession}>Sil</button>
+            <h2>{t("setup.saved.title")}</h2>
+            <button className="btn btn--ghost" onClick={onClearSession}>{t("setup.saved.delete")}</button>
           </div>
           <p className="context-hint">
-            Konu: <strong>{savedSession.topic}</strong> · {savedSession.guests.map(g => g.name).join(", ")} · {savedSession.utterances.length} replik
+            {t("setup.topicWord")} <strong>{savedSession.topic}</strong> · {savedSession.guests.map(g => g.name).join(", ")} · {savedSession.utterances.length} {t("setup.repliesWord")}
           </p>
           <button
             className="btn btn--primary"
             onClick={() => onStart(savedSession.guests, savedSession.topic, "kolay", null)}
           >
-            Kaldığın yerden devam et ▶
+            {t("setup.saved.continue")}
           </button>
         </section>
       )}
@@ -354,17 +344,17 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       {sharedSession && (
         <section className="setup__block setup__block--saved">
           <div className="setup__block-head">
-            <h2>🔗 Paylaşılan Oturum</h2>
-            <button className="btn btn--ghost" onClick={onClearSharedSession}>Kapat</button>
+            <h2>{t("setup.shared.title")}</h2>
+            <button className="btn btn--ghost" onClick={onClearSharedSession}>{t("setup.shared.close")}</button>
           </div>
           <p className="context-hint">
-            Konu: <strong>{sharedSession.topic}</strong> · {sharedSession.guests.map(g => g.name).join(", ")} · {sharedSession.utterances.length} replik
+            {t("setup.topicWord")} <strong>{sharedSession.topic}</strong> · {sharedSession.guests.map(g => g.name).join(", ")} · {sharedSession.utterances.length} {t("setup.repliesWord")}
           </p>
           <button
             className="btn btn--primary"
             onClick={() => onStart(sharedSession.guests, sharedSession.topic, "kolay", null)}
           >
-            İzle ▶
+            {t("setup.shared.watch")}
           </button>
         </section>
       )}
@@ -372,7 +362,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       {/* 1) KONU */}
       <section className="setup__block">
         <div className="setup__block-head">
-          <h2>1 · Bugünün Konusu</h2>
+          <h2>{t("setup.block1")}</h2>
           <div className="topic-tabs" role="tablist">
             <button
               role="tab"
@@ -380,7 +370,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               className={`topic-tab ${topicTab === "derin" ? "topic-tab--active" : ""}`}
               onClick={() => switchTab("derin")}
             >
-              🧠 Derin
+              {t("setup.tab.derin")}
             </button>
             <button
               role="tab"
@@ -388,7 +378,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               className={`topic-tab ${topicTab === "gunluk" ? "topic-tab--active" : ""}`}
               onClick={() => switchTab("gunluk")}
             >
-              ☕ Gündelik <span className="topic-tab__bonus">bonus</span>
+              {t("setup.tab.gunluk")} <span className="topic-tab__bonus">{t("setup.tab.bonus")}</span>
             </button>
           </div>
         </div>
@@ -415,14 +405,14 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             onClick={() => loadTopics()}
             disabled={loadingTopics}
           >
-            {loadingTopics ? "⏳ Konu üretiliyor…" : "↻ Başka konular öner"}
+            {loadingTopics ? t("setup.topicsLoading") : t("setup.topicsMore")}
           </button>
         </div>
         {notice && <p className="setup-notice">{notice}</p>}
         <div className="topic-row">
           <input
             className="topic-input"
-            placeholder="…ya da kendi konunuzu yazın (futbol, aşk, uzay, tarih…)"
+            placeholder={t("setup.topicPlaceholder")}
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && fetchGuestsForInput()}
@@ -432,7 +422,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             disabled={!topic.trim() || loading}
             onClick={() => fetchGuestsForInput()}
           >
-            Konukları getir
+            {t("setup.fetchGuests")}
           </button>
         </div>
       </section>
@@ -440,11 +430,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       {/* 2) KONUKLAR */}
       <section className="setup__block">
         <div className="setup__block-head">
-          <h2>2 · Sayın Konuklar</h2>
+          <h2>{t("setup.block2")}</h2>
           <div className="setup__draw-controls">
             {guests && guests.length > 0 && (
               <button className="btn btn--ghost" onClick={reshuffle} disabled={loading}>
-                ↻ Başkaları
+                {t("setup.reshuffle")}
               </button>
             )}
           </div>
@@ -456,10 +446,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
               <div key={i} className="guest-card guest-card--skeleton" />
             ))}
           {!loading && (!guests || guests.length === 0) && (
-            <div className="guest-empty">
-              Bir konu seçin ya da yazıp “Konukları getir”e basın; o konunun çağlar-ötesi isimlerini
-              masaya davet edeyim. Dilerseniz aşağıdan kendi konuğunuzu da ekleyebilirsiniz.
-            </div>
+            <div className="guest-empty">{t("setup.guestEmpty")}</div>
           )}
               {!loading &&
             guests?.map((g) => (
@@ -467,7 +454,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                 <button
                   className="guest-card__remove"
                   onClick={() => removeGuest(g.name)}
-                  title="Çıkar"
+                  title={t("setup.guestRemove")}
                 >
                   ×
                 </button>
@@ -478,10 +465,10 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                 {g.era && <div className="guest-card__era">{g.era}</div>}
                 {g.blurb !== g.name && <p className="guest-card__blurb">{g.blurb}</p>}
                 {g.summaryStatus === "en_wiki" && (
-                  <div className="guest-card__badge guest-card__badge--en">İngilizce Vikipedi'den</div>
+                  <div className="guest-card__badge guest-card__badge--en">{t("setup.badge.enWiki")}</div>
                 )}
                 {g.summaryStatus === "minimal" && (
-                  <div className="guest-card__badge guest-card__badge--warn">Vikipedi özeti yok — yine de masada!</div>
+                  <div className="guest-card__badge guest-card__badge--warn">{t("setup.badge.minimal")}</div>
                 )}
               </div>
             ))}
@@ -490,7 +477,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         {/* Hazır konuk rafı — dokun, masaya gelsin. × ile kaldırılır. */}
         {quickGuests.length > 0 && (
           <div className="quickguests">
-            <div className="quickguests__label">Hazır konuklar — dokun, masaya gelsin</div>
+            <div className="quickguests__label">{t("setup.quickLabel")}</div>
             <div className="quickguests__strip">
               {quickGuests.map((q) => {
                 // Masada mı: chip'in görünen adı VEYA kanonik adı kadrodaysa.
@@ -504,7 +491,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                       className="qg__pick"
                       onClick={() => void addGuestByName(q.name, q.name)}
                       disabled={adding || already || (guests?.length ?? 0) >= MAX_GUESTS}
-                      title={already ? "Zaten masada" : `${q.name} — masaya ekle`}
+                      title={already ? t("setup.quick.onTable") : t("setup.quick.add", { name: q.name })}
                     >
                       <span className="qg__avatar">
                         {q.thumbnail ? <img src={q.thumbnail} alt={q.name} /> : <span>{initials(q.name)}</span>}
@@ -515,8 +502,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                     <button
                       className="qg__remove"
                       onClick={() => removeQuickGuest(q.name)}
-                      title="Raftan çıkar"
-                      aria-label={`${q.name} raftan çıkar`}
+                      title={t("setup.quick.removeShelf")}
+                      aria-label={t("setup.quick.removeShelfAria", { name: q.name })}
                     >
                       ×
                     </button>
@@ -531,9 +518,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         <div className="topic-row addguest-row">
           <input
             className="topic-input"
-            placeholder={`Kendi konuğunuzu ekleyin: bir isim yazın (ör. ${
-              topicTab === "gunluk" ? "İbrahim Tatlıses" : "Sevan Nişanyan"
-            }) ya da Vikipedi linki`}
+            placeholder={t("setup.addPlaceholder", {
+              ex: topicTab === "gunluk" ? t("setup.addExample.gunluk") : t("setup.addExample.derin"),
+            })}
             value={addName}
             onChange={(e) => setAddName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addGuest()}
@@ -544,7 +531,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
             onClick={() => addGuest()}
             disabled={!addName.trim() || adding || (guests?.length ?? 0) >= MAX_GUESTS}
           >
-            {adding ? "Aranıyor…" : "＋ Ekle"}
+            {adding ? t("setup.searching") : t("setup.add")}
           </button>
         </div>
         {addMsg && <p className="context-hint" style={{ color: "var(--danger)" }}>{addMsg}</p>}
@@ -556,22 +543,22 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           disabled={!canStart || checking}
           onClick={() => onStart(guests!, topic.trim(), "kolay", null)}
         >
-          {checking ? "Konu kontrol ediliyor…" : "Oturumu Aç ▶"}
+          {checking ? t("setup.checking") : t("setup.open")}
         </button>
         <div className="setup__meta">
           {hasKey ? (
             <button className="linklike" onClick={onOpenKey}>
-              🔑 Kendi anahtarınız kullanılıyor
+              {t("setup.ownKey")}
             </button>
           ) : (
             <>
               <span>
                 {demoRemaining !== null
-                  ? `Demo hakkı: ~${demoRemaining} istek`
-                  : "Kısa demo · sonra kendi anahtarınız"}
+                  ? t("setup.demoLeft", { n: demoRemaining })
+                  : t("setup.demoShort")}
               </span>
               <button className="linklike" onClick={onOpenKey}>
-                🔑 Kendi API anahtarınızı girin
+                {t("setup.enterKey")}
               </button>
             </>
           )}
@@ -582,7 +569,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       {sessions && sessions.length > 0 && (
         <section className="setup__block setup__block--history">
           <div className="setup__block-head">
-            <h2>📜 Geçmiş Oturumlar</h2>
+            <h2>{t("setup.history")}</h2>
           </div>
           <div className="history-list">
             {sessions.map((s) => (
@@ -590,7 +577,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                 <div className="history-card__info">
                   <div className="history-card__topic">{s.topic}</div>
                   <div className="history-card__meta">
-                    {s.guestNames.join(", ")} · {s.utterancesCount} replik · {formatDate(s.savedAt)}
+                    {s.guestNames.join(", ")} · {s.utterancesCount} {t("setup.repliesWord")} · {formatDate(s.savedAt)}
                   </div>
                 </div>
                 <div className="history-card__actions">
@@ -598,23 +585,23 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
                     <button
                       className="btn btn--ghost btn--sm"
                       onClick={() => onLoadSession?.(s.id)}
-                      title="Oturumu izle"
+                      title={t("setup.history.watch")}
                     >
-                      ▶ İzle
+                      {t("setup.history.watch")}
                     </button>
                   ) : (
                     <button
                       className="btn btn--ghost btn--sm"
                       onClick={() => onContinueSession?.(s.id)}
-                      title="Kaldığın yerden devam et"
+                      title={t("setup.history.continue")}
                     >
-                      ▶ Devam
+                      {t("setup.history.continue")}
                     </button>
                   )}
                   <button
                     className="btn btn--ghost btn--sm btn--danger"
                     onClick={() => onDeleteSession?.(s.id)}
-                    title="Sil"
+                    title={t("setup.history.delete")}
                   >
                     Sil
                   </button>

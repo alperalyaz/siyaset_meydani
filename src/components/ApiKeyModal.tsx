@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ProviderKind } from "../lib/store";
+import { useT } from "../lib/i18n";
 
 interface Props {
   open: boolean;
@@ -54,6 +55,7 @@ const PROVIDERS: { id: ProviderKind; label: string; prefix: string; desc: string
 ];
 
 export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave, onClear, onClose, currentElevenKey, onSaveEleven, onClearEleven }: Props) {
+  const { t } = useT();
   const [value, setValue] = useState(currentKey ?? "");
   const [provider, setProvider] = useState<ProviderKind>(currentProvider ?? "deepseek");
   const [elevenVal, setElevenVal] = useState(currentElevenKey ?? "");
@@ -65,12 +67,9 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
   return (
     <div className="modal__backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>API Anahtarı</h2>
+        <h2>{t("key.title")}</h2>
         {reason && <p className="modal__reason">{reason}</p>}
-        <p className="modal__desc">
-          Kendi API anahtarınızı girerek sınırsız oturum açabilirsiniz. Anahtar yalnızca
-          bu tarayıcıda saklanır, hiçbir sunucuda tutulmaz.
-        </p>
+        <p className="modal__desc">{t("key.desc")}</p>
 
         <div className="modal__tabs">
           {PROVIDERS.map((p) => (
@@ -104,28 +103,26 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
         <div className="modal__actions">
           {currentKey && (
             <button className="btn btn--ghost" onClick={onClear}>
-              Anahtarı sil
+              {t("key.delete")}
             </button>
           )}
           <button className="btn btn--ghost" onClick={onClose}>
-            Kapat
+            {t("key.close")}
           </button>
           <button
             className="btn btn--primary"
             disabled={!value.trim()}
             onClick={() => onSave(value.trim(), provider)}
           >
-            Kaydet
+            {t("key.save")}
           </button>
         </div>
 
         {onSaveEleven && (
           <div className="modal__eleven">
-            <h3>🎧 HD Ses (ElevenLabs) — opsiyonel</h3>
+            <h3>{t("key.eleven.title")}</h3>
             <p className="modal__desc">
-              Ücretsiz demoda HD ses yalnızca tanışma turuyla sınırlıdır. Kendi ElevenLabs
-              anahtarınızı girerseniz tüm oturum boyunca sınırsız HD ses alırsınız. Anahtar
-              yalnızca bu tarayıcıda saklanır.{" "}
+              {t("key.eleven.desc")}{" "}
               <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noreferrer">
                 elevenlabs.io
               </a>{" "}
@@ -140,7 +137,7 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
             <div className="modal__actions">
               {currentElevenKey && onClearEleven && (
                 <button className="btn btn--ghost" onClick={() => { setElevenVal(""); onClearEleven(); }}>
-                  HD anahtarını sil
+                  {t("key.eleven.delete")}
                 </button>
               )}
               <button
@@ -148,7 +145,7 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
                 disabled={!elevenVal.trim()}
                 onClick={() => onSaveEleven(elevenVal.trim())}
               >
-                HD anahtarını kaydet
+                {t("key.eleven.save")}
               </button>
             </div>
           </div>

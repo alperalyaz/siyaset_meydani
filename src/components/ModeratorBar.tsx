@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../lib/i18n";
 
 interface Props {
   running: boolean;
@@ -42,6 +43,7 @@ export function ModeratorBar({
   hdOn,
   onToggleHd,
 }: Props) {
+  const { t } = useT();
   const [text, setText] = useState("");
 
   const send = () => {
@@ -67,14 +69,14 @@ export function ModeratorBar({
         <button
           className={`btn btn--pause ${running ? "" : "btn--resume"}`}
           onClick={onPauseToggle}
-          title={running ? "Sayın konuklar, lütfen durun" : "Devam edin"}
+          title={running ? t("mod.pauseTitle") : t("mod.resumeTitle")}
         >
-          {running ? "⏸ Durun" : "▶ Devam"}
+          {running ? t("mod.pause") : t("mod.resume")}
         </button>
 
         <input
           className="modbar__input"
-          placeholder="Spiker olarak söz alın… (soru sorun, yönlendirin)"
+          placeholder={t("mod.input")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
@@ -84,7 +86,7 @@ export function ModeratorBar({
           <button
             className={`btn btn--ghost btn--icon ${ttsOn ? "btn--on" : ""}`}
             onClick={onToggleTts}
-            title={ttsOn ? "Seslendirme açık" : "Seslendirme kapalı"}
+            title={ttsOn ? t("mod.ttsOn") : t("mod.ttsOff")}
           >
             {ttsOn ? "🔊" : "🔇"}
           </button>
@@ -94,7 +96,7 @@ export function ModeratorBar({
           <button
             className={`btn btn--ghost btn--icon ${hdOn ? "btn--on" : ""}`}
             onClick={onToggleHd}
-            title={hdOn ? "HD sesler açık (ElevenLabs)" : "HD sesler kapalı — açmak için dokunun"}
+            title={hdOn ? t("mod.hdOn") : t("mod.hdOff")}
           >
             🎧
           </button>
@@ -105,7 +107,7 @@ export function ModeratorBar({
             <button
               className="btn btn--ghost btn--icon btn--sm"
               onClick={() => onTtsRateChange(Math.max(0.5, ttsRate - 0.25))}
-              title="Yavaşlat"
+              title={t("mod.slower")}
               disabled={ttsRate <= 0.5}
             >
               🐢
@@ -114,7 +116,7 @@ export function ModeratorBar({
             <button
               className="btn btn--ghost btn--icon btn--sm"
               onClick={() => onTtsRateChange(Math.min(2.0, ttsRate + 0.25))}
-              title="Hızlandır"
+              title={t("mod.faster")}
               disabled={ttsRate >= 2.0}
             >
               🐇
@@ -123,19 +125,19 @@ export function ModeratorBar({
         )}
 
         {onSave && hasUtterances && (
-          <button className="btn btn--ghost btn--icon" onClick={onSave} title="Oturumu kaydet">
+          <button className="btn btn--ghost btn--icon" onClick={onSave} title={t("mod.save")}>
             💾
           </button>
         )}
 
         {onShare && hasUtterances && (
-          <button className="btn btn--ghost btn--icon" onClick={onShare} title="Paylaş">
+          <button className="btn btn--ghost btn--icon" onClick={onShare} title={t("mod.share")}>
             📤
           </button>
         )}
 
         {onEndSession && hasUtterances && (
-          <button className="btn btn--ghost btn--icon" onClick={onEndSession} title="Oturumu bitir">
+          <button className="btn btn--ghost btn--icon" onClick={onEndSession} title={t("mod.end")}>
             🔚
           </button>
         )}
@@ -144,16 +146,16 @@ export function ModeratorBar({
           className="btn btn--ghost btn--icon"
           onClick={onSuggest}
           disabled={loadingSuggestions}
-          title="Soru öner"
+          title={t("mod.suggest")}
         >
           {loadingSuggestions ? "…" : "💡"}
         </button>
 
         <button className="btn btn--primary" onClick={send} disabled={!text.trim()}>
-          Söz Ver
+          {t("mod.give")}
         </button>
       </div>
-      {busy && <div className="modbar__hint">Konuklar hararetle tartışıyor…</div>}
+      {busy && <div className="modbar__hint">{t("mod.busy")}</div>}
     </div>
   );
 }

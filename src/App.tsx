@@ -25,6 +25,7 @@ import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from 
 import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, hasElevenKey } from "./lib/elevenTts";
 import { loadElevenKey, saveElevenKey, clearElevenKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
+import { useT, ct, detectTopicLang } from "./lib/i18n";
 import { encodeSession, decodeSession } from "./lib/share";
 
 import {
@@ -79,6 +80,7 @@ function isAbort(e: unknown): boolean {
 }
 
 export function App() {
+  const { t, lang, setLang } = useT();
   const [phase, setPhase] = useState<Phase>("setup");
   const [guests, setGuests] = useState<Guest[]>([]);
   const [topic, setTopic] = useState("");
@@ -135,6 +137,8 @@ export function App() {
   // SetupScreen unmount olur ama değer korunur (o yüzden panelde de geçerli).
   const [gunlukTheme, setGunlukTheme] = useState(false);
   const gunlukRef = useRef(gunlukTheme);
+  // Oturum (tartışma) dili = konunun dili. Spiker senaryo replikleri bu dilde.
+  const sessionLangRef = useRef<"tr" | "en">("tr");
   useEffect(() => {
     gunlukRef.current = gunlukTheme;
     document.documentElement.classList.toggle("theme-gunluk", gunlukTheme);
@@ -184,25 +188,19 @@ export function App() {
     const next = !hdRef.current;
     if (!next) {
       setHdTts(false);
-      showHdMsg("🎧 HD sesler kapatıldı — normal (tarayıcı) sesler kullanılıyor.");
+      showHdMsg(ct("hd.off"));
       return;
     }
     setHdTts(true);
     resetHdExhausted();
-    showHdMsg("🎧 HD sesler sınanıyor…");
+    showHdMsg(ct("hd.probing"));
     const p = await probeEleven();
     if (p.ok) {
-      showHdMsg("🎧 HD sesler açık — yüksek kaliteli seslendirme aktif.");
+      showHdMsg(ct("hd.on"));
     } else {
       setHdTts(false);
       markHdExhausted();
-      showHdMsg(
-        p.code === "NO_KEY"
-          ? "🎧 HD çalışmıyor: sunucuda ElevenLabs anahtarı yok. Vercel'e ELEVENLABS_API_KEY ekleyince açılır. Şimdilik normal sesler."
-          : p.code === "QUOTA"
-            ? "🎧 Günlük HD ses hakkı dolmuş — normal sesler kullanılıyor."
-            : "🎧 HD seslere ulaşılamadı — normal sesler kullanılıyor.",
-      );
+      showHdMsg(ct(p.code === "NO_KEY" ? "hd.noKey" : p.code === "QUOTA" ? "hd.quota" : "hd.unreachable"));
     }
   }, [showHdMsg]);
 
@@ -369,11 +367,7 @@ export function App() {
           if (e instanceof ElevenError && (e.code === "QUOTA" || e.code === "NO_KEY")) {
             markHdExhausted();
             setHdTts(false);
-            setError(
-              e.code === "QUOTA"
-                ? "🎧 Günlük HD ses hakkı doldu — normal seslere geçildi."
-                : "🎧 HD sesler şu an kapalı — normal seslere geçildi.",
-            );
+            setError(ct(e.code === "QUOTA" ? "hd.quotaFell" : "hd.offFell"));
           }
           // Diğer hatalarda sessizce tarayıcı sesine düş (aşağı devam).
         }
@@ -591,7 +585,7 @@ export function App() {
           append({
             id: uid(),
             speaker: "moderator",
-            text: modLines(gunlukRef.current).toOpening(t),
+            text: modLines(gunlukRef.current, sessionLangRef.current).toOpening(t),
             mode: "normal",
           });
           progressRef.current = { phase: "opening", i: 0 };
@@ -601,9 +595,7 @@ export function App() {
           // Demo kullanıcısı (kendi anahtarı yok) + HD açık: tanışma turu bitti,
           // ücretsiz HD demo burada sona erer; gerisi normal seslerle sürer.
           if (hdRef.current && !hasElevenKey() && !isHdExhausted()) {
-            setHdMsg(
-              "🎧 Ücretsiz HD ses demosu tanışma turuyla sınırlı — oturumun geri kalanı normal seslerle sürecek. Sınırsız HD için ⚙️ ayarlardan ElevenLabs anahtarınızı girebilirsiniz.",
-            );
+            setHdMsg(ct("hd.demoOver"));
             if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
             hdMsgTimer.current = setTimeout(() => setHdMsg(null), 8000);
           }
@@ -634,7 +626,7 @@ export function App() {
             append({
               id: uid(),
               speaker: "moderator",
-              text: modLines(gunlukRef.current).noStance,
+              text: modLines(gunlukRef.current, sessionLangRef.current).noStance,
               mode: "system",
             });
             {
@@ -748,7 +740,7 @@ export function App() {
             append({
               id: uid(),
               speaker: "moderator",
-              text: modLines(gunlukRef.current).final(goal, cfg.holdSeconds, cfg.finalGoal),
+              text: modLines(gunlukRef.current, sessionLangRef.current).final(goal, cfg.holdSeconds, cfg.finalGoal),
               mode: "system",
             });
             await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
@@ -760,7 +752,7 @@ export function App() {
           append({
             id: uid(),
             speaker: "moderator",
-            text: modLines(gunlukRef.current).win(cfg.finalGoal),
+            text: modLines(gunlukRef.current, sessionLangRef.current).win(cfg.finalGoal),
             mode: "system",
           });
           await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
@@ -830,7 +822,7 @@ export function App() {
             if (rate429Ref.current >= 3) {
               rate429Ref.current = 0;
               setError(
-                "Sağlayıcı limiti sürüyor — anahtarınızın günlük kotası dolmuş olabilir (özellikle Groq'un ücretsiz kotası hızlı dolar). Bir süre sonra ▶ Devam ile deneyin ya da farklı bir API anahtarı girin.",
+                ct("err.providerLimit"),
               );
               pause();
               return;
@@ -936,12 +928,13 @@ export function App() {
     setSessionMode(gunlukRef.current);
 
     activeSessionIdRef.current = ""; // yeni oturum → ilk otomatik kayıtta id alır
+    sessionLangRef.current = detectTopicLang(t); // spiker replikleri konu dilinde
     markActivity();
 
     const welcome: Utterance = {
       id: uid(),
       speaker: "moderator",
-      text: modLines(gunlukRef.current).welcome,
+      text: modLines(gunlukRef.current, sessionLangRef.current).welcome,
       mode: "normal",
     };
     utterRef.current = [welcome];
@@ -968,9 +961,7 @@ export function App() {
       setBlockedMsg(null);
       // Deterministik ön-filtre (sıfır token): bariz karalama → LLM'e gitme.
       if (quickTopicBlock(t).blocked) {
-        setBlockedMsg(
-          "Bu konuyla ilgili açık oturum düzenlenemiyor 🌱 Hakaret/karalama içeren başlıklara konuk çağrılmaz; lütfen farklı bir konu seçin.",
-        );
+        setBlockedMsg(ct("block.hate"));
         return;
       }
       setChecking(true);
@@ -978,9 +969,7 @@ export function App() {
         const verdict = await moderateTopic(t, apiKeyRef.current);
         syncMeta();
         if (!verdict.allowed) {
-          setBlockedMsg(
-            "Bu konuyla ilgili açık oturum düzenlenemiyor 🌱 Lütfen farklı bir konu seçin.",
-          );
+          setBlockedMsg(ct("block.generic"));
           return;
         }
         startSession(g, t, diff, context);
@@ -1048,7 +1037,7 @@ export function App() {
     append({
       id: uid(),
       speaker: "moderator",
-      text: modLines(gunlukRef.current).closing,
+      text: modLines(gunlukRef.current, sessionLangRef.current).closing,
       mode: "system",
     });
 
@@ -1127,6 +1116,7 @@ export function App() {
     if (!s) return;
 
     activeSessionIdRef.current = id; // devam eden oturum aynı kaydı günceller
+    sessionLangRef.current = detectTopicLang(s.topic);
     markActivity();
     assignVoicesForPanel(s.guests); // kayıtlı konuklar için de HD ses ataması
 
@@ -1224,9 +1214,7 @@ export function App() {
     append({
       id: uid(),
       speaker: "moderator",
-      text: gunlukRef.current
-        ? "Ay canlarım, siz bir şey demeyince muhabbet başıboş kaldı — boşa gitmesin diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
-        : "Bir süredir söz almadınız; oturum kendi başına sürmesin diye ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
+      text: modLines(gunlukRef.current, sessionLangRef.current).idlePause,
       mode: "system",
     });
     void doSuggest();
@@ -1276,14 +1264,14 @@ export function App() {
     setElevenKeyState(k);
     resetHdExhausted(); // yeni anahtar → HD'ye tekrar şans ver
     setHdTts(true);
-    setHdMsg("🎧 ElevenLabs anahtarı kaydedildi — artık tüm oturum boyunca sınırsız HD ses.");
+    setHdMsg(ct("hd.keySaved"));
     if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
     hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
   }, []);
   const clearElevenKeyCb = useCallback(() => {
     clearElevenKey();
     setElevenKeyState(null);
-    setHdMsg("🎧 ElevenLabs anahtarı silindi — HD ses yeniden tanışma turuyla sınırlı.");
+    setHdMsg(ct("hd.keyCleared"));
     if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
     hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
   }, []);
@@ -1342,10 +1330,17 @@ export function App() {
   if (phase === "setup") {
     return (
       <>
+        <button
+          className="lang-toggle"
+          onClick={() => setLang(lang === "tr" ? "en" : "tr")}
+          title={t("lang.title")}
+        >
+          🌐 {t("lang.toggle")}
+        </button>
         {error && (
           <div className="error-toast" role="alert">
             <span>⚠️ {error}</span>
-            <button className="error-toast__close" onClick={() => setError(null)} title="Kapat">
+            <button className="error-toast__close" onClick={() => setError(null)} title={t("key.close")}>
               ×
             </button>
           </div>
@@ -1384,11 +1379,11 @@ export function App() {
           <div className="modal__backdrop" onClick={() => setBlockedMsg(null)}>
             <div className="modal modal--block" onClick={(e) => e.stopPropagation()}>
               <div className="modal--block__icon">🕊️</div>
-              <h2>Bu konu uygun değil</h2>
+              <h2>{t("block.title")}</h2>
               <p>{blockedMsg}</p>
               <div className="modal__actions">
                 <button className="btn btn--primary" onClick={() => setBlockedMsg(null)}>
-                  Tamam, başka konu seçeyim
+                  {t("block.ok")}
                 </button>
               </div>
             </div>
@@ -1396,13 +1391,10 @@ export function App() {
         )}
         <footer className="credits">
           <p className="credits__disclaimer">
-            <strong>Sorumluluk reddi:</strong> Bu deneysel bir eğlence ve mizah projesidir.
-            Oturumdaki konuşmalar yapay zeka tarafından üretilir; kurgusaldır ve adı geçen gerçek
-            ya da tarihî kişilerin gerçek görüşlerini, sözlerini veya kişiliğini yansıtmaz.
-            İçerik hatalı, eksik ya da yanıltıcı olabilir; kaynak veya danışmanlık niteliği taşımaz.
+            <strong>{t("footer.disclaimerLabel")}</strong>{t("footer.disclaimer")}
           </p>
            <p className="credits__by">
-            <a href="https://github.com/alperalyaz/siyaset_meydani" target="_blank" rel="noopener">Alper Alyaz</a>'ın kişisel projesidir · DeepSeek / OpenAI / Claude ile çalışır · Vikipedi verileriyle beslenir
+            <a href="https://github.com/alperalyaz/siyaset_meydani" target="_blank" rel="noopener">Alper Alyaz</a>{t("footer.by")}
           </p>
         </footer>
       </>
@@ -1479,17 +1471,17 @@ export function App() {
           {hdMsg}
         </div>
       )}
-      {savedToast && <div className="save-toast">✅ Oturum kaydedildi</div>}
-      {shareToast && <div className="save-toast" style={{ background: "linear-gradient(135deg, #3fb6c9, #268fa8)" }}>🔗 Paylaşım linki kopyalandı!</div>}
+      {savedToast && <div className="save-toast">{t("toast.saved")}</div>}
+      {shareToast && <div className="save-toast" style={{ background: "linear-gradient(135deg, #3fb6c9, #268fa8)" }}>{t("toast.shared")}</div>}
 
       {leaveModal && (
         <div className="modal__backdrop" onClick={() => setLeaveModal(false)}>
           <div className="modal modal--confirm" onClick={(e) => e.stopPropagation()}>
-            <h2>Oturumu sonlandır</h2>
-            <p>Oturumu sonlandırmak istediğinize emin misiniz? Spiker bir kapanış konuşması yapacak ve sonuçlar gösterilecektir.</p>
+            <h2>{t("leave.title")}</h2>
+            <p>{t("leave.body")}</p>
             <div className="modal__actions">
-              <button className="btn btn--ghost" onClick={() => setLeaveModal(false)}>İptal</button>
-              <button className="btn btn--primary" onClick={endSession}>Oturumu Bitir</button>
+              <button className="btn btn--ghost" onClick={() => setLeaveModal(false)}>{t("leave.cancel")}</button>
+              <button className="btn btn--primary" onClick={endSession}>{t("leave.confirm")}</button>
             </div>
           </div>
         </div>

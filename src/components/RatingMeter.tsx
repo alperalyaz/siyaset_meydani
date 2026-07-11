@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useT } from "../lib/i18n";
 
 interface Props {
   rating: number;
@@ -8,6 +9,7 @@ interface Props {
 // Sağdaki (mobilde üstteki) reytingmetre. Konu ısındıkça yükselir,
 // biri uzattıkça / herkes uzlaştıkça düşer.
 export function RatingMeter({ rating, note }: Props) {
+  const { t } = useT();
   const low = rating < 30;
   const high = rating >= 75;
   const color = low ? "#e94b6b" : high ? "#4caf7d" : "#f2b134";
@@ -15,7 +17,7 @@ export function RatingMeter({ rating, note }: Props) {
   return (
     <div className={`meter ${low ? "meter--low" : ""}`}>
       <div className="meter__head">
-        <span className="meter__label">REYTİNGMETRE</span>
+        <span className="meter__label">{t("meter.label")}</span>
         <span className="meter__value" style={{ color }}>
           {Math.round(rating)}
         </span>
@@ -37,11 +39,11 @@ export function RatingMeter({ rating, note }: Props) {
 
       {low && (
         <div className="meter__alert">
-          ⚠️ REYTİNGLER DİPTE<br />
-          <span>Spiker, müdahale edin!</span>
+          {t("meter.low")}<br />
+          <span>{t("meter.lowSub")}</span>
         </div>
       )}
-      {high && !low && <div className="meter__hype">🔥 Ortam kızıştı!</div>}
+      {high && !low && <div className="meter__hype">{t("meter.hype")}</div>}
     </div>
   );
 }

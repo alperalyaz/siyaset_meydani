@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SessionResult } from "../types";
 import { ALL_BADGES } from "../lib/gamification";
 import { renderShareCard, shareOrDownloadCard } from "../lib/shareCard";
+import { useT } from "../lib/i18n";
 
 interface Props {
   result: SessionResult;
@@ -10,19 +11,15 @@ interface Props {
   onBack: () => void;
 }
 
-function fmtSeconds(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return m > 0 ? `${m}dk ${sec}sn` : `${sec}sn`;
-}
-
-const DIFF_LABELS: Record<string, string> = {
-  kolay: "Kolay",
-  orta: "Orta",
-  zor: "Zor",
-};
-
 export function SessionResultScreen({ result, topic, guestNames, onBack }: Props) {
+  const { t, lang } = useT();
+  const fmtSeconds = (s: number): string => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    const mu = lang === "tr" ? "dk" : "m";
+    const su = lang === "tr" ? "sn" : "s";
+    return m > 0 ? `${m}${mu} ${sec}${su}` : `${sec}${su}`;
+  };
   const totalBadges = ALL_BADGES.length;
   const [sharing, setSharing] = useState(false);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
@@ -44,16 +41,16 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
         won: result.ended === "win",
       });
       if (!blob) {
-        setShareMsg("Görsel oluşturulamadı, tekrar deneyin.");
+        setShareMsg(t("res.imgFail"));
         return;
       }
       const res = await shareOrDownloadCard(
         blob,
         "siyaset-meydani-karne.png",
-        `"${topic}" — Reyting ${result.averageRating}. Sen de tarihi tartıştır!`,
+        t("res.shareCaption", { topic, n: result.averageRating }),
       );
-      if (res === "downloaded") setShareMsg("📥 Görsel indirildi — paylaşabilirsin!");
-      else if (res === "failed") setShareMsg("Paylaşım başarısız oldu.");
+      if (res === "downloaded") setShareMsg(t("res.downloaded"));
+      else if (res === "failed") setShareMsg(t("res.shareFail"));
     } finally {
       setSharing(false);
     }
@@ -63,11 +60,11 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
     <div className="result">
       <header className="result__head">
         <h1 className="result__title">
-          {result.ended === "win" ? "🏆 Oturum Başarılı!" : "📺 Oturum Sona Erdi"}
+          {result.ended === "win" ? t("res.win") : t("res.end")}
         </h1>
         <p className="result__topic">"{topic}"</p>
         <p className="result__meta">
-          {guestNames.join(", ")} · {DIFF_LABELS[result.difficulty] ?? result.difficulty}
+          {guestNames.join(", ")} · {t(`diff.${result.difficulty}`)}
         </p>
       </header>
 
@@ -86,21 +83,21 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
           >
             {result.averageRating}
           </span>
-          <span className="result__score-label">Ortalama Reyting</span>
+          <span className="result__score-label">{t("res.avg")}</span>
         </div>
 
         <div className="result__grid">
-          <Stat label="Zirve Reyting" value={String(result.peakRating)} emoji="📈" />
-          <Stat label="Dip Reyting" value={String(result.troughRating)} emoji="📉" />
-          <Stat label="Toplam Süre" value={fmtSeconds(result.totalSeconds)} emoji="⏱️" />
-          <Stat label="Toplam Replik" value={String(result.utteranceCount)} emoji="💬" />
+          <Stat label={t("res.peak")} value={String(result.peakRating)} emoji="📈" />
+          <Stat label={t("res.trough")} value={String(result.troughRating)} emoji="📉" />
+          <Stat label={t("res.duration")} value={fmtSeconds(result.totalSeconds)} emoji="⏱️" />
+          <Stat label={t("res.replies")} value={String(result.utteranceCount)} emoji="💬" />
           <Stat
-            label="Müdahale"
+            label={t("res.interventions")}
             value={String(result.moderatorInterventions)}
             emoji="🎤"
           />
           <Stat
-            label="En Çok Konuşan"
+            label={t("res.mostTalkative")}
             value={result.mostTalkative ? `${result.mostTalkative} (${result.mostTalkativeCount})` : "-"}
             emoji="🗣️"
           />
@@ -109,7 +106,7 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
         {result.mostControversialMoment && (
           <div className="result__moment">
             <span className="result__moment-label">
-              🔥 En Tartışmalı An (Reyting {result.mostControversialRating})
+              {t("res.moment", { n: result.mostControversialRating })}
             </span>
             <p className="result__moment-text">"{result.mostControversialMoment}"</p>
           </div>
@@ -118,21 +115,22 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
 
       <div className="result__badges">
         <h3 className="result__section-title">
-          Rozetler ({result.badges.length}/{totalBadges})
+          {t("res.badges", { n: result.badges.length, total: totalBadges })}
         </h3>
         <div className="result__badge-grid">
           {ALL_BADGES.map((badge) => {
             const earned = result.badges.some((b) => b.id === badge.id);
+            const desc = t(`badge.${badge.id}.desc`);
             return (
               <div
                 key={badge.id}
                 className={`result__badge ${earned ? "result__badge--earned" : "result__badge--locked"}`}
-                title={earned ? `Kazanıldı: ${badge.description}` : `Kilitli: ${badge.description}`}
+                title={earned ? t("res.earned", { d: desc }) : t("res.locked", { d: desc })}
               >
                 <span className="result__badge-emoji">
                   {earned ? badge.emoji : "🔒"}
                 </span>
-                <span className="result__badge-name">{badge.name}</span>
+                <span className="result__badge-name">{t(`badge.${badge.id}.name`)}</span>
                 {earned && <span className="result__badge-check">✓</span>}
               </div>
             );
@@ -142,15 +140,13 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
 
       <div className="result__actions">
         <button className="btn btn--primary result__share" onClick={shareKarne} disabled={sharing}>
-          {sharing ? "🎨 Görsel hazırlanıyor…" : "📸 Karneyi Paylaş"}
+          {sharing ? t("res.sharePrep") : t("res.share")}
         </button>
         <button className="btn btn--ghost" onClick={onBack}>
-          Ana Ekrana Dön
+          {t("res.back")}
         </button>
         {shareMsg && <p className="result__sharemsg">{shareMsg}</p>}
-        <p className="result__hint">
-          Rozetlerin tarayıcında saklanır — biriktirmeye devam et!
-        </p>
+        <p className="result__hint">{t("res.hint")}</p>
       </div>
     </div>
   );
