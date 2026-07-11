@@ -21,7 +21,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
 import { loadElevenKey, saveElevenKey, clearElevenKey, loadGeminiKey, saveGeminiKey, clearGeminiKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { useT, ct, detectTopicLang } from "./lib/i18n";
@@ -176,36 +176,9 @@ export function App() {
     setGeminiKey(geminiKey);
   }, [geminiKey]);
 
-  // HD durum bildirimi (açıkça: çalışıyor / anahtar yok / kota dolu).
+  // HD durum bildirimi (anahtar kaydedildi / kaldırıldı gibi).
   const [hdMsg, setHdMsg] = useState<string | null>(null);
   const hdMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showHdMsg = useCallback((m: string) => {
-    setHdMsg(m);
-    if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
-    hdMsgTimer.current = setTimeout(() => setHdMsg(null), 5000);
-  }, []);
-
-  // 🎧 aç/kapa: açarken HD'nin GERÇEKTEN çalışıp çalışmadığını sınar ve net
-  // geri bildirim verir (sessizce tarayıcı sesine düşüp "dandik" görünmesin).
-  const toggleHd = useCallback(async () => {
-    const next = !hdRef.current;
-    if (!next) {
-      setHdTts(false);
-      showHdMsg(ct("hd.off"));
-      return;
-    }
-    setHdTts(true);
-    resetHdExhausted();
-    showHdMsg(ct("hd.probing"));
-    const p = await probeEleven();
-    if (p.ok) {
-      showHdMsg(ct("hd.on"));
-    } else {
-      setHdTts(false);
-      markHdExhausted();
-      showHdMsg(ct(p.code === "NO_KEY" ? "hd.noKey" : p.code === "QUOTA" ? "hd.quota" : "hd.unreachable"));
-    }
-  }, [showHdMsg]);
 
   // Oturum durumu ref'lerde tutulur (kapanış tuzaklarından kaçınmak için).
   const utterRef = useRef<Utterance[]>([]);
@@ -1436,8 +1409,7 @@ export function App() {
         onToggleTts={() => setTtsOn((v) => !v)}
         ttsRate={ttsRate}
         onTtsRateChange={setTtsRate}
-        hdOn={hdTts}
-        onToggleHd={toggleHd}
+        onOpenKey={() => setKeyModal(true)}
       />
 
       {hdMsg && (

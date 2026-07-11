@@ -30,13 +30,11 @@ export function hasOwnHdKey(): boolean {
   return !!userElevenKey || !!userGeminiKey;
 }
 
+// HD sesler HER ZAMAN varsayılan AÇIK — kullanıcı düğmeye basmak zorunda değil.
+// (Kota/anahtar bitince otomatik tarayıcı sesine düşülür; açıp kapatma düğmesi
+// kaldırıldı.) Oturum içinde kota dolarsa isHdExhausted devreye girer.
 export function loadHdEnabled(): boolean {
-  try {
-    const v = localStorage.getItem(HD_KEY);
-    return v === null ? true : v === "1"; // ilk açılışta HD (ElevenLabs) VARSAYILAN AÇIK
-  } catch {
-    return true;
-  }
+  return true;
 }
 export function saveHdEnabled(on: boolean): void {
   try {

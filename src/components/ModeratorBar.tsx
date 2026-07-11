@@ -18,8 +18,7 @@ interface Props {
   onToggleTts: () => void;
   ttsRate?: number;
   onTtsRateChange?: (rate: number) => void;
-  hdOn?: boolean;
-  onToggleHd?: () => void;
+  onOpenKey?: () => void;
 }
 
 // Spiker kontrol çubuğu: müdahale, duraklat/devam, hazır soru önerileri.
@@ -40,8 +39,7 @@ export function ModeratorBar({
   onToggleTts,
   ttsRate,
   onTtsRateChange,
-  hdOn,
-  onToggleHd,
+  onOpenKey,
 }: Props) {
   const { t } = useT();
   const [text, setText] = useState("");
@@ -92,16 +90,6 @@ export function ModeratorBar({
           </button>
         )}
 
-        {ttsSupported && ttsOn && onToggleHd && (
-          <button
-            className={`btn btn--ghost btn--icon ${hdOn ? "btn--on" : ""}`}
-            onClick={onToggleHd}
-            title={hdOn ? t("mod.hdOn") : t("mod.hdOff")}
-          >
-            🎧
-          </button>
-        )}
-
         {ttsSupported && ttsOn && ttsRate !== undefined && onTtsRateChange && (
           <div className="tts-rate">
             <button
@@ -139,6 +127,12 @@ export function ModeratorBar({
         {onEndSession && hasUtterances && (
           <button className="btn btn--ghost btn--icon" onClick={onEndSession} title={t("mod.end")}>
             🔚
+          </button>
+        )}
+
+        {onOpenKey && (
+          <button className="btn btn--ghost btn--icon" onClick={onOpenKey} title={t("mod.settings")}>
+            ⚙️
           </button>
         )}
 
