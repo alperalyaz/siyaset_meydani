@@ -6,6 +6,11 @@ import type { Lang } from "./i18n";
 export function modLines(gunluk: boolean, lang: Lang = "tr") {
   if (lang === "en") {
     return {
+      // Tek-nefes açılış: konukları isimle tanıt + konu + doğrudan görüşlere geç.
+      welcomeOpen: (names: string, topic: string) =>
+        gunluk
+          ? `Helloooo my dears, welcome! 💕 At our table today: ${names}. Our topic: ${topic} Come on darlings, no bios needed — dive straight into your thoughts!`
+          : `Welcome! At our table today: ${names}. Our topic: ${topic} Let's begin straight with your views — go ahead.`,
       welcome: gunluk
         ? "Helloooo my dears, welcome sweethearts! 💕 We've got wonderful guests today and a delightful chat ahead. Let's get to know each other first — go on, tell us about yourselves, darlings."
         : "Hello and welcome to our session. First, let's get to know you — please introduce yourselves briefly, one by one.",
@@ -33,6 +38,10 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
     };
   }
   return {
+    welcomeOpen: (names: string, topic: string) =>
+      gunluk
+        ? `Merhabaaa canlarım, hoş geldiniz tatlılarım! 💕 Bugün masamızda ${names} var. Konumuz: ${topic} Hadi canlarım, tanıtıma gerek yok — doğrudan fikirlerinizle başlayalım, çekinmek yok!`
+        : `Hoş geldiniz! Bugün masamızda ${names} var. Konumuz: ${topic} Buyurun, doğrudan görüşlerinizle başlayalım.`,
     welcome: gunluk
       ? "Merhabaaa canlarım, hoş geldiniz tatlılarım! 💕 Bugün yine bir dünya güzel konuğumuz var, çok keyifli bir muhabbet bizi bekliyor. Hadi önce şöyle bir tanışalım, buyurun bakalım kendinizi anlatın canlarım."
       : "Merhaba, oturumumuza hoş geldiniz. Öncelikle sizleri tanıyalım — buyurun, sırayla kısaca kendinizi tanıtın.",

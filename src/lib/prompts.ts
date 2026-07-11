@@ -278,13 +278,14 @@ export function openingMessages(
     { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
       role: "user" as const,
-      content: `Oturum yeni açıldı, spiker ilk sözü sana verdi. Konu: "${topic}".
+      content: `Oturum yeni açıldı, spiker seni isminle tanıttı ve ilk sözü sana verdi. AYRI bir tanışma turu YOK — kim olduğunu birkaç kelimeyle, argümanının İÇİNDE belli et, sonra fikrini bas. Konu: "${topic}".
 
-Önce şuna dürüstçe karar ver: bu KONU hakkında gerçekten net bir fikrin var mı?
-- Fikrin VARSA: kısaca teşekkür et, sonra bu konudaki NET fikrini 2-4 cümlede, modern ve düz bir dille, bir gerekçeyle söyle. Kararlı ol.
-- Bu konuda gerçekten bilgin/fikrin YOKSA: boş konuşma, laf üretme. Dürüstçe "bu konuda net bir fikrim yok, tartışmayı dinlemekle yetineceğim" tarzında tek cümle söyle.
+Nasıl:
+- Lafa KISACIK kendini konumlandırarak gir (uzun özgeçmiş/bio ANLATMA — en fazla yarım cümle): kim olduğun ya da bu konuya neden hâkim olduğun sezilsin. Örn: "Ben güç işlerini iyi bilirim, o yüzden..." / "Bir hükümdar olarak şunu söyleyeyim..." / "Ney üflemiş biri olarak..."
+- Hemen ardından bu konudaki NET fikrini 2-4 cümlede, gerekçesiyle söyle. Kararlı ol. Kuru "merhaba ben Xim" tanıtımı YAPMA; kimliğin fikrinle harmanlansın.
+- Bu konuda gerçekten fikrin YOKSA: boş konuşma; "bu konuda net bir fikrim yok, dinleyeceğim" de.
 
-Tarz için örnek TON (içeriği kopyalama, sadece netlik ve modernlik için): "Teşekkürler söz için. Bu mesele yıllarca tartışıldı; bana kalırsa kapatılması yanlıştı, çünkü sonrasında iş daha da kötüye gitti. Fikrim bu."
+Örnek TON (kopyalama, sadece biçim için): "Bir stratejist olarak söyleyeyim: bu iş sabır ister. Bana kalırsa aceleci karar felakete götürür, çünkü..."
 
 Sadece şu JSON'u döndür:
 {"hasStance": true veya false, "text": "<açılış cümlelerin>"}`,

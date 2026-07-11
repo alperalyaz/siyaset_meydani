@@ -10,7 +10,6 @@ import { ModeratorBar } from "./components/ModeratorBar";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SessionResultScreen } from "./components/SessionResultScreen";
 import {
-  runIntro,
   runOpeningStatement,
   runRatingDirector,
   runGuest,
@@ -578,38 +577,8 @@ export function App() {
         if (w) await pace(w.text, 9, undefined, ctrl.signal);
       }
 
-      // --- TANIŞMA TURU ---
-      while (runningRef.current && progressRef.current.phase === "intro") {
-        if (pendingIdlePauseRef.current) { pendingIdlePauseRef.current = false; performIdlePauseRef.current(); return; }
-        const i = progressRef.current.i;
-        if (i >= g.length) {
-          append({
-            id: uid(),
-            speaker: "moderator",
-            text: modLines(gunlukRef.current, sessionLangRef.current).toOpening(t),
-            mode: "normal",
-          });
-          progressRef.current = { phase: "opening", i: 0 };
-          const ctrl = new AbortController();
-          abortRef.current = ctrl;
-          await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
-          continue;
-        }
-        const ctrl = new AbortController();
-        abortRef.current = ctrl;
-        setThinking(i);
-        setStreamingText("");
-        const text = await runIntro(g[i], g, t, i, apiKeyRef.current, ctrl.signal, (token) => setStreamingText((p) => p + token));
-        setThinking(null);
-        setStreamingText("");
-        syncMeta();
-        if (!runningRef.current) return;
-        append({ id: uid(), speaker: i, text, mode: "normal" });
-        progressRef.current = { phase: "intro", i: i + 1 };
-        speakingRef.current = true;
-        await pace(text, i, g[i].gender, ctrl.signal);
-        speakingRef.current = false;
-      }
+      // (Ayrı TANIŞMA turu kaldırıldı — spiker açılışta konukları isimle tanıtır,
+      //  konuklar da görüş turunda kısaca kendini konumlandırır. Doğrudan görüşler.)
 
       // --- GÖRÜŞ TURU ---
       while (runningRef.current && progressRef.current.phase === "opening") {
@@ -925,16 +894,19 @@ export function App() {
     sessionLangRef.current = detectTopicLang(t); // spiker replikleri konu dilinde
     markActivity();
 
+    // Tek-nefes açılış: spiker konukları isimle tanıtır + konu + doğrudan
+    // görüşlere geçer. Ayrı tanışma turu YOK (tekrarı önler, hızlı başlar).
+    const names = g.map((x) => x.name).join(", ");
     const welcome: Utterance = {
       id: uid(),
       speaker: "moderator",
-      text: modLines(gunlukRef.current, sessionLangRef.current).welcome,
+      text: modLines(gunlukRef.current, sessionLangRef.current).welcomeOpen(names, t),
       mode: "normal",
     };
     utterRef.current = [welcome];
     setUtterances([welcome]);
 
-    progressRef.current = { phase: "intro", i: 0 };
+    progressRef.current = { phase: "opening", i: 0 };
     activeRef.current = [];
     threadRef.current = null;
     modNoteRef.current = undefined;
