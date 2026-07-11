@@ -133,6 +133,8 @@ export function App() {
   // Oturum açılış hazırlığı göstergesi: 0 = gizli, 1 = kadrolama, 2 = ses/ilk
   // görüş hazırlığı. İlk konuk repliği ekrana düşünce kapanır.
   const [bootStage, setBootStage] = useState<0 | 1 | 2>(0);
+  // Yazı üretildi, HD ses sentezleniyor (canlı yol) — baloncukta "kayıt" ibaresi.
+  const [prepping, setPrepping] = useState(false);
   const [closingSequence, setClosingSequence] = useState(false);
   const [modPending, setModPending] = useState(false);
 
@@ -332,6 +334,7 @@ export function App() {
     cancelSpeech();
     setThinking(null);
     setBootStage(0);
+    setPrepping(false);
     setStreamingText("");
     pausedRef.current = true;
     speakingRef.current = false; // pace() abort ile kesilirse takılı kalmasın
@@ -504,7 +507,10 @@ export function App() {
       });
       const named = bestIdx >= 0 ? bestIdx : undefined;
       let speaker = named ?? leastRecentActive();
-      if (speaker === last && active.length > 1) {
+      // "Az önce konuşanı atla" kuralı yalnızca İSİMSİZ hitapta geçerli:
+      // spiker birini İSMİYLE çağırdıysa, az önce konuşmuş olsa bile CEVAP
+      // VERMESİ gereken odur (Petro'ya sorulan soruyu Platon cevaplamasın).
+      if (named === undefined && speaker === last && active.length > 1) {
         speaker = active.find((i) => i !== last) ?? speaker;
       }
       return { speaker, role: "answerHost" };
@@ -685,7 +691,9 @@ export function App() {
         syncMeta();
         if (!runningRef.current) return;
         // Yazı, ses hazır olunca düşer (önceden hazırlandıysa anında).
+        if (!pre) setPrepping(true);
         await prepareVoice(text, i, g[i].gender, ctrl.signal);
+        setPrepping(false);
         // Sıradaki konuğun görüşü, bu konuk konuşurken hazırlansın.
         startOpeningAhead(i + 1);
         setThinking(null);
@@ -843,9 +851,13 @@ export function App() {
         syncMeta();
         if (!runningRef.current) return;
 
-        // Akış baloncuğu ekranda kalır; sesin ilk parçası hazır olunca yazı
-        // mesaja dönüşür ve ses HEMEN başlar (uzun "sessiz okuma" gecikmesi yok).
-        if (text.trim()) await prepareVoice(text, speaker, g[speaker].gender, ctrl.signal);
+        // Akış baloncuğu ekranda kalır; ses hazır olunca yazı mesaja dönüşür
+        // ve ses HEMEN başlar (uzun "sessiz okuma" gecikmesi yok).
+        if (text.trim()) {
+          if (!pre) setPrepping(true);
+          await prepareVoice(text, speaker, g[speaker].gender, ctrl.signal);
+          setPrepping(false);
+        }
         setThinking(null);
         setStreamingText("");
         if (!runningRef.current) return;
@@ -1582,7 +1594,7 @@ export function App() {
         <main className="panel__stage">
           {error && <div className="banner banner--error">{error}</div>}
           {modPending && <div className="banner" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>⏳ Spiker sırada bekliyor — konuk bitince araya girecek...</div>}
-          <ChatStream utterances={utterances} guests={guests} thinking={thinking} streamingText={streamingText} />
+          <ChatStream utterances={utterances} guests={guests} thinking={thinking} streamingText={streamingText} prepping={prepping} />
           {bootStage > 0 && (
             <div className="boot-loading">
               <div className="boot-loading__title">{t("boot.title")}</div>

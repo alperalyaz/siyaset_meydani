@@ -1179,6 +1179,15 @@ html.theme-gunluk .panel {
   color: var(--muted);
   line-height: 1.5;
 }
+/* Konuşma baloncuğunda "ses kaydediliyor" ibaresi (yazı hazır, TTS sürüyor). */
+.turn__prep {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+  animation: boot-pulse 1.4s ease-in-out infinite;
+}
+
 /* Oturum açılış yüklemesi: kadrolama + ses hazırlığı sürerken gösterilir. */
 .boot-loading {
   margin: 1.2rem auto;

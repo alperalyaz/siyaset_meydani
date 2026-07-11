@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { Guest, Utterance } from "../types";
+import { useT } from "../lib/i18n";
 
 // Basit satır içi markdown: **kalın**, *italik*, _italik_.
 function renderRich(text: string): ReactNode[] {
@@ -24,6 +25,8 @@ interface Props {
   guests: Guest[];
   thinking: number | null;
   streamingText?: string;
+  // Yazı tamam, HD ses sentezleniyor — baloncukta "kayıt" ibaresi göster.
+  prepping?: boolean;
 }
 
 function initials(name: string): string {
@@ -34,7 +37,8 @@ function initials(name: string): string {
     .join("");
 }
 
-export function ChatStream({ utterances, guests, thinking, streamingText }: Props) {
+export function ChatStream({ utterances, guests, thinking, streamingText, prepping }: Props) {
+  const { t } = useT();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -103,6 +107,7 @@ export function ChatStream({ utterances, guests, thinking, streamingText }: Prop
                 <span></span>
               </div>
             )}
+            {prepping && <div className="turn__prep">{t("stream.prep")}</div>}
           </div>
         </div>
       )}
