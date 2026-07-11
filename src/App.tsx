@@ -130,6 +130,9 @@ export function App() {
 
   const [leaveModal, setLeaveModal] = useState(false);
   const [idleModal, setIdleModal] = useState(false);
+  // Oturum açılış hazırlığı göstergesi: 0 = gizli, 1 = kadrolama, 2 = ses/ilk
+  // görüş hazırlığı. İlk konuk repliği ekrana düşünce kapanır.
+  const [bootStage, setBootStage] = useState<0 | 1 | 2>(0);
   const [closingSequence, setClosingSequence] = useState(false);
   const [modPending, setModPending] = useState(false);
 
@@ -328,6 +331,7 @@ export function App() {
     abortRef.current?.abort();
     cancelSpeech();
     setThinking(null);
+    setBootStage(0);
     setStreamingText("");
     pausedRef.current = true;
     speakingRef.current = false; // pace() abort ile kesilirse takılı kalmasın
@@ -553,6 +557,7 @@ export function App() {
     try {
       // --- KADROLAMA (karşıt pozisyonlar) ---
       if (stancesRef.current.length === 0) {
+        setBootStage(1); // "oturum yükleniyor" göstergesi
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         const cast = await assignStances(
@@ -611,6 +616,7 @@ export function App() {
       // Spiker welcome mesajını seslendir (sadece ilk başlangıçta) — bu
       // sırada ilk konuğun görüşü arkada hazırlanır.
       if (utterRef.current.length <= 1) {
+        setBootStage(2); // sesler + ilk görüş hazırlanıyor
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         const w = utterRef.current[0];
@@ -684,6 +690,7 @@ export function App() {
         startOpeningAhead(i + 1);
         setThinking(null);
         setStreamingText("");
+        setBootStage(0); // ilk replik geldi → yükleme göstergesini kapat
         if (!runningRef.current) return;
         append({ id: uid(), speaker: i, text, mode: "normal" });
         if (hasStance && !activeRef.current.includes(i)) activeRef.current.push(i);
@@ -1576,6 +1583,20 @@ export function App() {
           {error && <div className="banner banner--error">{error}</div>}
           {modPending && <div className="banner" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>⏳ Spiker sırada bekliyor — konuk bitince araya girecek...</div>}
           <ChatStream utterances={utterances} guests={guests} thinking={thinking} streamingText={streamingText} />
+          {bootStage > 0 && (
+            <div className="boot-loading">
+              <div className="boot-loading__title">{t("boot.title")}</div>
+              <div className="boot-loading__bar">
+                <div
+                  className="boot-loading__fill"
+                  style={{ width: bootStage === 1 ? "35%" : "75%" }}
+                />
+              </div>
+              <div className="boot-loading__stage">
+                {t(bootStage === 1 ? "boot.stage1" : "boot.stage2")}
+              </div>
+            </div>
+          )}
         </main>
         <aside className="panel__side">
           <RatingMeter rating={rating} note={ratingNote} />

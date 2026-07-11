@@ -1179,6 +1179,43 @@ html.theme-gunluk .panel {
   color: var(--muted);
   line-height: 1.5;
 }
+/* Oturum açılış yüklemesi: kadrolama + ses hazırlığı sürerken gösterilir. */
+.boot-loading {
+  margin: 1.2rem auto;
+  max-width: 460px;
+  padding: 1.1rem 1.3rem;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+.boot-loading__title {
+  font-weight: 800;
+  margin-bottom: 0.7rem;
+}
+.boot-loading__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.boot-loading__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #e0447a);
+  transition: width 0.8s ease;
+  animation: boot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes boot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.boot-loading__stage {
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 /* Boşta molası modalı: ekranın önüne çıkan soru önerileri. */
 .modal--idle {
   max-width: 620px;

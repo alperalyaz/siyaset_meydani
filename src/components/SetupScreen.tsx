@@ -78,6 +78,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     if (firstLangRef.current) { firstLangRef.current = false; return; }
     setQuickDerin(loadQuickGuests("derin", lang));
     setQuickGunluk(loadQuickGuests("gunluk", lang));
+    // Eski dilde üretilmiş taze konu çipleri ekranda kalmasın.
+    setExtraTopics([]);
   }, [lang]);
 
   const quickGuests = topicTab === "gunluk" ? quickGunluk : quickDerin;
@@ -240,7 +242,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     } finally {
       setLoadingTopics(false);
     }
-  }, [apiKey, onError, topicTab]);
+    // DİKKAT: lang bağımlılıkta olmalı — yoksa dil değiştirilince eski dilin
+    // closure'ı kalır ve konular yanlış dilde üretilir.
+  }, [apiKey, onError, topicTab, lang, t]);
 
   // Sekme değişince üretilmiş (diğer sekmeye ait) taze konuları temizle.
   const switchTab = useCallback((tab: TopicTab) => {

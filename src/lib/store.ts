@@ -170,11 +170,12 @@ export interface QuickGuest {
 export type QuickTab = "derin" | "gunluk";
 const MAX_QUICK_GUESTS = 10;
 
-// derin v5 / gunluk v3: mükerrer temizliği + kanonik-ad takibi. Dil eki: TR
-// mevcut anahtarı korur (geriye uyum), EN için ayrı anahtar (İngilizce raf).
+// derin v6: İskender → Sokrates (varsayılan raf değişince sürüm yükselir ki
+// mevcut kullanıcılar da yeni rafı görsün). gunluk v3: mükerrer temizliği.
+// Dil eki: TR mevcut anahtarı korur (geriye uyum), EN için ayrı anahtar.
 export type QuickLang = "tr" | "en";
 const QUICK_KEY_BASE: Record<QuickTab, string> = {
-  derin: "siyaset_meydani_quick_guests_v5",
+  derin: "siyaset_meydani_quick_guests_v6",
   gunluk: "siyaset_meydani_quick_gunluk_v3",
 };
 function quickStorageKey(tab: QuickTab, lang: QuickLang): string {
@@ -212,7 +213,7 @@ const DEFAULT_QUICK_GUESTS: Record<QuickLang, Record<QuickTab, QuickGuest[]>> = 
     derin: [
       { name: "Sevan Nişanyan" },
       { name: "Machiavelli" },
-      { name: "Büyük İskender" },
+      { name: "Sokrates" },
       { name: "Halil İnalcık" },
       { name: "Sun Tzu" },
       { name: "Büyük Petro" },
@@ -234,7 +235,7 @@ const DEFAULT_QUICK_GUESTS: Record<QuickLang, Record<QuickTab, QuickGuest[]>> = 
     derin: [
       { name: "Christopher Hitchens" },
       { name: "Niccolò Machiavelli" },
-      { name: "Alexander the Great" },
+      { name: "Socrates" },
       { name: "Sun Tzu" },
       { name: "Peter the Great" },
       { name: "Mahatma Gandhi" },
