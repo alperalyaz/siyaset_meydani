@@ -1233,18 +1233,20 @@ export function App() {
     if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
     hdMsgTimer.current = setTimeout(() => setHdMsg(null), ms);
   }, []);
-  // HD anahtarı kaydet — türü ön-eke göre yönlendir: "AIza..." → Google Gemini,
-  // diğer ("sk_..." vb.) → ElevenLabs. Diğer slotu temizler (tek anahtar aktif).
-  // Kaydettikten sonra anahtar HEMEN sınanır ve sonuç açıkça bildirilir
-  // ("girdim ama çalışmıyor" belirsizliği kalmasın).
+  // HD anahtarı kaydet — türü ön-eke göre yönlendir: yalnızca "sk_..." →
+  // ElevenLabs; geri kalan her şey → Google Gemini. (Google anahtarları eski
+  // "AIza..." VEYA yeni "AQ...." biçiminde olabilir; varsayılan motorumuz
+  // Gemini olduğu için bilinmeyen biçimler de Gemini'ye gider.) Diğer slotu
+  // temizler (tek anahtar aktif). Kaydettikten sonra anahtar HEMEN sınanır ve
+  // sonuç açıkça bildirilir ("girdim ama çalışmıyor" belirsizliği kalmasın).
   const saveHdKeyCb = useCallback((k: string) => {
     const key = k.trim();
-    if (/^AIza/i.test(key)) {
-      saveGeminiKey(key); setGeminiKeyState(key); setGeminiKey(key);
-      clearElevenKey(); setElevenKeyState(null); setElevenKey(null);
-    } else {
+    if (/^sk_/i.test(key)) {
       saveElevenKey(key); setElevenKeyState(key); setElevenKey(key);
       clearGeminiKey(); setGeminiKeyState(null); setGeminiKey(null);
+    } else {
+      saveGeminiKey(key); setGeminiKeyState(key); setGeminiKey(key);
+      clearElevenKey(); setElevenKeyState(null); setElevenKey(null);
     }
     resetHdExhausted(); // yeni anahtar → HD'ye tekrar şans ver
     setHdTts(true);
