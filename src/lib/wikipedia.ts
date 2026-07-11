@@ -207,52 +207,60 @@ function acceptablePersonPage(s: Summary | null): s is Summary {
   return !!s && (!s.type || s.type === "standard") && looksLikePerson(s);
 }
 
-async function resolveGuestInfo(rawName: string): Promise<EnrichedInfo> {
+// lang: arayüz/oturum dili. "en" ise İNGİLİZCE Vikipedi ÖNCELİKLİ (İngilizce
+// isimler ve doğru "Peter the Great" gibi başlıklar için), "tr" ise Türkçe.
+async function resolveGuestInfo(rawName: string, lang: "tr" | "en" = "tr"): Promise<EnrichedInfo> {
   const name = normalizeName(rawName);
 
-  // 1) TR Vikipedi — doğrudan başlık
-  const tr = await fetchTrSummary(name);
-  if (acceptablePersonPage(tr)) return summaryToInfo(tr, name, "ok");
+  const primary = lang === "en" ? fetchEnSummary : fetchTrSummary;
+  const secondary = lang === "en" ? fetchTrSummary : fetchEnSummary;
+  const primarySearch: "tr" | "en" = lang === "en" ? "en" : "tr";
+  const secondarySearch: "tr" | "en" = lang === "en" ? "tr" : "en";
+  // Beklenen dilden gelen sonuç "ok" (rozetsiz). Diğer dile düşülürse: TR
+  // arayüzde EN'e düşmek "İngilizce Vikipedi'den" rozetini gösterir; EN
+  // arayüzde TR'ye düşmek nadir, onu da rozetsiz "ok" göster.
+  const primaryStatus: Guest["summaryStatus"] = "ok";
+  const secondaryStatus: Guest["summaryStatus"] = lang === "en" ? "ok" : "en_wiki";
 
-  // 2) EN Vikipedi — doğrudan başlık
-  const en = await fetchEnSummary(name);
-  if (acceptablePersonPage(en)) return summaryToInfo(en, name, "en_wiki");
+  // 1) Öncelikli dil — doğrudan başlık
+  const p = await primary(name);
+  if (acceptablePersonPage(p)) return summaryToInfo(p, name, primaryStatus);
 
-  // 3) Wikidata — kişi tercihli arama. Metin aramasından ÖNCE: eski/alternatif
-  //    adı gerçek kişiye çevirir (Eflatun → Platon), metin araması ise aynı
-  //    kelimeli alakasız sayfalara ("Eflatun Pınar" anıtı) kayabilir. Bulunan
-  //    etiketle Vikipedi bir kez daha denenir ki foto/özet de gelsin.
+  // 2) İkincil dil — doğrudan başlık
+  const s = await secondary(name);
+  if (acceptablePersonPage(s)) return summaryToInfo(s, name, secondaryStatus);
+
+  // 3) Wikidata — kişi tercihli arama (eski/alternatif adı gerçek kişiye çevirir).
   const wd = await fetchWikidataDescription(name);
   if (wd) {
     const label = wd.label.replace(/_/g, " ").trim() || name;
     if (label.toLocaleLowerCase("tr") !== name.toLocaleLowerCase("tr")) {
-      const s2 = await fetchTrSummary(label);
-      if (acceptablePersonPage(s2)) return summaryToInfo(s2, label, "ok");
-      const s3 = await fetchEnSummary(label);
-      if (acceptablePersonPage(s3)) return summaryToInfo(s3, label, "en_wiki");
+      const s2 = await primary(label);
+      if (acceptablePersonPage(s2)) return summaryToInfo(s2, label, primaryStatus);
+      const s3 = await secondary(label);
+      if (acceptablePersonPage(s3)) return summaryToInfo(s3, label, secondaryStatus);
     }
     return {
       name: label,
       era: wd.description || "",
       blurb: wd.description || label,
       thumbnail: undefined,
-      summaryStatus: "en_wiki",
+      summaryStatus: secondaryStatus,
     };
   }
 
-  // 4) TR tam metin arama — LLM'in bozuk yazımını ("Soyad, Ad", ufak typo)
-  //    gerçek maddeye eşler.
-  const trHit = await searchWikiTitle("tr", name);
-  if (trHit) {
-    const s = await fetchTrSummary(trHit);
-    if (acceptablePersonPage(s)) return summaryToInfo(s, trHit, "ok");
+  // 4) Öncelikli dilde tam metin arama (bozuk yazım/typo düzeltir)
+  const pHit = await searchWikiTitle(primarySearch, name);
+  if (pHit) {
+    const x = await primary(pHit);
+    if (acceptablePersonPage(x)) return summaryToInfo(x, pHit, primaryStatus);
   }
 
-  // 5) EN tam metin arama
-  const enHit = await searchWikiTitle("en", name);
-  if (enHit) {
-    const s = await fetchEnSummary(enHit);
-    if (acceptablePersonPage(s)) return summaryToInfo(s, enHit, "en_wiki");
+  // 5) İkincil dilde tam metin arama
+  const sHit = await searchWikiTitle(secondarySearch, name);
+  if (sHit) {
+    const x = await secondary(sHit);
+    if (acceptablePersonPage(x)) return summaryToInfo(x, sHit, secondaryStatus);
   }
 
   // 6) Hiçbir kaynakta yok
@@ -428,7 +436,7 @@ export function isBlockedName(name: string): boolean {
   return SACRED_TITLES.has(t) || SACRED_TITLES.has(bare);
 }
 
-export async function buildGuestsFromNames(names: string[], count = 3): Promise<Guest[]> {
+export async function buildGuestsFromNames(names: string[], count = 3, lang: "tr" | "en" = "tr"): Promise<Guest[]> {
   const guests: Guest[] = [];
   const used = new Set<string>();
   const add = (g: Guest) => {
@@ -441,7 +449,7 @@ export async function buildGuestsFromNames(names: string[], count = 3): Promise<
   for (const name of shuffle(names)) {
     if (guests.length >= count) break;
     if (isBlockedName(name)) continue;
-    const info = await resolveGuestInfo(name);
+    const info = await resolveGuestInfo(name, lang);
     if (isBlockedName(info.name)) continue; // arama engelli kişiye çözülmüş olabilir
     if (info.summaryStatus === "minimal") {
       add({
@@ -482,7 +490,24 @@ export type ResolveResult =
   | { status: "blocked" }
   | { status: "notfound" };
 
-export async function resolveGuestByName(query: string): Promise<ResolveResult> {
+async function opensearch(lang: "tr" | "en", q: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
+        q,
+      )}&limit=5&namespace=0&format=json&origin=*`,
+    );
+    if (res.ok) {
+      const data = (await res.json()) as [string, string[]];
+      if (Array.isArray(data?.[1])) return data[1];
+    }
+  } catch {
+    /* yoksay */
+  }
+  return [];
+}
+
+export async function resolveGuestByName(query: string, lang: "tr" | "en" = "tr"): Promise<ResolveResult> {
   const q = query.trim();
   if (!q) return { status: "notfound" };
 
@@ -491,41 +516,16 @@ export async function resolveGuestByName(query: string): Promise<ResolveResult> 
   if (urlMatch) {
     candidates = [decodeURIComponent(urlMatch[1]).replace(/_/g, " ")];
   } else {
-    // TR Vikipedi opensearch
-    try {
-      const res = await fetch(
-        `https://tr.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
-          q,
-        )}&limit=5&namespace=0&format=json&origin=*`,
-      );
-      if (res.ok) {
-        const data = (await res.json()) as [string, string[]];
-        if (Array.isArray(data?.[1])) candidates.push(...data[1]);
-      }
-    } catch {
-      /* yoksay */
-    }
-    // TR'de bulunamadıysa EN opensearch'i de dene
-    if (candidates.length === 0) {
-      try {
-        const enRes = await fetch(
-          `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
-            q,
-          )}&limit=5&namespace=0&format=json&origin=*`,
-        );
-        if (enRes.ok) {
-          const enData = (await enRes.json()) as [string, string[]];
-          if (Array.isArray(enData?.[1])) candidates.push(...enData[1]);
-        }
-      } catch {
-        /* yoksay */
-      }
-    }
+    // Opensearch — arayüz diline göre önce o dil, bulunamazsa diğeri.
+    const primary: "tr" | "en" = lang === "en" ? "en" : "tr";
+    const secondary: "tr" | "en" = lang === "en" ? "tr" : "en";
+    candidates.push(...(await opensearch(primary, q)));
+    if (candidates.length === 0) candidates.push(...(await opensearch(secondary, q)));
     if (candidates.length === 0) candidates = [q];
   }
 
   for (const title of candidates) {
-    const info = await resolveGuestInfo(title);
+    const info = await resolveGuestInfo(title, lang);
     if (info.summaryStatus === "minimal") continue;
     // Engelli isim kontrolü (orijinal title ile, info.name İngilizce ad olabilir)
     if (isBlockedName(title) || isBlockedName(info.name)) return { status: "blocked" };

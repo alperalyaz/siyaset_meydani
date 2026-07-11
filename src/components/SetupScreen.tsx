@@ -64,11 +64,21 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   // Sessiz hata olmasın: boş sonuç/yedek havuz gibi durumlar kullanıcıya söylenir.
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Hazır konuk rafı — her sekmenin kendi listesi. Fotoğraflar Vikipedi'den lazy.
-  const [quickDerin, setQuickDerin] = useState<QuickGuest[]>(() => loadQuickGuests("derin"));
-  const [quickGunluk, setQuickGunluk] = useState<QuickGuest[]>(() => loadQuickGuests("gunluk"));
-  useEffect(() => saveQuickGuests("derin", quickDerin), [quickDerin]);
-  useEffect(() => saveQuickGuests("gunluk", quickGunluk), [quickGunluk]);
+  // Hazır konuk rafı — her sekmenin kendi listesi, ARAYÜZ DİLİNE göre (TR/EN).
+  // Fotoğraflar Vikipedi'den lazy. Kayıt anahtarı dile göre ayrık.
+  const langRef = useRef(lang);
+  langRef.current = lang;
+  const [quickDerin, setQuickDerin] = useState<QuickGuest[]>(() => loadQuickGuests("derin", lang));
+  const [quickGunluk, setQuickGunluk] = useState<QuickGuest[]>(() => loadQuickGuests("gunluk", lang));
+  useEffect(() => saveQuickGuests("derin", quickDerin, langRef.current), [quickDerin]);
+  useEffect(() => saveQuickGuests("gunluk", quickGunluk, langRef.current), [quickGunluk]);
+  // Dil değişince rafları o dilin listesiyle yeniden yükle (ilk mount atlanır).
+  const firstLangRef = useRef(true);
+  useEffect(() => {
+    if (firstLangRef.current) { firstLangRef.current = false; return; }
+    setQuickDerin(loadQuickGuests("derin", lang));
+    setQuickGunluk(loadQuickGuests("gunluk", lang));
+  }, [lang]);
 
   const quickGuests = topicTab === "gunluk" ? quickGunluk : quickDerin;
   // Aktif sekmenin setter'ını ÇAĞRI ANINDA seç (ref üzerinden), yoksa
@@ -85,11 +95,11 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   useEffect(() => {
     let cancelled = false;
     const jobs: { tab: QuickTab; q: QuickGuest }[] = [];
-    for (const q of loadQuickGuests("derin")) if (!q.resolved) jobs.push({ tab: "derin", q });
-    for (const q of loadQuickGuests("gunluk")) if (!q.resolved) jobs.push({ tab: "gunluk", q });
+    for (const q of loadQuickGuests("derin", lang)) if (!q.resolved) jobs.push({ tab: "derin", q });
+    for (const q of loadQuickGuests("gunluk", lang)) if (!q.resolved) jobs.push({ tab: "gunluk", q });
     jobs.forEach(async ({ tab, q }) => {
       try {
-        const res = await resolveGuestByName(q.name);
+        const res = await resolveGuestByName(q.name, lang);
         if (cancelled) return;
         const setter = tab === "gunluk" ? setQuickGunluk : setQuickDerin;
         setter((prev) =>
@@ -114,7 +124,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang]);
 
   // Gündelik teması App'te yönetilir ki oturum (panel) ekranına da taşınsın.
   // SetupScreen sadece aktif sekmeyi App'e bildirir; sınıfı App <html>'e koyar.
@@ -182,7 +192,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           setNotice(t("notice.noGuests"));
         }
         shownNamesRef.current = [...shownNamesRef.current, ...names].slice(-40);
-        const g = await buildGuestsFromNames(names, DEFAULT_COUNT);
+        const g = await buildGuestsFromNames(names, DEFAULT_COUNT, lang);
         shownNamesRef.current = [...shownNamesRef.current, ...g.map((x) => x.name)].slice(-40);
         setGuests(g);
       } catch (e) {
@@ -191,7 +201,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         setLoading(false);
       }
     },
-    [apiKey, onError, t],
+    [apiKey, onError, t, lang],
   );
 
   const pickTopic = useCallback(
@@ -277,7 +287,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       setAdding(true);
       setAddMsg(null);
       try {
-        const res = await resolveGuestByName(q);
+        const res = await resolveGuestByName(q, lang);
         if (res.status === "blocked") {
           setAddMsg(t("notice.blockedName"));
           return;
@@ -294,7 +304,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
         setAdding(false);
       }
     },
-    [addResolvedGuest, onError],
+    [addResolvedGuest, onError, lang],
   );
 
   const addGuest = useCallback(() => void addGuestByName(addName), [addGuestByName, addName]);

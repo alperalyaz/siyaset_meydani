@@ -170,12 +170,16 @@ export interface QuickGuest {
 export type QuickTab = "derin" | "gunluk";
 const MAX_QUICK_GUESTS = 10;
 
-// derin v5 / gunluk v3: mükerrer (aynı kişinin iki adı) sorununu temizlemek ve
-// kanonik-ad takibini (resolvedName) devreye almak için sürüm yükseltildi.
-const QUICK_GUESTS_KEYS: Record<QuickTab, string> = {
+// derin v5 / gunluk v3: mükerrer temizliği + kanonik-ad takibi. Dil eki: TR
+// mevcut anahtarı korur (geriye uyum), EN için ayrı anahtar (İngilizce raf).
+export type QuickLang = "tr" | "en";
+const QUICK_KEY_BASE: Record<QuickTab, string> = {
   derin: "siyaset_meydani_quick_guests_v5",
   gunluk: "siyaset_meydani_quick_gunluk_v3",
 };
+function quickStorageKey(tab: QuickTab, lang: QuickLang): string {
+  return lang === "en" ? `${QUICK_KEY_BASE[tab]}_en` : QUICK_KEY_BASE[tab];
+}
 
 // Aynı kişinin farklı adlarla (ör. "Machiavelli" ve "Niccolò Machiavelli") iki
 // kez rafta durmasını önler. Kimlik anahtarı: kanonik ad varsa o, yoksa görünen ad.
@@ -201,45 +205,72 @@ function dedupeQuick(list: QuickGuest[]): QuickGuest[] {
 // Gündelik: magazin/TV yıldızları (kadın programı havası).
 // Kullanıcı istediğini × ile çıkarabilir, kendi ekledikleri eklenir; boş
 // liste de saklanır (varsayılanlar geri gelmez).
-const DEFAULT_QUICK_GUESTS: Record<QuickTab, QuickGuest[]> = {
-  derin: [
-    { name: "Sevan Nişanyan" },
-    { name: "Machiavelli" },
-    { name: "Büyük İskender" },
-    { name: "Halil İnalcık" },
-    { name: "Sun Tzu" },
-    { name: "Büyük Petro" },
-    { name: "Mahatma Gandhi" },
-    { name: "Kadir Mısıroğlu" },
-  ],
-  gunluk: [
-    { name: "Acun Ilıcalı" },
-    { name: "Cem Yılmaz" },
-    { name: "Hülya Avşar" },
-    { name: "Müge Anlı" },
-    { name: "Ebru Gündeş" },
-    { name: "Seren Serengil" },
-    { name: "Bülent Ersoy" },
-    { name: "Gülben Ergen" },
-  ],
+// Dil bazlı varsayılan raflar. TR: Türk figürleri. EN: İngilizce Vikipedi'de
+// doğrudan bulunan İngilizce adlar (uluslararası). Kullanıcı × ile çıkarabilir.
+const DEFAULT_QUICK_GUESTS: Record<QuickLang, Record<QuickTab, QuickGuest[]>> = {
+  tr: {
+    derin: [
+      { name: "Sevan Nişanyan" },
+      { name: "Machiavelli" },
+      { name: "Büyük İskender" },
+      { name: "Halil İnalcık" },
+      { name: "Sun Tzu" },
+      { name: "Büyük Petro" },
+      { name: "Mahatma Gandhi" },
+      { name: "Kadir Mısıroğlu" },
+    ],
+    gunluk: [
+      { name: "Acun Ilıcalı" },
+      { name: "Cem Yılmaz" },
+      { name: "Hülya Avşar" },
+      { name: "Müge Anlı" },
+      { name: "Ebru Gündeş" },
+      { name: "Seren Serengil" },
+      { name: "Bülent Ersoy" },
+      { name: "Gülben Ergen" },
+    ],
+  },
+  en: {
+    derin: [
+      { name: "Christopher Hitchens" },
+      { name: "Niccolò Machiavelli" },
+      { name: "Alexander the Great" },
+      { name: "Sun Tzu" },
+      { name: "Peter the Great" },
+      { name: "Mahatma Gandhi" },
+      { name: "Friedrich Nietzsche" },
+      { name: "Winston Churchill" },
+    ],
+    gunluk: [
+      { name: "Gordon Ramsay" },
+      { name: "Kim Kardashian" },
+      { name: "Elon Musk" },
+      { name: "Oprah Winfrey" },
+      { name: "Cristiano Ronaldo" },
+      { name: "Simon Cowell" },
+      { name: "Gwyneth Paltrow" },
+      { name: "Kanye West" },
+    ],
+  },
 };
 
-export function loadQuickGuests(tab: QuickTab): QuickGuest[] {
+export function loadQuickGuests(tab: QuickTab, lang: QuickLang = "tr"): QuickGuest[] {
+  const def = () => [...DEFAULT_QUICK_GUESTS[lang][tab]];
   try {
-    const raw = localStorage.getItem(QUICK_GUESTS_KEYS[tab]);
-    if (raw === null) return [...DEFAULT_QUICK_GUESTS[tab]];
+    const raw = localStorage.getItem(quickStorageKey(tab, lang));
+    if (raw === null) return def();
     const list = JSON.parse(raw) as QuickGuest[];
     return Array.isArray(list)
       ? dedupeQuick(list.filter((x) => x && typeof x.name === "string")).slice(0, MAX_QUICK_GUESTS)
-      : [...DEFAULT_QUICK_GUESTS[tab]];
+      : def();
   } catch {
-    return [...DEFAULT_QUICK_GUESTS[tab]];
+    return def();
   }
 }
 
-export function saveQuickGuests(tab: QuickTab, list: QuickGuest[]): void {
+export function saveQuickGuests(tab: QuickTab, list: QuickGuest[], lang: QuickLang = "tr"): void {
   try {
-    localStorage.setItem(QUICK_GUESTS_KEYS[tab], JSON.stringify(list.slice(0, MAX_QUICK_GUESTS)));
+    localStorage.setItem(quickStorageKey(tab, lang), JSON.stringify(list.slice(0, MAX_QUICK_GUESTS)));
   } catch {
     /* yoksay */
   }
