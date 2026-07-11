@@ -116,17 +116,28 @@ const VOICES: Record<"male" | "female", Record<Tone, string[]>> = {
 // Spiker: konuklardan ayrışan kendine has, sıcak sunucu sesi (havuzlarda yok).
 const MODERATOR_VOICE = "pFZP5JQG7iQjIQuC4Bku"; // Lily
 
-// Konuğun dönemi + tartışma üslubundan ses TONU çıkar (kişiye uygun eşleştirme).
+// Konuğun ses TONU (yaşı). Kural: tarihî figürler akıllarda YAŞLI halleriyle
+// kalmıştır (Vikipedi fotoğrafları hep son dönemleri) — bir 19. yüzyıl
+// düşünürüne delikanlı sesi verilmez. Doğum yılı esas alınır:
+//   • 1950 öncesi doğum (ya da yıl yok + tarihî dönem) → OLGUN ses
+//   • 1950-1985 arası → ORTA
+//   • 1985 sonrası (genç güncel ünlüler) → GENÇ
 function toneForGuest(g: Guest): Tone {
   const era = (g.era || "").toLocaleLowerCase("tr");
-  const style = g.debateStyle || "";
-  const old = /antik|m[öo]\b|milattan|orta ?çağ|osmanl|selçuk|rönesans|klasik|1[3-8]\d\d|padişah|sultan|kağan|imparator|hükümdar|çar/.test(era);
-  const modern = /modern|günümüz|çağdaş|20\.|21\.|19[5-9]\d|20\d\d/.test(era);
-  const authoritative = /otoriter|bilgiç|soğukkanlı/.test(style);
-  const youthful = /nükteli|alaycı|provokatör|duygusal/.test(style);
-  if (authoritative || old) return "mature";
-  if (youthful || modern) return "young";
-  return "mid";
+  // Dönem metnindeki İLK 3-4 haneli yıl ≈ doğum yılı ("1814-1876", "d. 1971").
+  const yearMatch = /(?:m\.?ö\.?|mö)\s*\d{2,4}|\b(\d{3,4})\b/.exec(era);
+  const bornBC = /m\.?ö\.?|milattan önce/.test(era);
+  const born = bornBC ? -1 : yearMatch?.[1] ? Number(yearMatch[1]) : null;
+  if (born !== null) {
+    if (born < 1950) return "mature";
+    if (born < 1985) return "mid";
+    return "young";
+  }
+  // Yıl yoksa dönem ipuçlarına bak; belirsizse OLGUN varsay (tarihî isim olasılığı yüksek).
+  if (/antik|milattan|orta ?çağ|osmanl|selçuk|rönesans|klasik|yüzyıl|padişah|sultan|kağan|imparator|hükümdar|çar/.test(era))
+    return "mature";
+  if (/güncel|günümüz|çağdaş|sosyal medya|youtuber|influencer/.test(era)) return "mid";
+  return "mature";
 }
 
 // Üsluba göre ElevenLabs voice_settings — ifade/dinamizm kişiye göre değişsin.
@@ -278,35 +289,7 @@ onSpeechRate((mult) => {
   }
 });
 
-// Metni cümle sınırlarından parçalara böl. İLK parça kısa tutulur ki ses
-// olabildiğince erken başlasın; sonraki parçalar öncekiler çalarken arkada
-// sentezlenir (boru hattı). Parçalar sunucunun tek-istek sınırının (600)
-// güvenle altında kalır — uzun konuşmaların sesinin kesilmesini de önler.
-function chunkText(t: string, firstTarget = 160, target = 280): string[] {
-  const sentences = t.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+\s*$/g) ?? [t];
-  const chunks: string[] = [];
-  let cur = "";
-  const flush = () => {
-    if (cur.trim()) chunks.push(cur.trim());
-    cur = "";
-  };
-  for (const s of sentences) {
-    const limit = chunks.length === 0 ? firstTarget : target;
-    if (cur && cur.length + s.length > limit) flush();
-    cur += s;
-    // Tek cümle aşırı uzunsa kelime sınırından sert böl (sunucu sınırı 600).
-    while (cur.length > 520) {
-      const cut = cur.lastIndexOf(" ", 520);
-      const idx = cut > 200 ? cut : 520;
-      chunks.push(cur.slice(0, idx).trim());
-      cur = cur.slice(idx);
-    }
-  }
-  flush();
-  return chunks.length ? chunks : [t];
-}
-
-// Tek bir hazır (blob URL) ses parçasını çal; canlı hız desteğiyle.
+// Tek bir hazır (blob URL) sesi çal; canlı hız desteğiyle.
 function playUrl(url: string, baseRate: number, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve) => {
     const audio = new Audio(url);
@@ -384,11 +367,12 @@ async function synthesize(
   return url;
 }
 
-// HD ses ile seslendir. Metin cümle parçalarına bölünür: ilk parça sentezlenir
-// sentezlenmez çalınır, sonraki parça çalma sırasında arkada hazırlanır (boru
-// hattı) — ses çok daha erken başlar. İlk parça hata verirse (kota vb.)
-// ElevenError fırlatır ki çağıran tarayıcı sesine düşsün; SONRAKİ parçalarda
-// hata olursa metin baştan okunmasın diye sessizce durur. İptalde sessizce durur.
+// HD ses ile seslendir. Konuşma TEK istekte, TEK parça sentezlenir — parçalara
+// bölmek ton bütünlüğünü bozuyor (Gemini her isteği ayrı "çekim" gibi okuyor,
+// cümle ortasında ses değişmiş hissi veriyor). Gecikme, prepareSpeech ile
+// çözülür: yazı zaten ses hazır olunca gösterilir ve bu sentez önbellekten
+// anında döner. Hata olursa ElevenError fırlatır (çağıran tarayıcı sesine
+// düşer); iptal sinyalinde sessizce durur.
 export async function elevenSpeak(
   text: string,
   opts: { voiceIdx: number; gender?: "male" | "female"; signal?: AbortSignal },
@@ -400,38 +384,18 @@ export async function elevenSpeak(
   const voiceId = voiceIdFor(opts.voiceIdx, opts.gender);
   const settings = opts.voiceIdx === MODERATOR_VOICE_INDEX ? undefined : assignedSettings[opts.voiceIdx];
   const gemini = geminiFor(opts.voiceIdx);
-  const baseRate = voiceForGuest(opts.voiceIdx, opts.gender).rate;
+  const url = await synthesize(t, voiceId, opts.signal, settings, gemini); // hata → yukarı fırlar
 
-  const chunks = chunkText(t);
-  let pending: Promise<string> = synthesize(chunks[0], voiceId, opts.signal, settings, gemini);
-  for (let k = 0; k < chunks.length; k++) {
-    let url: string;
-    try {
-      url = await pending;
-    } catch (e) {
-      if (k === 0) throw e; // hiç ses çalınmadı → çağıran tarayıcı sesine düşer
-      // Kısmi ses çalındı; kalan metni tarayıcıyla BAŞTAN okutmak daha kötü —
-      // sessizce bitir. Kota/anahtar sorunuysa sonraki replikler için işaretle.
-      if (e instanceof ElevenError && (e.code === "QUOTA" || e.code === "NO_KEY" || e.code === "BAD_KEY")) {
-        markHdExhausted();
-      }
-      return;
-    }
-    if (opts.signal?.aborted) return;
-    if (k + 1 < chunks.length) {
-      const next = synthesize(chunks[k + 1], voiceId, opts.signal, settings, gemini);
-      next.catch(() => {}); // hata bir sonraki await'te ele alınır (unhandled rejection önle)
-      pending = next;
-    }
-    await playUrl(url, baseRate, opts.signal);
-    if (opts.signal?.aborted) return;
-  }
+  if (opts.signal?.aborted) return;
+  const baseRate = voiceForGuest(opts.voiceIdx, opts.gender).rate;
+  await playUrl(url, baseRate, opts.signal);
 }
 
-// Sesin İLK parçasını önceden sentezle (önbelleğe girer). Amaç: yazı ekrana
-// düştüğü ANDA sesin de başlaması — LLM cevabı gelir gelmez çağrılır, yazı
-// bu bekleme bitince gösterilir. Hatalar yutulur; asıl çalma sırasında aynı
-// hata yeniden alınır ve oradaki akış (tarayıcı sesine düşme) işler.
+// Konuşmanın TAMAMINI önceden sentezle (önbelleğe girer). LLM cevabı gelir
+// gelmez çağrılır; yazı bu bekleme bitince gösterilir — böylece yazı ve ses
+// AYNI ANDA başlar ve ses tek parça, dikişsiz olur. Hatalar yutulur; asıl
+// çalma sırasında aynı hata yeniden alınır ve oradaki akış (tarayıcı sesine
+// düşme) işler.
 export async function prepareSpeech(
   text: string,
   opts: { voiceIdx: number; gender?: "male" | "female"; signal?: AbortSignal },
@@ -442,7 +406,7 @@ export async function prepareSpeech(
     const voiceId = voiceIdFor(opts.voiceIdx, opts.gender);
     const settings = opts.voiceIdx === MODERATOR_VOICE_INDEX ? undefined : assignedSettings[opts.voiceIdx];
     const gemini = geminiFor(opts.voiceIdx);
-    await synthesize(chunkText(t)[0], voiceId, opts.signal, settings, gemini);
+    await synthesize(t, voiceId, opts.signal, settings, gemini);
   } catch {
     /* yut — asıl çalmada ele alınır */
   }

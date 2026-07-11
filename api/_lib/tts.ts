@@ -16,7 +16,10 @@ const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-t
 // Faturalı anahtarda maliyeti makul tutar; kullanıcı bitince kendi Gemini
 // anahtarını girip devam eder. Env ile ayarlanır.
 const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "3000"); // IP/gün (~3 dk)
-const MAX_TEXT = 600; // tek istekte azami karakter (kötüye kullanım/uzun metin freni)
+// Tek istekte azami karakter. Konuşmalar ton bütünlüğü için TEK istekte
+// sentezlenir (bölmek ses değişimi hissi veriyor); 2-4 cümlelik replikler
+// rahat sığsın diye sınır geniş — yine de kötüye kullanım freni var.
+const MAX_TEXT = 1200;
 
 // Gemini'nin bilinen hazır sesleri (güvenlik için beyaz liste).
 const GEMINI_VOICES = new Set([

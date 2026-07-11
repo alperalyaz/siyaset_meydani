@@ -192,6 +192,21 @@ export function App() {
   const apiKeyRef = useRef<string | null>(apiKey);
 
   const progressRef = useRef<Progress>({ phase: "intro", i: 0 });
+  // ── AKIŞ BORUSU ── Mevcut konuşma ÇALARKEN sıradaki tur (yönetmen kararı +
+  // replik + ses) arkada hazırlanır; sıra gelince anında ekrana düşer. Spiker
+  // araya girer ya da transkript değişirse hazırlanan tur çöpe gider (küçük
+  // token bedeli — akıcılık için kabul edilebilir).
+  const aheadRef = useRef<{
+    forCount: number; // planlandığı andaki utterance sayısı (geçerlilik anahtarı)
+    speaker: number;
+    role: GuestRole;
+    ctrl: AbortController;
+    promise: Promise<{ dec: Awaited<ReturnType<typeof runRatingDirector>>; text: string } | null>;
+  } | null>(null);
+  const discardAhead = useCallback(() => {
+    aheadRef.current?.ctrl.abort();
+    aheadRef.current = null;
+  }, []);
   const activeRef = useRef<number[]>([]); // net fikri olan konuklar
   const threadRef = useRef<Thread | null>(null);
   const modNoteRef = useRef<string | undefined>(undefined);
@@ -558,11 +573,48 @@ export function App() {
         syncMeta();
       }
 
-      // Spiker welcome mesajını seslendir (sadece ilk başlangıçta)
+      // ── AKIŞ BORUSU (görüş turu) ── Görüş replikleri birbirinden bağımsız
+      // (transkripte bakmazlar); sıradaki konuğun repliği + sesi, mevcut
+      // konuşma çalarken arkada hazırlanır. İlki, hoş geldin konuşması
+      // çalarken hazırlanır — açılıştaki uzun bekleme böyle kapanır.
+      type OpenAhead = {
+        i: number;
+        ctrl: AbortController;
+        promise: Promise<Awaited<ReturnType<typeof runOpeningStatement>> | null>;
+      };
+      let openAhead: OpenAhead | null = null;
+      const takeOpenAhead = (): OpenAhead | null => {
+        const v = openAhead;
+        openAhead = null;
+        return v;
+      };
+      const startOpeningAhead = (idx: number) => {
+        if (idx >= g.length || progressRef.current.phase !== "opening") return;
+        const ctrl = new AbortController();
+        const promise = (async () => {
+          try {
+            const r = await runOpeningStatement(
+              g[idx], g, t,
+              stancesRef.current[idx] ?? null,
+              topicContextRef.current,
+              idx, apiKeyRef.current, ctrl.signal,
+            );
+            if (r.text.trim()) await prepareVoice(r.text, idx, g[idx].gender, ctrl.signal);
+            return r;
+          } catch {
+            return null; // hata/iptal → tüketici canlı yoldan üretir
+          }
+        })();
+        openAhead = { i: idx, ctrl, promise };
+      };
+
+      // Spiker welcome mesajını seslendir (sadece ilk başlangıçta) — bu
+      // sırada ilk konuğun görüşü arkada hazırlanır.
       if (utterRef.current.length <= 1) {
         const ctrl = new AbortController();
         abortRef.current = ctrl;
         const w = utterRef.current[0];
+        startOpeningAhead(progressRef.current.i);
         if (w) await pace(w.text, 9, undefined, ctrl.signal);
       }
 
@@ -603,20 +655,33 @@ export function App() {
         abortRef.current = ctrl;
         setThinking(i);
         setStreamingText("");
-        const { text, hasStance } = await runOpeningStatement(
-          g[i],
-          g,
-          t,
-          stancesRef.current[i] ?? null,
-          topicContextRef.current,
-          i,
-          apiKeyRef.current,
-          ctrl.signal,
-        );
+        // Önceden hazırlanmış görüş varsa kullan; yoksa canlı üret.
+        let pre: Awaited<ReturnType<typeof runOpeningStatement>> | null = null;
+        {
+          const ahead = takeOpenAhead();
+          if (ahead) {
+            if (ahead.i === i) pre = await ahead.promise;
+            else ahead.ctrl.abort();
+          }
+        }
+        const { text, hasStance } =
+          pre ??
+          (await runOpeningStatement(
+            g[i],
+            g,
+            t,
+            stancesRef.current[i] ?? null,
+            topicContextRef.current,
+            i,
+            apiKeyRef.current,
+            ctrl.signal,
+          ));
         syncMeta();
         if (!runningRef.current) return;
-        // Yazı, sesin ilk parçası hazır olunca düşer (ses gecikmesi hissi olmasın).
+        // Yazı, ses hazır olunca düşer (önceden hazırlandıysa anında).
         await prepareVoice(text, i, g[i].gender, ctrl.signal);
+        // Sıradaki konuğun görüşü, bu konuk konuşurken hazırlansın.
+        startOpeningAhead(i + 1);
         setThinking(null);
         setStreamingText("");
         if (!runningRef.current) return;
@@ -657,16 +722,36 @@ export function App() {
         setThinking(speaker);
         setStreamingText("");
 
-        const dec = await runRatingDirector(
-          g,
-          t,
-          utterRef.current,
-          g[speaker].name,
-          role,
-          modNoteRef.current,
-          apiKeyRef.current,
-          ctrl.signal,
-        );
+        // ── AKIŞ BORUSU: önceki konuşma çalarken hazırlanan tur geçerliyse
+        // kullan. Geçerlilik: transkript değişmemiş, spiker notu yok ve plan
+        // aynı konuşmacı/rol için yapılmış.
+        let pre: { dec: Awaited<ReturnType<typeof runRatingDirector>>; text: string } | null = null;
+        {
+          const ahead = aheadRef.current;
+          if (ahead) {
+            aheadRef.current = null;
+            const valid =
+              ahead.forCount === utterRef.current.length &&
+              !modNoteRef.current &&
+              ahead.speaker === speaker &&
+              ahead.role === role;
+            if (valid) pre = await ahead.promise;
+            else ahead.ctrl.abort(); // yön değişti → hazırlanan tur çöpe
+          }
+        }
+
+        const dec =
+          pre?.dec ??
+          (await runRatingDirector(
+            g,
+            t,
+            utterRef.current,
+            g[speaker].name,
+            role,
+            modNoteRef.current,
+            apiKeyRef.current,
+            ctrl.signal,
+          ));
         syncMeta();
         setRating(dec.rating);
         setRatingNote(dec.note);
@@ -731,20 +816,22 @@ export function App() {
           return;
         }
 
-        const text = await runGuest(
-          g[speaker],
-          g,
-          t,
-          utterRef.current,
-          dec.cue,
-          role,
-          stancesRef.current[speaker] ?? null,
-          topicContextRef.current,
-          speaker,
-          apiKeyRef.current,
-          ctrl.signal,
-          (token) => setStreamingText((p) => p + token),
-        );
+        const text =
+          pre?.text ??
+          (await runGuest(
+            g[speaker],
+            g,
+            t,
+            utterRef.current,
+            dec.cue,
+            role,
+            stancesRef.current[speaker] ?? null,
+            topicContextRef.current,
+            speaker,
+            apiKeyRef.current,
+            ctrl.signal,
+            (token) => setStreamingText((p) => p + token),
+          ));
         rate429Ref.current = 0; // tur başarılı — limit sayacını sıfırla
         syncMeta();
         if (!runningRef.current) return;
@@ -766,6 +853,38 @@ export function App() {
           });
         }
         advanceThread(speaker, role);
+
+        // ── AKIŞ BORUSU (üretici): sıradaki tur, bu konuşma çalarken arkada
+        // hazırlanır (yönetmen kararı + replik + ses). Spiker notu beklemede
+        // değilse plan deterministiktir; araya girilirse geçerlilik anahtarı
+        // (forCount/modNote) turun çöpe gitmesini sağlar.
+        if (text.trim() && runningRef.current && !pendingModNoteRef.current && !pendingIdlePauseRef.current) {
+          const plan = nextSpeaker();
+          const actrl = new AbortController();
+          const forCount = utterRef.current.length;
+          const transcript = utterRef.current;
+          const promise = (async () => {
+            try {
+              const d = await runRatingDirector(
+                g, t, transcript, g[plan.speaker].name, plan.role,
+                undefined, apiKeyRef.current, actrl.signal,
+              );
+              const tx = await runGuest(
+                g[plan.speaker], g, t, transcript, d.cue, plan.role,
+                stancesRef.current[plan.speaker] ?? null,
+                topicContextRef.current, plan.speaker,
+                apiKeyRef.current, actrl.signal,
+              );
+              if (tx.trim()) await prepareVoice(tx, plan.speaker, g[plan.speaker].gender, actrl.signal);
+              return { dec: d, text: tx };
+            } catch {
+              return null; // hata/iptal → sıra gelince canlı üretilir
+            }
+          })();
+          aheadRef.current?.ctrl.abort();
+          aheadRef.current = { forCount, speaker: plan.speaker, role: plan.role, ctrl: actrl, promise };
+        }
+
         if (text.trim()) {
           speakingRef.current = true;
           await pace(text, speaker, g[speaker].gender, ctrl.signal);
@@ -970,6 +1089,7 @@ export function App() {
 
   const leave = useCallback(() => {
     pause();
+    discardAhead();
     persistSession(); // kaydetmeden çıksa bile konuşma "önceki oturumlar"da kalsın
     cancelSpeech();
     setPhase("setup");
@@ -981,12 +1101,13 @@ export function App() {
     setSessionResult(null);
     setComboToast(null);
     setLeaveModal(false);
-  }, [pause, persistSession]);
+  }, [pause, persistSession, discardAhead]);
 
   const endSession = useCallback(() => {
     setLeaveModal(false);
     if (closingSequence) return;
     setClosingSequence(true);
+    discardAhead();
 
     // Oturum boşsa direkt ayrıl
     if (utterRef.current.length <= 1) {
@@ -1030,7 +1151,7 @@ export function App() {
     persistSession(); // biten oturumu "önceki oturumlar"a (ended işaretiyle) yaz
     setPhase("result");
     setClosingSequence(false);
-  }, [closingSequence, leave, pause, append, persistSession]);
+  }, [closingSequence, leave, pause, append, persistSession, discardAhead]);
 
   // Geri (‹ ya da tarayıcı/telefon geri tuşu): oturumu BİTİRMEZ, sadece ana
   // menüye döner. Konuşma "önceki oturumlar"a yazılır ve oradan devam edilir.
