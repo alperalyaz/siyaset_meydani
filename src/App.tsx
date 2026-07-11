@@ -565,7 +565,7 @@ export function App() {
         });
         // HD sesleri: cinsiyet + dönem + üsluba göre her konuğa AYRI, kişiliğine
         // uygun ElevenLabs sesi ata (panelde tekrar yok). Konuşmadan ÖNCE olmalı.
-        assignVoicesForPanel(g);
+        assignVoicesForPanel(g, gunlukRef.current);
         syncMeta();
       }
 
@@ -1118,7 +1118,7 @@ export function App() {
     activeSessionIdRef.current = id; // devam eden oturum aynı kaydı günceller
     sessionLangRef.current = detectTopicLang(s.topic);
     markActivity();
-    assignVoicesForPanel(s.guests); // kayıtlı konuklar için de HD ses ataması
+    assignVoicesForPanel(s.guests, gunlukRef.current); // kayıtlı konuklar için de HD ses ataması
 
     setGuests(s.guests);
     setTopic(s.topic);

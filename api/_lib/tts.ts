@@ -1,17 +1,28 @@
-// ElevenLabs metin-ses (TTS) proxy'si. Sunucudaki ELEVENLABS_API_KEY ile çalışır
-// (demo). Kötüye kullanımı önlemek için IP başına GÜNLÜK KARAKTER limiti uygulanır
-// (kalıcı olması için Supabase RPC; yoksa bellek-içi yedek). Kullanıcı kendi
-// ElevenLabs anahtarını "x-eleven-key" başlığıyla gönderirse limit uygulanmaz.
+// Metin-ses (TTS) proxy'si — İKİ motor:
+//   • DEMO motoru: Google Gemini TTS (GEMINI_API_KEY). Üst düzey kalite +
+//     ücretsiz/cömert katman + 70+ dil + üsluba göre doğal-dil yönlendirme.
+//   • BYOK motoru: ElevenLabs — kullanıcı "x-eleven-key" başlığıyla kendi
+//     anahtarını verirse tüm oturum onunla (limitsiz).
+// Motor seçimi: BYOK ElevenLabs anahtarı varsa ElevenLabs; yoksa GEMINI_API_KEY
+// varsa Gemini (demo); o da yoksa ELEVENLABS_API_KEY varsa ElevenLabs demo.
+// Demo modunda IP başına GÜNLÜK KARAKTER limiti (Supabase RPC; yoksa bellek).
 //
-// Yanıt: başarılıysa audio/mpeg (mp3) baytları + "x-tts-remaining" başlığı.
-// Hata/kota durumunda JSON gövde ({error, code}) döner ki istemci tarayıcı
-// sesine düşebilsin.
+// Yanıt: audio (mp3=ElevenLabs / wav=Gemini) + "x-tts-remaining"; hata/kota
+// durumunda JSON gövde ({error, code}) döner ki istemci tarayıcı sesine düşsün.
 
-// Türkçe kalitesi için en iyi model: eleven_multilingual_v2 (flash ucuz ama
-// "dandik" duyuluyordu). Env ile değiştirilebilir (ucuz istenirse flash_v2_5).
-const MODEL_ID = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
+const ELEVEN_MODEL = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
+const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "6000"); // IP/gün
 const MAX_TEXT = 600; // tek istekte azami karakter (kötüye kullanım/uzun metin freni)
+
+// Gemini'nin bilinen hazır sesleri (güvenlik için beyaz liste).
+const GEMINI_VOICES = new Set([
+  "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede",
+  "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba",
+  "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar",
+  "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi",
+  "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
+]);
 
 export interface TtsRequestBody {
   text?: string;
@@ -22,6 +33,7 @@ export interface TtsRequestBody {
     style?: number;
     use_speaker_boost?: boolean;
   };
+  gemini?: { voice?: string; style?: string };
 }
 
 // İstemciden gelen ses ayarlarını güvenli aralığa sıkıştır (kötü değer gelmesin).
@@ -86,6 +98,29 @@ async function consumeChars(ip: string, chars: number): Promise<number> {
   return consumeMemory(ip, chars);
 }
 
+// Ham PCM'yi (16-bit, mono) tarayıcının çalabileceği WAV'a sarar.
+function pcmToWav(pcm: Uint8Array, sampleRate: number): Uint8Array {
+  const dataLen = pcm.length;
+  const buf = new ArrayBuffer(44 + dataLen);
+  const v = new DataView(buf);
+  const wr = (o: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  wr(0, "RIFF"); v.setUint32(4, 36 + dataLen, true); wr(8, "WAVE");
+  wr(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, 1, true); // mono
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true); // byte rate (mono, 16-bit)
+  v.setUint16(32, 2, true); // block align
+  v.setUint16(34, 16, true); // bits
+  wr(36, "data"); v.setUint32(40, dataLen, true);
+  new Uint8Array(buf, 44).set(pcm);
+  return new Uint8Array(buf);
+}
+
+// Base64 → Uint8Array (Node ortamı; Buffer mevcut).
+function b64ToBytes(b64: string): Uint8Array {
+  return new Uint8Array(Buffer.from(b64, "base64"));
+}
+
 export async function handleTts(
   body: TtsRequestBody,
   userElevenKey: string | undefined,
@@ -98,15 +133,26 @@ export async function handleTts(
   }
 
   const byok = Boolean(userElevenKey && userElevenKey.trim());
-  const apiKey = byok ? userElevenKey!.trim() : process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
-    return {
-      status: 503,
-      body: { error: "HD sesler şu an kapalı (anahtar yok).", code: "NO_KEY" },
-    };
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const elevenDemoKey = process.env.ELEVENLABS_API_KEY;
+
+  // Motor seçimi.
+  let engine: "eleven" | "gemini";
+  let apiKey: string;
+  if (byok) {
+    engine = "eleven";
+    apiKey = userElevenKey!.trim();
+  } else if (geminiKey) {
+    engine = "gemini";
+    apiKey = geminiKey;
+  } else if (elevenDemoKey) {
+    engine = "eleven";
+    apiKey = elevenDemoKey;
+  } else {
+    return { status: 503, body: { error: "HD sesler şu an kapalı (anahtar yok).", code: "NO_KEY" } };
   }
 
-  // Demo modunda karakter limiti.
+  // Demo modunda karakter limiti (BYOK sınırsız).
   let remaining: number | null = null;
   if (!byok) {
     const used = await consumeChars(ip, text.length);
@@ -114,22 +160,40 @@ export async function handleTts(
     if (used > DEMO_CHAR_LIMIT) {
       return {
         status: 429,
-        body: {
-          error: "Günlük HD ses hakkınız doldu; normal seslere geçildi.",
-          code: "QUOTA",
-          remaining: 0,
-        },
+        body: { error: "Günlük HD ses hakkınız doldu; normal seslere geçildi.", code: "QUOTA", remaining: 0 },
       };
     }
   }
 
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`;
+  const headers: Record<string, string> = { "Cache-Control": "no-store" };
+  if (remaining !== null) headers["x-tts-remaining"] = String(remaining);
+  headers["x-tts-byok"] = byok ? "1" : "0";
+  headers["x-tts-engine"] = engine;
+
+  if (engine === "gemini") {
+    return geminiGenerate(text, body.gemini, apiKey, headers);
+  }
+  return elevenGenerate(text, voiceId, sanitizeSettings(body?.settings), apiKey, headers);
+}
+
+async function geminiGenerate(
+  text: string,
+  gemini: TtsRequestBody["gemini"],
+  apiKey: string,
+  headers: Record<string, string>,
+): Promise<TtsResult> {
+  const voice = gemini?.voice && GEMINI_VOICES.has(gemini.voice) ? gemini.voice : "Kore";
+  const style = (gemini?.style ?? "").toString().slice(0, 160).replace(/[\n\r]+/g, " ").trim();
+  // Üslup, doğal-dil talimatı olarak metnin önüne konur ("... tonuyla oku: <metin>").
+  // Metnin dili neyse Gemini o dilde okur; talimat sesli okunmaz.
+  const input = style ? `${style}: ${text}` : text;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
   const payload = {
-    text,
-    model_id: MODEL_ID,
-    // Konuğun üslubuna göre istemciden gelen ayarlar (yoksa dengeli varsayılan).
-    // multilingual_v2 stability/style/similarity'yi onurlandırır.
-    voice_settings: sanitizeSettings(body?.settings),
+    contents: [{ parts: [{ text: input }] }],
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+    },
   };
 
   let upstream: Response | undefined;
@@ -138,35 +202,73 @@ export async function handleTts(
     try {
       upstream = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "audio/mpeg",
-          "xi-api-key": apiKey,
-        },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify(payload),
       });
     } catch (err) {
-      if (attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, 800));
-        continue;
-      }
-      return { status: 502, body: { error: "ElevenLabs'a ulaşılamadı.", code: "UPSTREAM", detail: String(err) } };
+      if (attempt < maxRetries) { await new Promise((r) => setTimeout(r, 800)); continue; }
+      return { status: 502, body: { error: "Gemini'ye ulaşılamadı.", code: "UPSTREAM", detail: String(err) } };
     }
     if (upstream.ok) break;
-    if (upstream.status === 429 && attempt < maxRetries) {
-      await new Promise((r) => setTimeout(r, 800));
+    if ((upstream.status === 429 || upstream.status === 503) && attempt < maxRetries) {
+      await new Promise((r) => setTimeout(r, 900));
       continue;
     }
     const detail = await upstream.text().catch(() => "");
-    // 401/402/429 → istemci tarayıcı sesine düşsün.
+    // Geçersiz/eksik anahtar (400 API_KEY_INVALID / 401 / 403) → NO_KEY;
+    // kota (429 / RESOURCE_EXHAUSTED) → QUOTA; diğer → UPSTREAM. Hepsi tarayıcı
+    // sesine düşürür ama mesaj doğru olsun.
+    const invalidKey = upstream.status === 401 || upstream.status === 403 || /API_KEY_INVALID|API key not valid/i.test(detail);
+    const quota = upstream.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail);
+    const code = invalidKey ? "NO_KEY" : quota ? "QUOTA" : "UPSTREAM";
+    return { status: upstream.status, body: { error: "HD ses üretilemedi.", code, detail: detail.slice(0, 300) } };
+  }
+  if (!upstream) return { status: 502, body: { error: "Beklenmeyen hata.", code: "UPSTREAM" } };
+
+  const data = (await upstream.json()) as {
+    candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[];
+  };
+  const part = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+  const b64 = part?.inlineData?.data;
+  if (!b64) {
+    return { status: 502, body: { error: "Gemini ses döndürmedi.", code: "UPSTREAM" } };
+  }
+  const rate = Number(/rate=(\d+)/.exec(part?.inlineData?.mimeType ?? "")?.[1] ?? "24000") || 24000;
+  const wav = pcmToWav(b64ToBytes(b64), rate);
+  return { status: 200, audio: wav, contentType: "audio/wav", headers };
+}
+
+async function elevenGenerate(
+  text: string,
+  voiceId: string,
+  settings: ReturnType<typeof sanitizeSettings>,
+  apiKey: string,
+  headers: Record<string, string>,
+): Promise<TtsResult> {
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`;
+  const payload = { text, model_id: ELEVEN_MODEL, voice_settings: settings };
+
+  let upstream: Response | undefined;
+  const maxRetries = 1;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      upstream = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "audio/mpeg", "xi-api-key": apiKey },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      if (attempt < maxRetries) { await new Promise((r) => setTimeout(r, 800)); continue; }
+      return { status: 502, body: { error: "ElevenLabs'a ulaşılamadı.", code: "UPSTREAM", detail: String(err) } };
+    }
+    if (upstream.ok) break;
+    if (upstream.status === 429 && attempt < maxRetries) { await new Promise((r) => setTimeout(r, 800)); continue; }
+    const detail = await upstream.text().catch(() => "");
     const code = upstream.status === 401 ? "NO_KEY" : upstream.status === 402 ? "QUOTA" : upstream.status === 429 ? "QUOTA" : "UPSTREAM";
     return { status: upstream.status, body: { error: "HD ses üretilemedi.", code, detail: detail.slice(0, 300) } };
   }
   if (!upstream) return { status: 502, body: { error: "Beklenmeyen hata.", code: "UPSTREAM" } };
 
   const buf = new Uint8Array(await upstream.arrayBuffer());
-  const headers: Record<string, string> = { "Cache-Control": "no-store" };
-  if (remaining !== null) headers["x-tts-remaining"] = String(remaining);
-  headers["x-tts-byok"] = byok ? "1" : "0";
   return { status: 200, audio: buf, contentType: "audio/mpeg", headers };
 }

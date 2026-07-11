@@ -137,28 +137,80 @@ function settingsForGuest(g: Guest): { stability: number; similarity_boost: numb
 
 type VoiceSettings = ReturnType<typeof settingsForGuest>;
 
+// ── Gemini (demo motoru) sesleri — cinsiyet + tona göre gruplu hazır sesler.
+// (Gemini seslerinin cinsiyeti resmî değil; algılanan cinsiyete göre en iyi
+// tahmin. Yanlış duyulursa ayarlanır.) Spikere ayrık bir ses.
+const GEMINI_VOICES: Record<"male" | "female", Record<Tone, string[]>> = {
+  female: {
+    mature: ["Kore", "Gacrux", "Vindemiatrix"],
+    mid: ["Callirrhoe", "Despina", "Sulafat"],
+    young: ["Leda", "Aoede", "Autonoe", "Achernar"],
+  },
+  male: {
+    mature: ["Charon", "Orus", "Alnilam", "Schedar"],
+    mid: ["Iapetus", "Algieba", "Sadaltager"],
+    young: ["Puck", "Fenrir", "Enceladus", "Zubenelgenubi"],
+  },
+};
+const GEMINI_MODERATOR = "Aoede"; // sıcak, canlı sunucu tonu
+
+// Üsluba (ve gündelik moduna) göre Gemini için DOĞAL-DİL üslup talimatı.
+// Gemini bu talimatı okumaz; sesi ona göre şekillendirir.
+function geminiStyleForGuest(g: Guest, gunluk: boolean): string {
+  const s = g.debateStyle || "";
+  if (gunluk) return "in a cheerful, warm, lively daytime-talk-show tone, smiling and playful";
+  if (/agresif|provokat[öo]r|otoriter/.test(s)) return "in a forceful, sharp, confrontational tone";
+  if (/soğukkanlı|bilgiç|arabulucu/.test(s)) return "in a calm, measured, composed tone";
+  if (/duygusal/.test(s)) return "in an emotional, heartfelt tone";
+  if (/nükteli|alaycı/.test(s)) return "in a witty, playful, teasing tone";
+  return "in a natural, engaging TV-panel tone";
+}
+function geminiModeratorStyle(gunluk: boolean): string {
+  return gunluk
+    ? "cheerfully and warmly, like an enthusiastic, affectionate daytime TV host"
+    : "in a composed, warm, professional TV host tone";
+}
+
 // Panel için ses ATAMASI: her konuğa (index'ine) AYRI ve kişiliğine uygun ses.
 // Aynı panelde iki konuk aynı sesi almaz (havuz yetmezse en yakın tondan devam).
-// App, konukların cinsiyeti belli olduktan sonra çağırır.
+// Hem ElevenLabs hem Gemini için ayrı atama yapılır. App, konukların cinsiyeti
+// belli olunca ve gündelik modunu bildirerek çağırır.
 let assignedVoices: (string | undefined)[] = [];
 let assignedSettings: (VoiceSettings | undefined)[] = [];
+let assignedGemini: ({ voice: string; style: string } | undefined)[] = [];
+let panelGunluk = false;
 
-export function assignVoicesForPanel(guests: Guest[]): void {
+export function assignVoicesForPanel(guests: Guest[], gunluk = false): void {
   assignedVoices = [];
   assignedSettings = [];
+  assignedGemini = [];
+  panelGunluk = gunluk;
   const used = new Set<string>();
+  const usedG = new Set<string>();
   guests.forEach((g, i) => {
     const gender: "male" | "female" = g.gender === "female" ? "female" : "male";
     const tone = toneForGuest(g);
-    assignedVoices[i] = pickVoice(gender, tone, used);
+    assignedVoices[i] = pickVoice(VOICES, gender, tone, used);
     assignedSettings[i] = settingsForGuest(g);
+    assignedGemini[i] = { voice: pickVoice(GEMINI_VOICES, gender, tone, usedG), style: geminiStyleForGuest(g, gunluk) };
   });
+}
+
+// Gemini ses+üslup bilgisi (moderatör dahil). Atama yoksa emniyetli varsayılan.
+function geminiFor(i: number): { voice: string; style: string } {
+  if (i === MODERATOR_VOICE_INDEX) return { voice: GEMINI_MODERATOR, style: geminiModeratorStyle(panelGunluk) };
+  return assignedGemini[i] ?? { voice: "Kore", style: "in a natural, engaging TV-panel tone" };
 }
 
 // İstenen tondan başlayıp, kullanılmamış ilk sesi seç; o ton biterse komşu
 // tonlara geç; hepsi kullanıldıysa istenen tonun ilk sesine dön (deterministik).
-function pickVoice(gender: "male" | "female", tone: Tone, used: Set<string>): string {
-  const groups = VOICES[gender];
+function pickVoice(
+  pools: Record<"male" | "female", Record<Tone, string[]>>,
+  gender: "male" | "female",
+  tone: Tone,
+  used: Set<string>,
+): string {
+  const groups = pools[gender];
   const order: Tone[] =
     tone === "mature" ? ["mature", "mid", "young"] : tone === "young" ? ["young", "mid", "mature"] : ["mid", "mature", "young"];
   for (const t of order) {
@@ -225,6 +277,7 @@ async function synthesize(
   voiceId: string,
   signal?: AbortSignal,
   settings?: VoiceSettings,
+  gemini?: { voice: string; style: string },
 ): Promise<string> {
   const key = `${voiceId}|${text}`;
   const hit = cacheGet(key);
@@ -232,10 +285,15 @@ async function synthesize(
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (userElevenKey) headers["x-eleven-key"] = userElevenKey;
+  // Hem ElevenLabs (voiceId+settings) hem Gemini (voice+style) bilgisini gönder;
+  // sunucu hangi motoru kullanıyorsa ona göre seçer.
+  const body: Record<string, unknown> = { text, voiceId };
+  if (settings) body.settings = settings;
+  if (gemini) body.gemini = gemini;
   const res = await fetch(`${API_BASE}/api/tts`, {
     method: "POST",
     headers,
-    body: JSON.stringify(settings ? { text, voiceId, settings } : { text, voiceId }),
+    body: JSON.stringify(body),
     signal,
   });
 
@@ -275,7 +333,8 @@ export async function elevenSpeak(
 
   const voiceId = voiceIdFor(opts.voiceIdx, opts.gender);
   const settings = opts.voiceIdx === MODERATOR_VOICE_INDEX ? undefined : assignedSettings[opts.voiceIdx];
-  const url = await synthesize(t, voiceId, opts.signal, settings); // hata → yukarı fırlar
+  const gemini = geminiFor(opts.voiceIdx);
+  const url = await synthesize(t, voiceId, opts.signal, settings, gemini); // hata → yukarı fırlar
 
   if (opts.signal?.aborted) return;
 
@@ -315,7 +374,10 @@ export function markHdExhausted(): void {
 // açıkça söylenir.
 export async function probeEleven(): Promise<{ ok: boolean; code?: string; message?: string }> {
   try {
-    await synthesize("Merhaba, hoş geldiniz.", MODERATOR_VOICE);
+    await synthesize("Merhaba, hoş geldiniz.", MODERATOR_VOICE, undefined, undefined, {
+      voice: GEMINI_MODERATOR,
+      style: "in a warm, friendly tone",
+    });
     return { ok: true };
   } catch (e) {
     if (e instanceof ElevenError) return { ok: false, code: e.code, message: e.message };
