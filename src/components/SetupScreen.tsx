@@ -155,6 +155,15 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           setLoading(false);
           return;
         }
+        // Anlamsız girdi (klavye yığını "sdkfj" vb.): boşuna konuk/token harcama.
+        if (!verdict.meaningful) {
+          setGuests(null);
+          setNotice(
+            "🤔 Bunu bir tartışma konusu olarak anlayamadım. Lütfen gerçek bir başlık yazın (ör. \"Ev almak mı akıllıca, kirada oturmak mı?\").",
+          );
+          setLoading(false);
+          return;
+        }
         // Tartışmaya kapalı (tek doğrusu olan) konu: engellemeyiz ama uyarırız —
         // konuklar boş yere karşıt uydurmaz, dürüstçe hemfikir olur.
         if (!verdict.debatable) {

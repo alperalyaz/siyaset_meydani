@@ -111,7 +111,7 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
             <span className="result__moment-label">
               🔥 En Tartışmalı An (Reyting {result.mostControversialRating})
             </span>
-            <p className="result__moment-text">"{result.mostControversialMoment}…"</p>
+            <p className="result__moment-text">"{result.mostControversialMoment}"</p>
           </div>
         )}
       </div>

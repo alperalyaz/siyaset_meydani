@@ -571,6 +571,7 @@ export function App() {
 
       // --- TANIŞMA TURU ---
       while (runningRef.current && progressRef.current.phase === "intro") {
+        if (pendingIdlePauseRef.current) { pendingIdlePauseRef.current = false; performIdlePauseRef.current(); return; }
         const i = progressRef.current.i;
         if (i >= g.length) {
           append({
@@ -603,6 +604,7 @@ export function App() {
 
       // --- GÖRÜŞ TURU ---
       while (runningRef.current && progressRef.current.phase === "opening") {
+        if (pendingIdlePauseRef.current) { pendingIdlePauseRef.current = false; performIdlePauseRef.current(); return; }
         const i = progressRef.current.i;
         if (i >= g.length) {
             if (activeRef.current.length === 0) {
@@ -626,7 +628,6 @@ export function App() {
           progressRef.current = { phase: "debate", i: 0 };
           // Gamification: warming up is done, enter debate phase
           sessionPhaseRef.current = "debate";
-          markActivity(); // serbest tartışma başladı — spikere temiz 3 dk pencere
           eventQueueRef.current.push(phaseChangeEvent("debate", Date.now()));
           flushEvent();
           continue;
@@ -1220,13 +1221,12 @@ export function App() {
     if (phase !== "panel") return;
     const iv = setInterval(() => {
       if (!runningRef.current || idleFiredRef.current) return;
-      // Tanışma/görüş turları (warmup) sonlu ve senaryolu — orada araya girme;
-      // sadece kendi kendine sürüp token yakan serbest tartışmada devreye gir.
-      if (sessionPhaseRef.current === "warmup") return;
+      // Oturum kendi kendine ilerliyor ve spiker 3 dk'dır katılmadıysa araya gir
+      // (tanışma/görüş turu dahil — HD seslerle bunlar uzun sürebiliyor).
       if (Date.now() - lastActivityRef.current < IDLE_MS) return;
       idleFiredRef.current = true;
       pendingIdlePauseRef.current = true; // döngü, sıradaki tur başında uygular
-    }, 20_000);
+    }, 10_000);
 
     return () => clearInterval(iv);
   }, [phase]);

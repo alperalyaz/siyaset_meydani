@@ -44,6 +44,7 @@ export async function suggestTopicIdeas(
 export interface ModerationVerdict {
   allowed: boolean;
   category: string;
+  meaningful: boolean; // gerçek bir konu mu (gibberish "sdkfj" → false)
   debatable: boolean; // konunun gerçekten iki tarafı var mı (2×2=4 → false)
 }
 
@@ -135,15 +136,15 @@ export async function moderateTopic(
       max_tokens: 120,
       signal,
     });
-    const p = parseJsonLoose<{ allowed?: boolean; category?: string; debatable?: boolean }>(content);
+    const p = parseJsonLoose<{ allowed?: boolean; category?: string; meaningful?: boolean; debatable?: boolean }>(content);
     if (p && typeof p.allowed === "boolean") {
-      return { allowed: p.allowed, category: p.category ?? "", debatable: p.debatable !== false };
+      return { allowed: p.allowed, category: p.category ?? "", meaningful: p.meaningful !== false, debatable: p.debatable !== false };
     }
-    return { allowed: true, category: "", debatable: true };
+    return { allowed: true, category: "", meaningful: true, debatable: true };
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) throw e;
-    return { allowed: true, category: "", debatable: true };
+    return { allowed: true, category: "", meaningful: true, debatable: true };
   }
 }
 

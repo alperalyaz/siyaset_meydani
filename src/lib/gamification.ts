@@ -230,7 +230,7 @@ export function computeSessionResult(
     const moment =
       debateGuestUtterances[Math.min(ord, debateGuestUtterances.length - 1)] ??
       debateGuestUtterances[debateGuestUtterances.length - 1];
-    if (moment) mostControversialMoment = moment.text.slice(0, 120);
+    if (moment) mostControversialMoment = moment.text; // tam replik (kırpma yok)
   }
 
   return {
