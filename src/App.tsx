@@ -22,7 +22,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, hasElevenKey } from "./lib/elevenTts";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey } from "./lib/elevenTts";
 import { loadElevenKey, saveElevenKey, clearElevenKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { useT, ct, detectTopicLang } from "./lib/i18n";
@@ -351,12 +351,9 @@ export function App() {
       gender: "male" | "female" | undefined,
       signal: AbortSignal,
     ) => {
-      // Demo (kendi anahtarı yok): HD yalnızca TANIŞMA turunda çalışır — sonra
-      // "ücretsiz demo bitti" ve normale döner. Kendi anahtarı olan: hep HD.
-      const hdAllowed =
-        hdRef.current &&
-        !isHdExhausted() &&
-        (hasElevenKey() || progressRef.current.phase === "intro");
+      // Demo motoru Gemini (cömert ücretsiz katman) → HD tüm oturum boyunca açık.
+      // Kota/limit dolarsa (sunucu 429/NO_KEY) otomatik tarayıcı sesine düşülür.
+      const hdAllowed = hdRef.current && !isHdExhausted();
       if (hdAllowed) {
         try {
           await elevenSpeak(text, { voiceIdx, gender, signal });
@@ -592,13 +589,6 @@ export function App() {
           const ctrl = new AbortController();
           abortRef.current = ctrl;
           await pace(utterRef.current[utterRef.current.length - 1]?.text ?? "", 9, undefined, ctrl.signal);
-          // Demo kullanıcısı (kendi anahtarı yok) + HD açık: tanışma turu bitti,
-          // ücretsiz HD demo burada sona erer; gerisi normal seslerle sürer.
-          if (hdRef.current && !hasElevenKey() && !isHdExhausted()) {
-            setHdMsg(ct("hd.demoOver"));
-            if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
-            hdMsgTimer.current = setTimeout(() => setHdMsg(null), 8000);
-          }
           continue;
         }
         const ctrl = new AbortController();

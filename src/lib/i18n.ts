@@ -159,7 +159,7 @@ const TR: Record<string, string> = {
   "key.close": "Kapat",
   "key.save": "Kaydet",
   "key.eleven.title": "🎧 HD Ses (ElevenLabs) — opsiyonel",
-  "key.eleven.desc": "Ücretsiz demoda HD ses yalnızca tanışma turuyla sınırlıdır. Kendi ElevenLabs anahtarınızı girerseniz tüm oturum boyunca sınırsız HD ses alırsınız. Anahtar yalnızca bu tarayıcıda saklanır.",
+  "key.eleven.desc": "HD sesler ücretsiz çalışır (Google Gemini) — tüm oturum boyunca. İsterseniz kendi ElevenLabs anahtarınızı girip seslendirmeyi ElevenLabs sesleriyle yapabilirsiniz. Anahtar yalnızca bu tarayıcıda saklanır.",
   "key.eleven.delete": "HD anahtarını sil",
   "key.eleven.save": "HD anahtarını kaydet",
   // RatingMeter
@@ -322,7 +322,7 @@ const EN: Record<string, string> = {
   "key.close": "Close",
   "key.save": "Save",
   "key.eleven.title": "🎧 HD Voice (ElevenLabs) — optional",
-  "key.eleven.desc": "In the free demo, HD voice is limited to the intro round. Enter your own ElevenLabs key for unlimited HD voice throughout the session. The key is stored only in this browser.",
+  "key.eleven.desc": "HD voices are free (Google Gemini) — for the whole session. Optionally, enter your own ElevenLabs key to narrate with ElevenLabs voices instead. The key is stored only in this browser.",
   "key.eleven.delete": "Delete HD key",
   "key.eleven.save": "Save HD key",
   "meter.label": "RATING METER",
