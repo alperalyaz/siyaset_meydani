@@ -5,6 +5,7 @@
 // Çıktı 1080×1350 (Instagram/Story dostu) PNG blob'u.
 
 export const APP_NAME = "Siyaset Meydanı";
+export const APP_NAME_EN = "Debate Arena";
 export const APP_URL = "siyaset-meydani.vercel.app";
 
 export interface MomentCardData {
@@ -14,6 +15,7 @@ export interface MomentCardData {
   guestColor: string;
   quote: string;
   rating: number;
+  lang?: "tr" | "en";
 }
 
 export interface KarneCardData {
@@ -27,9 +29,38 @@ export interface KarneCardData {
   totalBadges: number;
   moment?: string;
   won?: boolean;
+  lang?: "tr" | "en";
 }
 
 export type ShareCardData = MomentCardData | KarneCardData;
+
+// Paylaşım kartı etiketleri (arayüz diline göre).
+const CARD_L: Record<"tr" | "en", Record<string, string>> = {
+  tr: {
+    sub: "YAPAY ZEKÂ AÇIK OTURUMU",
+    cta: "Sen de tarihi tartıştır 🎭",
+    meter: "REYTİNGMETRE",
+    won: "🏆 OTURUM BAŞARILI",
+    report: "📺 OTURUM KARNESİ",
+    avg: "ORTALAMA REYTİNG",
+    peak: "ZİRVE",
+    trough: "DİP",
+    badge: "ROZET",
+    moment: "🔥 EN ÇARPICI AN",
+  },
+  en: {
+    sub: "AI PANEL DEBATE",
+    cta: "Make history debate too 🎭",
+    meter: "RATING METER",
+    won: "🏆 SESSION SUCCESS",
+    report: "📺 SESSION REPORT",
+    avg: "AVERAGE RATING",
+    peak: "PEAK",
+    trough: "LOW",
+    badge: "BADGES",
+    moment: "🔥 MOST HEATED MOMENT",
+  },
+};
 
 const W = 1080;
 const H = 1350;
@@ -111,23 +142,23 @@ function drawBackground(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function drawHeader(ctx: CanvasRenderingContext2D) {
+function drawHeader(ctx: CanvasRenderingContext2D, lang: "tr" | "en") {
   ctx.textAlign = "left";
   ctx.font = "800 30px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = "#f2b134";
   ctx.fillText("●", PAD, 108);
   ctx.fillStyle = "#eef1fa";
-  ctx.fillText(`  ${APP_NAME.toUpperCase()}`, PAD + 6, 108);
+  ctx.fillText(`  ${(lang === "en" ? APP_NAME_EN : APP_NAME).toUpperCase()}`, PAD + 6, 108);
   ctx.font = "700 24px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = "#9aa4c4";
-  ctx.fillText("YAPAY ZEKÂ AÇIK OTURUMU", PAD, 150);
+  ctx.fillText(CARD_L[lang].sub, PAD, 150);
 }
 
-function drawFooter(ctx: CanvasRenderingContext2D) {
+function drawFooter(ctx: CanvasRenderingContext2D, lang: "tr" | "en") {
   ctx.textAlign = "center";
   ctx.font = "800 34px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = "#f2b134";
-  ctx.fillText("Sen de tarihi tartıştır 🎭", W / 2, H - 118);
+  ctx.fillText(CARD_L[lang].cta, W / 2, H - 118);
   ctx.font = "600 30px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = "#9aa4c4";
   ctx.fillText(APP_URL, W / 2, H - 70);
@@ -158,15 +189,15 @@ function drawMoment(ctx: CanvasRenderingContext2D, d: MomentCardData) {
   ctx.fillText(`— ${d.guestName}`, W / 2, Math.min(endY + 80, H - 380));
 
   // Reyting rozeti.
-  drawRatingBadge(ctx, d.rating, W / 2, H - 232);
+  drawRatingBadge(ctx, d.rating, W / 2, H - 232, d.lang ?? "tr");
 }
 
-function drawRatingBadge(ctx: CanvasRenderingContext2D, rating: number, cx: number, cy: number) {
+function drawRatingBadge(ctx: CanvasRenderingContext2D, rating: number, cx: number, cy: number, lang: "tr" | "en") {
   const col = ratingColor(rating);
   ctx.textAlign = "center";
   ctx.font = "800 26px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = "#9aa4c4";
-  ctx.fillText("REYTİNGMETRE", cx, cy - 44);
+  ctx.fillText(CARD_L[lang].meter, cx, cy - 44);
   ctx.font = "900 84px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = col;
   ctx.fillText(String(rating), cx, cy + 40);
@@ -183,10 +214,11 @@ function drawRatingBadge(ctx: CanvasRenderingContext2D, rating: number, cx: numb
 }
 
 function drawKarne(ctx: CanvasRenderingContext2D, d: KarneCardData) {
+  const L = CARD_L[d.lang ?? "tr"];
   ctx.textAlign = "center";
   ctx.font = "900 46px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = d.won ? "#4caf7d" : "#eef1fa";
-  ctx.fillText(d.won ? "🏆 OTURUM BAŞARILI" : "📺 OTURUM KARNESİ", W / 2, 250);
+  ctx.fillText(d.won ? L.won : L.report, W / 2, 250);
 
   // Konu.
   ctx.font = "700 42px system-ui, 'Segoe UI', Arial, sans-serif";
@@ -205,14 +237,14 @@ function drawKarne(ctx: CanvasRenderingContext2D, d: KarneCardData) {
   ctx.fillText(String(d.averageRating), W / 2, cy);
   ctx.font = "700 30px system-ui, 'Segoe UI', Arial, sans-serif";
   ctx.fillStyle = "#9aa4c4";
-  ctx.fillText("ORTALAMA REYTİNG", W / 2, cy + 46);
+  ctx.fillText(L.avg, W / 2, cy + 46);
 
   // Üçlü mini istatistik.
   const statY = cy + 150;
   const cols = [
-    { label: "ZİRVE", value: String(d.peak), color: "#4caf7d" },
-    { label: "DİP", value: String(d.trough), color: "#e94b6b" },
-    { label: "ROZET", value: `${d.badges}/${d.totalBadges}`, color: "#f2b134" },
+    { label: L.peak, value: String(d.peak), color: "#4caf7d" },
+    { label: L.trough, value: String(d.trough), color: "#e94b6b" },
+    { label: L.badge, value: `${d.badges}/${d.totalBadges}`, color: "#f2b134" },
   ];
   const cw = (W - PAD * 2) / 3;
   cols.forEach((c, i) => {
@@ -240,7 +272,7 @@ function drawKarne(ctx: CanvasRenderingContext2D, d: KarneCardData) {
       ctx.textAlign = "left";
       ctx.font = "800 26px system-ui, 'Segoe UI', Arial, sans-serif";
       ctx.fillStyle = "#e94b6b";
-      ctx.fillText("🔥 EN ÇARPICI AN", PAD + 40, boxY + 56);
+      ctx.fillText(L.moment, PAD + 40, boxY + 56);
       ctx.font = "italic 600 34px Georgia, serif";
       ctx.fillStyle = "#eef1fa";
       const maxLines = Math.max(1, Math.floor((boxH - 90) / 46));
@@ -258,11 +290,12 @@ export async function renderShareCard(data: ShareCardData): Promise<Blob | null>
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
+    const lang = data.lang ?? "tr";
     drawBackground(ctx);
-    drawHeader(ctx);
+    drawHeader(ctx, lang);
     if (data.kind === "moment") drawMoment(ctx, data);
     else drawKarne(ctx, data);
-    drawFooter(ctx);
+    drawFooter(ctx, lang);
 
     return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png", 0.95));
   } catch {

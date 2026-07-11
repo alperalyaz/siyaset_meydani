@@ -69,6 +69,35 @@ export const TOPIC_POOL: string[] = [
   "Hayvanlar konuşabilseydi insanlara ne derdi?",
 ];
 
+// İngilizce arayüzdeki konu önerileri (aynı ruh, uluslararası).
+export const TOPIC_POOL_EN: string[] = [
+  "Can you stay friends with an ex?",
+  "Is jealousy proof of love, or of insecurity?",
+  "Who should pay the bill on a first date?",
+  "Is a couple that never fights healthier, or one that fights and makes up?",
+  "Is buying a home smarter, or renting?",
+  "Is an expensive phone really worth the money?",
+  "Do credit cards make life easier, or drown you in debt?",
+  "Does pineapple belong on pizza?",
+  "Is breakfast the most important meal, or overrated?",
+  "Should phones be allowed on the dinner table?",
+  "Is it rude to leave a group chat silently?",
+  "Should you ever show up to a visit empty-handed?",
+  "Was everything really better in the old days?",
+  "Have younger generations really gotten lazier?",
+  "Does a diploma still matter, or is it useless now?",
+  "Is it worth living in a big city?",
+  "Does honking in traffic solve anything, or just cause stress?",
+  "Is football just a game, or the religion of modern society?",
+  "Which wastes more time: TV series or movies?",
+  "Dubbing or subtitles: which is the real way to watch a film?",
+  "Toilet paper: should the flap go over or under?",
+  "Do you sleep with the AC on or off?",
+  "Do cats secretly run the world?",
+  "Why do the best ideas come in the shower?",
+  "If animals could talk, what would they tell us?",
+];
+
 // "Derin" sekmesi: düşünmeye değer, felsefi/tarihî, iki güçlü cepheli
 // konular. Varsayılan değil; kullanıcı sekme değiştirince görünür. Bunlar
 // da çağlar ötesi şahsiyetlerin en iyi kapıştığı, fikir veren başlıklar.
@@ -122,6 +151,42 @@ export const DEEP_TOPIC_POOL: string[] = [
   "Karıncalar insanlardan daha mı uygar bir toplum kurdu?",
   "Zamanda yolculuk yapabilseydin geçmişe mi, geleceğe mi giderdin?",
 ];
+
+export const DEEP_TOPIC_POOL_EN: string[] = [
+  "Should a good leader be loved, or feared?",
+  "What holds a society together: justice or mercy?",
+  "Which is higher: conscience or the law?",
+  "What moves a society forward: science or faith?",
+  "Are the victors who write history always right?",
+  "Is there destiny, or does each person carve their own path?",
+  "A well-meaning dictator, or an indecisive democracy?",
+  "How far is state authority legitimate against individual freedom?",
+  "Was the collapse of great empires inevitable, or a failure of leadership?",
+  "Do traditions deserve to be preserved, or torn down?",
+  "Is mathematics discovered, or invented?",
+  "Will AI bring humanity's end, or be its savior?",
+  "If the brain were fully mapped, would free will still exist?",
+  "Is a colony on Mars essential for humanity's future?",
+  "Does social media unite society, or polarize it?",
+  "Does money free a person, or enslave them?",
+  "Is success the work of effort, or of luck?",
+  "Is it power that corrupts a person, or money?",
+  "In hard times, does courage or reason light the way?",
+  "Does fame bring happiness?",
+  "Should art serve power, or stand against it?",
+  "Can AI create real art?",
+  "Why aren't there unforgettable songs like there used to be?",
+  "Do ants build a more civilized society than humans?",
+  "If you could time travel, would you go to the past or the future?",
+];
+
+// Arayüz diline göre konu havuzu seç.
+export function casualPool(lang: "tr" | "en"): string[] {
+  return lang === "en" ? TOPIC_POOL_EN : TOPIC_POOL;
+}
+export function deepPool(lang: "tr" | "en"): string[] {
+  return lang === "en" ? DEEP_TOPIC_POOL_EN : DEEP_TOPIC_POOL;
+}
 
 // Küratörlü kişi havuzu: çağlar arası çarpışmayı garantilemek için
 // farklı dönemlerden ilginç isimler. Vikipedi çekimi başarısız olursa

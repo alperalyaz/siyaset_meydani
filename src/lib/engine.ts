@@ -24,9 +24,10 @@ export async function suggestTopicIdeas(
   apiKey: string | null,
   signal?: AbortSignal,
   deep = false,
+  lang: "tr" | "en" = "tr",
 ): Promise<string[]> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { content } = await chat(topicIdeasMessages(avoid, deep), apiKey, {
+    const { content } = await chat(topicIdeasMessages(avoid, deep, lang), apiKey, {
       json: true,
       temperature: 1.1,
       max_tokens: 500,

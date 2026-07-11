@@ -39,6 +39,7 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
         totalBadges,
         moment: result.mostControversialMoment ?? undefined,
         won: result.ended === "win",
+        lang,
       });
       if (!blob) {
         setShareMsg(t("res.imgFail"));

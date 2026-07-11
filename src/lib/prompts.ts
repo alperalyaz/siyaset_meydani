@@ -418,10 +418,15 @@ Sadece şu JSON:
 
 // Açık oturum konu fikirleri üretir — ÇOĞU gündelik/eğlenceli, azı derin.
 // Farklı formatlarda konu üretir: "X mi Y mi?", "Neden X?", "X'in sırrı nedir?", "X hakkında ne düşünüyorsunuz?"
-export function topicIdeasMessages(avoid: string[], deep = false) {
+export function topicIdeasMessages(avoid: string[], deep = false, lang: "tr" | "en" = "tr") {
   const avoidLine = avoid.length
     ? `\nŞunları TEKRARLAMA (yenilerini üret): ${avoid.slice(0, 24).join("; ")}`
     : "";
+  // Çıktı dili: arayüz İngilizceyse konular İngilizce üretilsin (uluslararası).
+  const langLine =
+    lang === "en"
+      ? `\nÖNEMLİ: Konuları İNGİLİZCE yaz (tüm başlıklar İngilizce olsun).`
+      : `\nÖNEMLİ: Konuları TÜRKÇE yaz.`;
 
   if (deep) {
     return [
@@ -448,7 +453,7 @@ FORMAT ÇEŞİTLİLİĞİ (EN AZ 3 farklı format):
 - "Matematik keşfedilir mi, icat mı edilir?"
 - "İnsanı bozan güç müdür, para mıdır?"
 
-Kurallar: derin ama anlaşılır, iki cepheli, polemikli. Kısa ve çarpıcı.${avoidLine}
+Kurallar: derin ama anlaşılır, iki cepheli, polemikli. Kısa ve çarpıcı.${avoidLine}${langLine}
 
 Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
       },
@@ -485,7 +490,7 @@ FORMAT ÇEŞİTLİLİĞİ (hepsi aynı kalıpta olmasın, EN AZ 3 FARKLI format 
 - "Futbol sadece bir oyun mu, yoksa modern toplumun dini mi?"
 - "Klima açık mı uyunur, kapalı mı?"
 
-Kurallar: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, günlük ama polemikli konular. Kısa ve çarpıcı. Ders kitabı/akademik havası KESİNLİKLE olmasın.${avoidLine}
+Kurallar: herkesin bir tarafı tutabileceği, iki güçlü cephesi olan, günlük ama polemikli konular. Kısa ve çarpıcı. Ders kitabı/akademik havası KESİNLİKLE olmasın.${avoidLine}${langLine}
 
 Sadece şu JSON: {"topics": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },

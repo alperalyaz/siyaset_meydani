@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Guest, Difficulty } from "../types";
 import type { SessionMeta, QuickGuest, QuickTab } from "../lib/store";
 import { loadQuickGuests, saveQuickGuests, MAX_QUICK_GUESTS } from "../lib/store";
 import { buildGuestsFromNames, resolveGuestByName } from "../lib/wikipedia";
 import { suggestGuestNames, suggestTopicIdeas, moderateTopic } from "../lib/engine";
 import { quickTopicBlock } from "../lib/safety";
-import { TOPIC_POOL, DEEP_TOPIC_POOL } from "../lib/pool";
+import { TOPIC_POOL, DEEP_TOPIC_POOL, casualPool, deepPool } from "../lib/pool";
 import { useT } from "../lib/i18n";
 
 type TopicTab = "gunluk" | "derin";
@@ -43,7 +43,7 @@ function formatDate(ts: number): string {
 }
 
 export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining, hasKey, checking, savedSession, onClearSession, sessions, onLoadSession, onContinueSession, onDeleteSession, sharedSession, onClearSharedSession, onModeChange }: Props) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [guests, setGuests] = useState<Guest[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [topic, setTopic] = useState("");
@@ -53,9 +53,9 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   const [topicTab, setTopicTab] = useState<TopicTab>("derin");
   const topicTabRef = useRef<TopicTab>("derin");
   topicTabRef.current = topicTab;
-  // Her sekme için hazır havuzdan rastgele bir alt küme — açılışta farklı sıralama.
-  const [gunlukTopics] = useState<string[]>(() => shuffleArr(TOPIC_POOL).slice(0, 6));
-  const [derinTopics] = useState<string[]>(() => shuffleArr(DEEP_TOPIC_POOL).slice(0, 6));
+  // Her sekme için hazır havuzdan rastgele bir alt küme — dil değişince yenilenir.
+  const gunlukTopics = useMemo(() => shuffleArr(casualPool(lang)).slice(0, 6), [lang]);
+  const derinTopics = useMemo(() => shuffleArr(deepPool(lang)).slice(0, 6), [lang]);
   const poolTopics = topicTab === "derin" ? derinTopics : gunlukTopics;
 
   const [addName, setAddName] = useState("");
@@ -218,7 +218,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     setLoadingTopics(true);
     setNotice(null);
     try {
-      const fresh = await suggestTopicIdeas(seenTopicsRef.current, apiKey, undefined, topicTab === "derin");
+      const fresh = await suggestTopicIdeas(seenTopicsRef.current, apiKey, undefined, topicTab === "derin", lang);
       if (fresh.length) {
         seenTopicsRef.current = [...seenTopicsRef.current, ...fresh].slice(-80);
         setExtraTopics(fresh.slice(0, 6)); // en fazla 6 göster
