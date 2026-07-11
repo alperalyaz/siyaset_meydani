@@ -75,7 +75,7 @@ const TR: Record<string, string> = {
   "hd.keyCleared": "🎧 HD ses anahtarı silindi — ortak demo hakkıyla devam ediliyor.",
   // App: footer
   "footer.disclaimerLabel": "Sorumluluk reddi:",
-  "footer.disclaimer": " Bu deneysel bir eğlence ve mizah projesidir. Oturumdaki konuşmalar yapay zeka tarafından üretilir; kurgusaldır ve adı geçen gerçek ya da tarihî kişilerin gerçek görüşlerini, sözlerini veya kişiliğini yansıtmaz. İçerik hatalı, eksik ya da yanıltıcı olabilir; kaynak veya danışmanlık niteliği taşımaz.",
+  "footer.disclaimer": " Bu, tarihin kayıtlı bütün zihinlerini aynı masaya oturtma hayalini deneyen bir düşünce ve tartışma platformudur — gerçek dünyada asla kurulamayacak bu masayı yapay zekâ mümkün kılıyor. Oturumlardaki konuşmalar yapay zekâ tarafından üretilmiş KURGUSAL canlandırmalardır; adı geçen gerçek ya da tarihî kişilerin gerçek görüşlerini, sözlerini veya kişiliğini yansıtmaz, onlar adına konuşmaz. Amaç düşündürmek ve tartışma kültürünü beslemektir; içerik hatalı, eksik ya da yanıltıcı olabilir, akademik kaynak ya da danışmanlık niteliği taşımaz. Sohbet Meydanı tarafı ise iyi huylu bir eğlencedir — öyle izlenmelidir.",
   "footer.by": "'ın kişisel projesidir · DeepSeek / OpenAI / Claude ile çalışır · Vikipedi verileriyle beslenir",
   // Setup: hero
   "setup.title.derin": "Siyaset Meydanı",
@@ -260,7 +260,7 @@ const EN: Record<string, string> = {
   "hd.quotaFell": "🎧 Today's free HD voice allowance is used up — switched to normal voices. For uninterrupted HD, add your own free Gemini key (AIza… / AQ…) in ⚙️ settings.",
   "hd.keyCleared": "🎧 HD voice key removed — continuing on the shared demo allowance.",
   "footer.disclaimerLabel": "Disclaimer:",
-  "footer.disclaimer": " This is an experimental entertainment and satire project. Session dialogue is AI-generated; it is fictional and does not reflect the real views, statements, or personalities of the real or historical people named. Content may be wrong, incomplete, or misleading; it is not a source or advice.",
+  "footer.disclaimer": " This is a thought-and-debate platform attempting something impossible in the real world: seating every recorded mind in history at the same table — a meeting only AI can make possible. Session dialogue consists of FICTIONAL, AI-generated portrayals; it does not reflect, and does not speak for, the real views, statements, or personalities of the real or historical people named. The aim is to provoke thought and nourish the culture of debate; content may be wrong, incomplete, or misleading, and is neither an academic source nor advice. The Chat Arena side is good-natured entertainment — and should be watched as such.",
   "footer.by": "'s personal project · Runs on DeepSeek / OpenAI / Claude · Fed by Wikipedia data",
   "setup.title.derin": "Debate Arena",
   "setup.title.gunluk": "Chat Arena",
