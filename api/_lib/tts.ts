@@ -12,10 +12,10 @@
 
 const ELEVEN_MODEL = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
 const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
-// Demo tadı: IP başına GÜNLÜK ~1 dakikalık ses (~1000 karakter Türkçe konuşma).
-// Faturalı anahtarda maliyeti düşük tutar; kullanıcı bitince kendi Gemini
+// Demo tadı: IP başına GÜNLÜK ~3 dakikalık ses (~3000 karakter Türkçe konuşma).
+// Faturalı anahtarda maliyeti makul tutar; kullanıcı bitince kendi Gemini
 // anahtarını girip devam eder. Env ile ayarlanır.
-const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "1000"); // IP/gün (~1 dk)
+const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "3000"); // IP/gün (~3 dk)
 const MAX_TEXT = 600; // tek istekte azami karakter (kötüye kullanım/uzun metin freni)
 
 // Gemini'nin bilinen hazır sesleri (güvenlik için beyaz liste).
