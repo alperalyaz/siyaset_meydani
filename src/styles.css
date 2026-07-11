@@ -1153,15 +1153,21 @@ html.theme-gunluk .panel {
   color: var(--muted);
   line-height: 1.5;
 }
-/* HD (ElevenLabs) anahtar bölümü — LLM anahtarından ayrı, ince çizgiyle ayrık. */
-.modal__eleven {
-  margin-top: 1.1rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--line);
+/* Ayarlar modalı sekmeleri: içerik sekmeleri (sağlayıcı/motor seçimi). */
+.modal__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0;
 }
-.modal__eleven h3 {
-  margin: 0 0 0.4rem;
-  font-size: 0.98rem;
+/* Üst düzey sekmeler (Dil Modeli / Seslendirme) — altı çizgiyle ayrık. */
+.modal__tabs--top {
+  margin: 0.4rem 0 0.9rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+.modal__tabs--top .btn {
+  flex: 1;
 }
 /* Dil değiştirici — sabit sağ üst köşe, her ekranda görünür. */
 .lang-toggle {

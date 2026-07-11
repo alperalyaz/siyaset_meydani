@@ -278,6 +278,58 @@ onSpeechRate((mult) => {
   }
 });
 
+// Metni cümle sınırlarından parçalara böl. İLK parça kısa tutulur ki ses
+// olabildiğince erken başlasın; sonraki parçalar öncekiler çalarken arkada
+// sentezlenir (boru hattı). Parçalar sunucunun tek-istek sınırının (600)
+// güvenle altında kalır — uzun konuşmaların sesinin kesilmesini de önler.
+function chunkText(t: string, firstTarget = 160, target = 280): string[] {
+  const sentences = t.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+\s*$/g) ?? [t];
+  const chunks: string[] = [];
+  let cur = "";
+  const flush = () => {
+    if (cur.trim()) chunks.push(cur.trim());
+    cur = "";
+  };
+  for (const s of sentences) {
+    const limit = chunks.length === 0 ? firstTarget : target;
+    if (cur && cur.length + s.length > limit) flush();
+    cur += s;
+    // Tek cümle aşırı uzunsa kelime sınırından sert böl (sunucu sınırı 600).
+    while (cur.length > 520) {
+      const cut = cur.lastIndexOf(" ", 520);
+      const idx = cut > 200 ? cut : 520;
+      chunks.push(cur.slice(0, idx).trim());
+      cur = cur.slice(idx);
+    }
+  }
+  flush();
+  return chunks.length ? chunks : [t];
+}
+
+// Tek bir hazır (blob URL) ses parçasını çal; canlı hız desteğiyle.
+function playUrl(url: string, baseRate: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const audio = new Audio(url);
+    audio.dataset.baseRate = String(baseRate);
+    audio.playbackRate = Math.max(0.5, Math.min(4, baseRate * getSpeechRate()));
+    activeAudio = audio;
+
+    const done = () => {
+      if (activeAudio === audio) activeAudio = null;
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    };
+    const onAbort = () => {
+      audio.pause();
+      done();
+    };
+    signal?.addEventListener("abort", onAbort);
+    audio.onended = done;
+    audio.onerror = done;
+    void audio.play().catch(done); // otomatik oynatma engeli vb. → düş
+  });
+}
+
 async function synthesize(
   text: string,
   voiceId: string,
@@ -332,8 +384,11 @@ async function synthesize(
   return url;
 }
 
-// HD ses ile seslendir. Başarılıysa çözülür; kota/hata olursa ELEVENERROR
-// fırlatır ki çağıran tarayıcı sesine düşsün. İptal sinyalinde sessizce durur.
+// HD ses ile seslendir. Metin cümle parçalarına bölünür: ilk parça sentezlenir
+// sentezlenmez çalınır, sonraki parça çalma sırasında arkada hazırlanır (boru
+// hattı) — ses çok daha erken başlar. İlk parça hata verirse (kota vb.)
+// ElevenError fırlatır ki çağıran tarayıcı sesine düşsün; SONRAKİ parçalarda
+// hata olursa metin baştan okunmasın diye sessizce durur. İptalde sessizce durur.
 export async function elevenSpeak(
   text: string,
   opts: { voiceIdx: number; gender?: "male" | "female"; signal?: AbortSignal },
@@ -345,32 +400,52 @@ export async function elevenSpeak(
   const voiceId = voiceIdFor(opts.voiceIdx, opts.gender);
   const settings = opts.voiceIdx === MODERATOR_VOICE_INDEX ? undefined : assignedSettings[opts.voiceIdx];
   const gemini = geminiFor(opts.voiceIdx);
-  const url = await synthesize(t, voiceId, opts.signal, settings, gemini); // hata → yukarı fırlar
-
-  if (opts.signal?.aborted) return;
-
   const baseRate = voiceForGuest(opts.voiceIdx, opts.gender).rate;
 
-  await new Promise<void>((resolve) => {
-    const audio = new Audio(url);
-    audio.dataset.baseRate = String(baseRate);
-    audio.playbackRate = Math.max(0.5, Math.min(4, baseRate * getSpeechRate()));
-    activeAudio = audio;
+  const chunks = chunkText(t);
+  let pending: Promise<string> = synthesize(chunks[0], voiceId, opts.signal, settings, gemini);
+  for (let k = 0; k < chunks.length; k++) {
+    let url: string;
+    try {
+      url = await pending;
+    } catch (e) {
+      if (k === 0) throw e; // hiç ses çalınmadı → çağıran tarayıcı sesine düşer
+      // Kısmi ses çalındı; kalan metni tarayıcıyla BAŞTAN okutmak daha kötü —
+      // sessizce bitir. Kota/anahtar sorunuysa sonraki replikler için işaretle.
+      if (e instanceof ElevenError && (e.code === "QUOTA" || e.code === "NO_KEY" || e.code === "BAD_KEY")) {
+        markHdExhausted();
+      }
+      return;
+    }
+    if (opts.signal?.aborted) return;
+    if (k + 1 < chunks.length) {
+      const next = synthesize(chunks[k + 1], voiceId, opts.signal, settings, gemini);
+      next.catch(() => {}); // hata bir sonraki await'te ele alınır (unhandled rejection önle)
+      pending = next;
+    }
+    await playUrl(url, baseRate, opts.signal);
+    if (opts.signal?.aborted) return;
+  }
+}
 
-    const done = () => {
-      if (activeAudio === audio) activeAudio = null;
-      opts.signal?.removeEventListener("abort", onAbort);
-      resolve();
-    };
-    const onAbort = () => {
-      audio.pause();
-      done();
-    };
-    opts.signal?.addEventListener("abort", onAbort);
-    audio.onended = done;
-    audio.onerror = done;
-    void audio.play().catch(done); // otomatik oynatma engeli vb. → düş
-  });
+// Sesin İLK parçasını önceden sentezle (önbelleğe girer). Amaç: yazı ekrana
+// düştüğü ANDA sesin de başlaması — LLM cevabı gelir gelmez çağrılır, yazı
+// bu bekleme bitince gösterilir. Hatalar yutulur; asıl çalma sırasında aynı
+// hata yeniden alınır ve oradaki akış (tarayıcı sesine düşme) işler.
+export async function prepareSpeech(
+  text: string,
+  opts: { voiceIdx: number; gender?: "male" | "female"; signal?: AbortSignal },
+): Promise<void> {
+  try {
+    const t = clean(text);
+    if (!t) return;
+    const voiceId = voiceIdFor(opts.voiceIdx, opts.gender);
+    const settings = opts.voiceIdx === MODERATOR_VOICE_INDEX ? undefined : assignedSettings[opts.voiceIdx];
+    const gemini = geminiFor(opts.voiceIdx);
+    await synthesize(chunkText(t)[0], voiceId, opts.signal, settings, gemini);
+  } catch {
+    /* yut — asıl çalmada ele alınır */
+  }
 }
 
 // Bu oturumda HD sesi kalıcı olarak kapat (kota/anahtar sorunu). Çağıran, hata

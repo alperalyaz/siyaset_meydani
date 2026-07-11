@@ -21,7 +21,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
+import { elevenSpeak, prepareSpeech, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
 import { loadElevenKey, saveElevenKey, clearElevenKey, loadGeminiKey, saveGeminiKey, clearGeminiKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { useT, ct, detectTopicLang } from "./lib/i18n";
@@ -98,6 +98,7 @@ export function App() {
   const [provider, setProvider] = useState<ProviderKind>(loadProvider);
   const [demoRemaining, setDemoRemaining] = useState<number | null>(null);
   const [keyModal, setKeyModal] = useState(false);
+  const [keyModalTab, setKeyModalTab] = useState<"llm" | "voice">("llm");
   const [keyReason, setKeyReason] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
 
@@ -293,6 +294,7 @@ export function App() {
     if (isAbort(e)) return;
     if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) {
       setKeyReason(e.message);
+      setKeyModalTab("llm");
       setKeyModal(true);
     } else if (e instanceof ApiError && e.status === 429) {
       // Groq / upstream rate-limit — retry olarak handle edilecek, pause etme
@@ -366,6 +368,19 @@ export function App() {
       }
     },
     [speakVoice],
+  );
+
+  // LLM cevabı gelir gelmez sesin İLK parçasını hazırlat; çağıran, bu bekleme
+  // bitince yazıyı ekrana basar. Böylece yazı ve ses BİRLİKTE başlar ("yazı
+  // bitti, ses hâlâ yok" gecikmesi kalmaz). Tarayıcı sesi zaten anında
+  // başladığı için yalnızca HD aktifken beklenir.
+  const prepareVoice = useCallback(
+    async (text: string, voiceIdx: number, gender: "male" | "female" | undefined, signal: AbortSignal) => {
+      if (!ttsRef.current || !text.trim()) return;
+      if (!hdRef.current || isHdExhausted()) return;
+      await prepareSpeech(text, { voiceIdx, gender, signal });
+    },
+    [],
   );
 
   const lastGuestSpeaker = useCallback((): number | null => {
@@ -597,9 +612,12 @@ export function App() {
           apiKeyRef.current,
           ctrl.signal,
         );
+        syncMeta();
+        if (!runningRef.current) return;
+        // Yazı, sesin ilk parçası hazır olunca düşer (ses gecikmesi hissi olmasın).
+        await prepareVoice(text, i, g[i].gender, ctrl.signal);
         setThinking(null);
         setStreamingText("");
-        syncMeta();
         if (!runningRef.current) return;
         append({ id: uid(), speaker: i, text, mode: "normal" });
         if (hasStance && !activeRef.current.includes(i)) activeRef.current.push(i);
@@ -727,9 +745,14 @@ export function App() {
           (token) => setStreamingText((p) => p + token),
         );
         rate429Ref.current = 0; // tur başarılı — limit sayacını sıfırla
+        syncMeta();
+        if (!runningRef.current) return;
+
+        // Akış baloncuğu ekranda kalır; sesin ilk parçası hazır olunca yazı
+        // mesaja dönüşür ve ses HEMEN başlar (uzun "sessiz okuma" gecikmesi yok).
+        if (text.trim()) await prepareVoice(text, speaker, g[speaker].gender, ctrl.signal);
         setThinking(null);
         setStreamingText("");
-        syncMeta();
         if (!runningRef.current) return;
 
         modNoteRef.current = undefined; // tüket ki döngü kilitlenmesin
@@ -1335,7 +1358,7 @@ export function App() {
         )}
         <SetupScreen
           onStart={beginSession}
-          onOpenKey={() => setKeyModal(true)}
+          onOpenKey={() => { setKeyModalTab("llm"); setKeyModal(true); }}
           onError={handleError}
           apiKey={apiKey}
           demoRemaining={demoRemaining}
@@ -1362,6 +1385,8 @@ export function App() {
           currentElevenKey={geminiKey ?? elevenKey}
           onSaveEleven={saveHdKeyCb}
           onClearEleven={clearHdKeyCb}
+          currentVoiceEngine={geminiKey ? "gemini" : elevenKey ? "eleven" : undefined}
+          initialTab={keyModalTab}
         />
         {blockedMsg && (
           <div className="modal__backdrop" onClick={() => setBlockedMsg(null)}>
@@ -1450,7 +1475,7 @@ export function App() {
         onToggleTts={() => setTtsOn((v) => !v)}
         ttsRate={ttsRate}
         onTtsRateChange={setTtsRate}
-        onOpenKey={() => setKeyModal(true)}
+        onOpenKey={() => { setKeyModalTab("voice"); setKeyModal(true); }}
       />
 
       {hdMsg && (
@@ -1483,8 +1508,10 @@ export function App() {
         onClear={removeKey}
         onClose={() => setKeyModal(false)}
         currentElevenKey={geminiKey ?? elevenKey}
-          onSaveEleven={saveHdKeyCb}
-          onClearEleven={clearHdKeyCb}
+        onSaveEleven={saveHdKeyCb}
+        onClearEleven={clearHdKeyCb}
+        currentVoiceEngine={geminiKey ? "gemini" : elevenKey ? "eleven" : undefined}
+        initialTab={keyModalTab}
       />
     </div>
   );
