@@ -45,6 +45,7 @@ const TR: Record<string, string> = {
   // App: modallar
   "block.title": "Bu konu uygun değil",
   "block.ok": "Tamam, başka konu seçeyim",
+  "panel.back": "Ana menüye dön (oturum kaydedilir, sonra devam edebilirsin)",
   "leave.title": "Oturumu sonlandır",
   "leave.body": "Oturumu sonlandırmak istediğinize emin misiniz? Spiker bir kapanış konuşması yapacak ve sonuçlar gösterilecektir.",
   "leave.cancel": "İptal",
@@ -216,6 +217,7 @@ const EN: Record<string, string> = {
   "lang.title": "Türkçeye geç",
   "block.title": "This topic isn't suitable",
   "block.ok": "OK, I'll pick another topic",
+  "panel.back": "Back to main menu (session is saved; you can resume later)",
   "leave.title": "End the session",
   "leave.body": "Are you sure you want to end the session? The host will give a closing remark and the results will be shown.",
   "leave.cancel": "Cancel",

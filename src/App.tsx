@@ -1008,6 +1008,36 @@ export function App() {
     setClosingSequence(false);
   }, [closingSequence, leave, pause, append, persistSession]);
 
+  // Geri (‹ ya da tarayıcı/telefon geri tuşu): oturumu BİTİRMEZ, sadece ana
+  // menüye döner. Konuşma "önceki oturumlar"a yazılır ve oradan devam edilir.
+  // Panel'e girerken history'ye bir kayıt itilir ki telefonun geri tuşu
+  // sayfadan çıkarmak yerine ana menüye dönsün.
+  const leaveRef = useRef(leave);
+  useEffect(() => {
+    leaveRef.current = leave;
+  }, [leave]);
+  const panelHistRef = useRef(false);
+  useEffect(() => {
+    if (phase !== "panel") return;
+    window.history.pushState({ smPanel: true }, "");
+    panelHistRef.current = true;
+    const onPop = () => {
+      panelHistRef.current = false;
+      leaveRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      panelHistRef.current = false;
+    };
+  }, [phase]);
+  const goBack = useCallback(() => {
+    // history kaydımız varsa geri gidip popstate'e bırak (history dengede
+    // kalsın); yoksa doğrudan ayrıl.
+    if (panelHistRef.current) window.history.back();
+    else leave();
+  }, [leave]);
+
   const doSave = useCallback(() => {
     if (!persistSession()) return;
     setSavedToast(true);
@@ -1360,7 +1390,7 @@ export function App() {
   return (
     <div className="panel">
       <header className="panel__head">
-        <button className="btn btn--ghost btn--icon" onClick={() => setLeaveModal(true)} title="Oturumu bitir">
+        <button className="btn btn--ghost btn--icon" onClick={goBack} title={t("panel.back")}>
           ‹
         </button>
         <div className="panel__topic">
