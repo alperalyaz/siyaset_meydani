@@ -27,7 +27,7 @@ function clientIp(req: VercelLikeRequest): string {
 function cors(res: VercelLikeResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-eleven-key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-eleven-key, x-gemini-key");
   res.setHeader("Access-Control-Expose-Headers", "x-tts-remaining, x-tts-byok");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
@@ -46,8 +46,10 @@ export default async function handler(
     return;
   }
 
-  const uk = req.headers["x-eleven-key"];
-  const key = Array.isArray(uk) ? uk[0] : uk;
+  const ek = req.headers["x-eleven-key"];
+  const gk = req.headers["x-gemini-key"];
+  const elevenKey = Array.isArray(ek) ? ek[0] : ek;
+  const geminiKey = Array.isArray(gk) ? gk[0] : gk;
 
   let body: TtsRequestBody;
   try {
@@ -57,7 +59,7 @@ export default async function handler(
     return;
   }
 
-  const result = await handleTts(body, key, clientIp(req));
+  const result = await handleTts(body, { eleven: elevenKey, gemini: geminiKey }, clientIp(req));
   if (result.headers) {
     Object.entries(result.headers).forEach(([k, v]) => res.setHeader(k, v));
   }

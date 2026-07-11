@@ -12,14 +12,22 @@ import { onSpeechRate, getSpeechRate, voiceForGuest, MODERATOR_VOICE_INDEX } fro
 
 const HD_KEY = "siyaset_meydani_hd_tts_v1";
 
-// Kullanıcının kendi ElevenLabs anahtarı (BYOK) — varsa isteklerde header'a
-// eklenir ve sunucu demo karakter limitini UYGULAMAZ (sınırsız HD).
+// Kullanıcının kendi HD ses anahtarları (BYOK) — varsa isteklerde header'a
+// eklenir ve sunucu demo limitini UYGULAMAZ (sınırsız HD, kendi kotasından).
+// Gemini (AIza...) veya ElevenLabs (sk_...) olabilir.
 let userElevenKey: string | null = null;
+let userGeminiKey: string | null = null;
 export function setElevenKey(key: string | null): void {
   userElevenKey = key && key.trim() ? key.trim() : null;
 }
+export function setGeminiKey(key: string | null): void {
+  userGeminiKey = key && key.trim() ? key.trim() : null;
+}
 export function hasElevenKey(): boolean {
   return !!userElevenKey;
+}
+export function hasOwnHdKey(): boolean {
+  return !!userElevenKey || !!userGeminiKey;
 }
 
 export function loadHdEnabled(): boolean {
@@ -285,6 +293,7 @@ async function synthesize(
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (userElevenKey) headers["x-eleven-key"] = userElevenKey;
+  if (userGeminiKey) headers["x-gemini-key"] = userGeminiKey;
   // Hem ElevenLabs (voiceId+settings) hem Gemini (voice+style) bilgisini gönder;
   // sunucu hangi motoru kullanıyorsa ona göre seçer.
   const body: Record<string, unknown> = { text, voiceId };

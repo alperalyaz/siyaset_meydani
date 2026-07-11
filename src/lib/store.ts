@@ -88,6 +88,30 @@ export function clearElevenKey(): void {
   }
 }
 
+// --- Kullanıcının kendi Gemini anahtarı (BYOK — demo kotası dolunca) ---
+const GEMINI_KEY = "siyaset_meydani_gemini_key";
+export function loadGeminiKey(): string | null {
+  try {
+    return localStorage.getItem(GEMINI_KEY);
+  } catch {
+    return null;
+  }
+}
+export function saveGeminiKey(key: string): void {
+  try {
+    localStorage.setItem(GEMINI_KEY, key.trim());
+  } catch {
+    /* yoksay */
+  }
+}
+export function clearGeminiKey(): void {
+  try {
+    localStorage.removeItem(GEMINI_KEY);
+  } catch {
+    /* yoksay */
+  }
+}
+
 export function loadProvider(): ProviderKind {
   try {
     const raw = localStorage.getItem(PROVIDER_KEY);

@@ -22,8 +22,8 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey } from "./lib/elevenTts";
-import { loadElevenKey, saveElevenKey, clearElevenKey } from "./lib/store";
+import { elevenSpeak, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
+import { loadElevenKey, saveElevenKey, clearElevenKey, loadGeminiKey, saveGeminiKey, clearGeminiKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { useT, ct, detectTopicLang } from "./lib/i18n";
 import { encodeSession, decodeSession } from "./lib/share";
@@ -169,9 +169,13 @@ export function App() {
   // Kullanıcının kendi ElevenLabs anahtarı (BYOK). Varsa: tüm oturum HD +
   // sınırsız. Yoksa (demo): HD yalnızca tanışma turunda, sonra normale döner.
   const [elevenKey, setElevenKeyState] = useState<string | null>(loadElevenKey);
+  const [geminiKey, setGeminiKeyState] = useState<string | null>(loadGeminiKey);
   useEffect(() => {
     setElevenKey(elevenKey); // elevenTts modülüne bildir (header + limitsiz)
   }, [elevenKey]);
+  useEffect(() => {
+    setGeminiKey(geminiKey);
+  }, [geminiKey]);
 
   // HD durum bildirimi (açıkça: çalışıyor / anahtar yok / kota dolu).
   const [hdMsg, setHdMsg] = useState<string | null>(null);
@@ -1249,18 +1253,26 @@ export function App() {
     setApiKey(null);
     setKeyModal(false);
   }, []);
-  const saveElevenKeyCb = useCallback((k: string) => {
-    saveElevenKey(k);
-    setElevenKeyState(k);
+  // HD anahtarı kaydet — türü ön-eke göre yönlendir: "AIza..." → Google Gemini,
+  // diğer ("sk_..." vb.) → ElevenLabs. Diğer slotu temizler (tek anahtar aktif).
+  const saveHdKeyCb = useCallback((k: string) => {
+    const key = k.trim();
+    if (/^AIza/i.test(key)) {
+      saveGeminiKey(key); setGeminiKeyState(key);
+      clearElevenKey(); setElevenKeyState(null);
+    } else {
+      saveElevenKey(key); setElevenKeyState(key);
+      clearGeminiKey(); setGeminiKeyState(null);
+    }
     resetHdExhausted(); // yeni anahtar → HD'ye tekrar şans ver
     setHdTts(true);
     setHdMsg(ct("hd.keySaved"));
     if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
     hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
   }, []);
-  const clearElevenKeyCb = useCallback(() => {
-    clearElevenKey();
-    setElevenKeyState(null);
+  const clearHdKeyCb = useCallback(() => {
+    clearElevenKey(); setElevenKeyState(null);
+    clearGeminiKey(); setGeminiKeyState(null);
     setHdMsg(ct("hd.keyCleared"));
     if (hdMsgTimer.current) clearTimeout(hdMsgTimer.current);
     hdMsgTimer.current = setTimeout(() => setHdMsg(null), 6000);
@@ -1361,9 +1373,9 @@ export function App() {
           onSave={saveKey}
           onClear={removeKey}
           onClose={() => setKeyModal(false)}
-          currentElevenKey={elevenKey}
-          onSaveEleven={saveElevenKeyCb}
-          onClearEleven={clearElevenKeyCb}
+          currentElevenKey={geminiKey ?? elevenKey}
+          onSaveEleven={saveHdKeyCb}
+          onClearEleven={clearHdKeyCb}
         />
         {blockedMsg && (
           <div className="modal__backdrop" onClick={() => setBlockedMsg(null)}>
@@ -1485,9 +1497,9 @@ export function App() {
         onSave={saveKey}
         onClear={removeKey}
         onClose={() => setKeyModal(false)}
-        currentElevenKey={elevenKey}
-        onSaveEleven={saveElevenKeyCb}
-        onClearEleven={clearElevenKeyCb}
+        currentElevenKey={geminiKey ?? elevenKey}
+          onSaveEleven={saveHdKeyCb}
+          onClearEleven={clearHdKeyCb}
       />
     </div>
   );

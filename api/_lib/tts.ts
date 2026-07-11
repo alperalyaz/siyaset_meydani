@@ -123,7 +123,7 @@ function b64ToBytes(b64: string): Uint8Array {
 
 export async function handleTts(
   body: TtsRequestBody,
-  userElevenKey: string | undefined,
+  keys: { eleven?: string; gemini?: string },
   ip: string,
 ): Promise<TtsResult> {
   const text = (body?.text ?? "").toString().trim().slice(0, MAX_TEXT);
@@ -132,22 +132,25 @@ export async function handleTts(
     return { status: 400, body: { error: "text ve voiceId gerekli.", code: "BAD_REQUEST" } };
   }
 
-  const byok = Boolean(userElevenKey && userElevenKey.trim());
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const userGemini = keys.gemini && keys.gemini.trim() ? keys.gemini.trim() : "";
+  const userEleven = keys.eleven && keys.eleven.trim() ? keys.eleven.trim() : "";
+  const geminiDemoKey = process.env.GEMINI_API_KEY;
   const elevenDemoKey = process.env.ELEVENLABS_API_KEY;
 
-  // Motor seçimi.
+  // Motor + anahtar seçimi. Kullanıcının KENDİ anahtarı varsa (BYOK) demo
+  // limiti uygulanmaz ve o kullanılır. Öncelik: kullanıcı Gemini > kullanıcı
+  // ElevenLabs > sunucu Gemini (demo) > sunucu ElevenLabs (demo).
   let engine: "eleven" | "gemini";
   let apiKey: string;
-  if (byok) {
-    engine = "eleven";
-    apiKey = userElevenKey!.trim();
-  } else if (geminiKey) {
-    engine = "gemini";
-    apiKey = geminiKey;
+  let byok: boolean;
+  if (userGemini) {
+    engine = "gemini"; apiKey = userGemini; byok = true;
+  } else if (userEleven) {
+    engine = "eleven"; apiKey = userEleven; byok = true;
+  } else if (geminiDemoKey) {
+    engine = "gemini"; apiKey = geminiDemoKey; byok = false;
   } else if (elevenDemoKey) {
-    engine = "eleven";
-    apiKey = elevenDemoKey;
+    engine = "eleven"; apiKey = elevenDemoKey; byok = false;
   } else {
     return { status: 503, body: { error: "HD sesler şu an kapalı (anahtar yok).", code: "NO_KEY" } };
   }

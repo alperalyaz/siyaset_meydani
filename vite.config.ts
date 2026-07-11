@@ -69,11 +69,13 @@ function devApi() {
           return;
         }
         const ek = req.headers["x-eleven-key"];
-        const key = Array.isArray(ek) ? ek[0] : ek;
+        const gk = req.headers["x-gemini-key"];
+        const elevenKey = Array.isArray(ek) ? ek[0] : ek;
+        const geminiKey = Array.isArray(gk) ? gk[0] : gk;
         const fwd = req.headers["x-forwarded-for"];
         const ip =
           (typeof fwd === "string" ? fwd.split(",")[0] : req.socket?.remoteAddress) || "local";
-        const result = await handleTts(body, key, ip);
+        const result = await handleTts(body, { eleven: elevenKey, gemini: geminiKey }, ip);
         if (result.headers) {
           Object.entries(result.headers).forEach(([k, v]) => res.setHeader(k, v));
         }

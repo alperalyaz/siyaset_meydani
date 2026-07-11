@@ -130,7 +130,7 @@ export function ApiKeyModal({ open, reason, currentKey, currentProvider, onSave,
             </p>
             <input
               type="password"
-              placeholder="sk_... (ElevenLabs)"
+              placeholder="AIza… (Gemini) · sk_… (ElevenLabs)"
               value={elevenVal}
               onChange={(e) => setElevenVal(e.target.value)}
             />
