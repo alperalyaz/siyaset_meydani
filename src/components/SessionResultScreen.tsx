@@ -9,12 +9,13 @@ interface Props {
   topic: string;
   guestNames: string[];
   onBack: () => void;
-  // Rızayla herkese açık galeriye yayınlama (onay penceresini App açar).
-  onPublish?: () => void;
+  // Oturum VARSAYILAN olarak galeriye yayınlanır; kullanıcı buradan kaldırır.
   publishedUrl?: string | null;
+  publishing?: boolean;
+  onUnpublish?: () => void;
 }
 
-export function SessionResultScreen({ result, topic, guestNames, onBack, onPublish, publishedUrl }: Props) {
+export function SessionResultScreen({ result, topic, guestNames, onBack, publishedUrl, publishing, onUnpublish }: Props) {
   const { t, lang } = useT();
   const fmtSeconds = (s: number): string => {
     const m = Math.floor(s / 60);
@@ -142,20 +143,27 @@ export function SessionResultScreen({ result, topic, guestNames, onBack, onPubli
         </div>
       </div>
 
+      {publishing && <p className="result__publish-note">{t("publish.working")}</p>}
+      {publishedUrl && (
+        <div className="result__publish-note">
+          <span>{t("publish.autoNote")}</span>
+          <span className="result__publish-links">
+            <a href={publishedUrl} target="_blank" rel="noopener">
+              {t("publish.view")}
+            </a>
+            {onUnpublish && (
+              <button className="result__unpublish" onClick={onUnpublish}>
+                {t("publish.remove")}
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+
       <div className="result__actions">
         <button className="btn btn--primary result__share" onClick={shareKarne} disabled={sharing}>
           {sharing ? t("res.sharePrep") : t("res.share")}
         </button>
-        {onPublish && !publishedUrl && (
-          <button className="btn btn--ghost" onClick={onPublish}>
-            {t("publish.button")}
-          </button>
-        )}
-        {publishedUrl && (
-          <a className="btn btn--ghost" href={publishedUrl} target="_blank" rel="noopener">
-            {t("publish.view")}
-          </a>
-        )}
         <button className="btn btn--ghost" onClick={onBack}>
           {t("res.back")}
         </button>

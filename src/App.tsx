@@ -10,7 +10,7 @@ import { ModeratorBar } from "./components/ModeratorBar";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SessionResultScreen } from "./components/SessionResultScreen";
 import { PublicGallery } from "./components/PublicGallery";
-import { publishToGallery, fetchGallerySession } from "./lib/gallery";
+import { publishToGallery, fetchGallerySession, removeFromGallery } from "./lib/gallery";
 import {
   runOpeningStatement,
   runRatingDirector,
@@ -135,11 +135,32 @@ export function App() {
   // Zorunlu spiker müdahale ekranı: "idle" = 3 dk sessizlik molası,
   // "clash" = kızışma (konuklar birbirinin sözünü kesti, stüdyo karıştı).
   const [interjectModal, setInterjectModal] = useState<null | "idle" | "clash">(null);
-  // Galeriye yayınlama: rıza penceresi + sonuç durumu.
-  const [publishModal, setPublishModal] = useState(false);
+  // Galeriye yayın: VARSAYILAN yayınlanır (sonuç ekranında otomatik).
+  // Kullanıcı tek tıkla YAYINDAN KALDIRABİLİR (opt-out). Bilgilendirme,
+  // "Programı Bitir" onayında ve sonuç ekranındaki yayın notunda.
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
-  const [publishErr, setPublishErr] = useState<string | null>(null);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const autoPublishRef = useRef(false); // her sonuç ekranı için tek deneme
+
+  // Sonuç ekranına gelen oturum OTOMATİK galeriye yayınlanır (varsayılan
+  // yayında; kullanıcı sonuç ekranından tek tıkla kaldırabilir).
+  useEffect(() => {
+    if (phase !== "result" || autoPublishRef.current) return;
+    if (utterRef.current.length < 4) return; // cılız oturumları yayınlama
+    autoPublishRef.current = true;
+    setPublishing(true);
+    publishToGallery(guestsRef.current, topicRef.current, utterRef.current, rating, sessionLangRef.current)
+      .then(({ slug, url }) => {
+        setPublishedSlug(slug);
+        setPublishedUrl(url);
+      })
+      .catch(() => {
+        /* yayın başarısızsa sessiz geç — oturum deneyimi etkilenmesin */
+      })
+      .finally(() => setPublishing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, rating]);
   // Oturum açılış hazırlığı göstergesi: 0 = gizli, 1 = kadrolama, 2 = ses/ilk
   // görüş hazırlığı. İlk konuk repliği ekrana düşünce kapanır.
   const [bootStage, setBootStage] = useState<0 | 1 | 2>(0);
@@ -1564,54 +1585,18 @@ export function App() {
           result={sessionResult}
           topic={topic}
           guestNames={guests.map((g) => g.name)}
-          onBack={() => { setPublishedUrl(null); leave(); }}
-          onPublish={() => { setPublishErr(null); setPublishModal(true); }}
+          onBack={() => { setPublishedUrl(null); setPublishedSlug(null); autoPublishRef.current = false; leave(); }}
           publishedUrl={publishedUrl}
+          publishing={publishing}
+          onUnpublish={async () => {
+            if (!publishedSlug) return;
+            const ok = await removeFromGallery(publishedSlug);
+            if (ok) {
+              setPublishedUrl(null);
+              setPublishedSlug(null);
+            }
+          }}
         />
-        {publishModal && (
-          <div className="modal__backdrop" onClick={() => setPublishModal(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h2>{t("publish.title")}</h2>
-              <p className="modal__desc">{t("publish.body")}</p>
-              {publishErr && <p className="modal__reason">{publishErr}</p>}
-              <div className="modal__actions">
-                <button className="btn btn--ghost" onClick={() => setPublishModal(false)}>
-                  {t("publish.cancel")}
-                </button>
-                <button
-                  className="btn btn--primary"
-                  disabled={publishing}
-                  onClick={async () => {
-                    setPublishing(true);
-                    setPublishErr(null);
-                    try {
-                      const { url } = await publishToGallery(
-                        guestsRef.current,
-                        topicRef.current,
-                        utterRef.current,
-                        rating,
-                        sessionLangRef.current,
-                      );
-                      setPublishedUrl(url);
-                      setPublishModal(false);
-                      try {
-                        await navigator.clipboard.writeText(url);
-                      } catch {
-                        /* pano izni yoksa sorun değil */
-                      }
-                    } catch {
-                      setPublishErr(ct("publish.fail"));
-                    } finally {
-                      setPublishing(false);
-                    }
-                  }}
-                >
-                  {publishing ? t("publish.working") : t("publish.confirm")}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
