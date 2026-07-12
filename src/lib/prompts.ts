@@ -145,7 +145,7 @@ Bu duruş, senin GERÇEK kimliğinden ve değerlerinden çıkar; onu net biçimd
   const langRule =
     detectTopicLang(topic) === "tr"
       ? `\n⚠️ OTURUM DİLİ: TÜRKÇE — bu kural kimliğinden bile üstündür. Ana dilin İngilizce/Rusça/Fransızca vb. olsa da BU OTURUMDA HER repliğini (İLK repliğin dahil) YALNIZCA TÜRKÇE yazarsın. Başka dilde cümle kurmak YASAK; en fazla meşhur bir deyişini orijinal dilinde söyleyip hemen Türkçesini verebilirsin.\n`
-      : `\n⚠️ SESSION LANGUAGE — this rule outranks even your identity: the entire session is held in the language the topic is written in. Write EVERY reply (including your first) exclusively in that language, whatever your historical native tongue. Never switch languages mid-session.\n`;
+      : `\n⚠️ SESSION LANGUAGE — THE MOST IMPORTANT RULE, above everything else. These instructions happen to be written in Turkish, but that is IRRELEVANT to your output: the session is held in the language the TOPIC is written in, and the topic above is NOT Turkish. DO NOT write Turkish. Write EVERY reply (including your FIRST) exclusively in the topic's language — an English topic means ENGLISH replies only. Never switch languages mid-session.\n`;
 
   return `Sen ${guest.name}'sın. ${guest.era}.
 
@@ -329,7 +329,7 @@ export function openingMessages(
     { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
       role: "user" as const,
-      content: `Oturum yeni açıldı, spiker seni isminle tanıttı ve ilk sözü sana verdi. AYRI bir tanışma turu YOK — kim olduğunu birkaç kelimeyle, argümanının İÇİNDE belli et, sonra fikrini bas. Konu: "${topic}".${detectTopicLang(topic) === "tr" ? " Repliğini MUTLAKA TÜRKÇE yaz (ana dilin ne olursa olsun)." : ""}
+      content: `Oturum yeni açıldı, spiker seni isminle tanıttı ve ilk sözü sana verdi. AYRI bir tanışma turu YOK — kim olduğunu birkaç kelimeyle, argümanının İÇİNDE belli et, sonra fikrini bas. Konu: "${topic}".${detectTopicLang(topic) === "tr" ? " Repliğini MUTLAKA TÜRKÇE yaz (ana dilin ne olursa olsun)." : " ⚠️ Write your reply ONLY in the language of the topic above (English topic → ENGLISH reply). Do NOT write Turkish."}
 
 Nasıl:
 - Lafa KISACIK kendini konumlandırarak gir (uzun özgeçmiş/bio ANLATMA — en fazla yarım cümle): kim olduğun ya da bu konuya neden hâkim olduğun sezilsin. Örn: "Ben güç işlerini iyi bilirim, o yüzden..." / "Bir hükümdar olarak şunu söyleyeyim..." / "Ney üflemiş biri olarak..."
@@ -366,11 +366,15 @@ export function guestMessages(
 
   const cueHint = cue ? `\nYönetmen notu: ${cue}` : "";
 
+  const langReminder =
+    detectTopicLang(topic) === "tr"
+      ? ""
+      : "\n⚠️ Reply ONLY in the language of the topic (NOT Turkish).";
   return [
     { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
       role: "user" as const,
-      content: `Şu ana kadarki oturum:\n\n${transcript}\n\n${roleHint}${cueHint}\n\nSenin (${guest.name}) repliğin (2-4 cümle, net fikir):`,
+      content: `Şu ana kadarki oturum:\n\n${transcript}\n\n${roleHint}${cueHint}${langReminder}\n\nSenin (${guest.name}) repliğin (2-4 cümle, net fikir):`,
     },
   ];
 }
