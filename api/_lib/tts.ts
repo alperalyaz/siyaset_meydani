@@ -1,11 +1,10 @@
-// Metin-ses (TTS) proxy'si — ÜÇ motor:
-//   • DEMO motoru (tercih): Cloud TTS Chirp 3 HD (GOOGLE_TTS_API_KEY).
-//     Gemini TTS ile aynı sesler ama üretim ürünü — günlük istek tavanı yok,
-//     ayda 1M karakter ücretsiz, sonrası $30/1M.
-//   • DEMO yedeği: Google Gemini TTS (GEMINI_API_KEY) — önizleme modeli,
-//     Tier 1'de 100 istek/gün tavanı var; Chirp anahtarı yoksa kullanılır.
-//   • BYOK: kullanıcı "x-gemini-key" (Gemini) ya da "x-eleven-key"
+// Metin-ses (TTS) proxy'si:
+//   • DEMO motoru: Cloud TTS Chirp 3 HD (GOOGLE_TTS_API_KEY). Gemini TTS ile
+//     aynı sesler ama üretim ürünü — günlük istek tavanı yok, ayda 1M
+//     karakter ücretsiz, sonrası $30/1M.
+//   • BYOK: kullanıcı "x-gemini-key" (Gemini TTS) ya da "x-eleven-key"
 //     (ElevenLabs) başlığıyla kendi anahtarını verirse tüm oturum onunla.
+//     (Gemini motoru yalnızca BYOK için yaşar; demo yedeği kaldırıldı.)
 // Demo modunda IP başına GÜNLÜK KARAKTER limiti (Supabase RPC; yoksa bellek).
 //
 // Yanıt: audio (mp3=ElevenLabs / wav=Gemini) + "x-tts-remaining"; hata/kota
@@ -142,18 +141,16 @@ export async function handleTts(
 
   const userGemini = keys.gemini && keys.gemini.trim() ? keys.gemini.trim() : "";
   const userEleven = keys.eleven && keys.eleven.trim() ? keys.eleven.trim() : "";
-  // Cloud TTS (Chirp 3 HD): Gemini TTS ile AYNI sesler ama önizleme değil,
-  // üretim ürünü — günlük istek tavanı yok, ayda 1M karakter ücretsiz.
-  // Ayarlıysa demo motoru olarak ÖNCELİKLİDİR (Gemini'nin 100 istek/gün
-  // tavanına takılmamak için).
+  // DEMO motoru: yalnızca Cloud TTS Chirp 3 HD (GOOGLE_TTS_API_KEY).
+  // Gemini TTS demo yedeği KALDIRILDI — önizleme modelinin 100 istek/gün
+  // tavanı bir web demosu için anlamsız. (Kullanıcının KENDİ Gemini
+  // anahtarı — BYOK — hâlâ Gemini motorunu kullanır; o kendi kotasıdır.)
   const chirpDemoKey = process.env.GOOGLE_TTS_API_KEY;
-  const geminiDemoKey = process.env.GEMINI_API_KEY;
   const elevenDemoKey = process.env.ELEVENLABS_API_KEY;
 
   // Motor + anahtar seçimi. Kullanıcının KENDİ anahtarı varsa (BYOK) demo
   // limiti uygulanmaz ve o kullanılır. Öncelik: kullanıcı Gemini > kullanıcı
-  // ElevenLabs > sunucu Chirp3-HD (demo) > sunucu Gemini (demo) > sunucu
-  // ElevenLabs (demo).
+  // ElevenLabs > sunucu Chirp3-HD (demo) > sunucu ElevenLabs (demo).
   let engine: "eleven" | "gemini" | "chirp";
   let apiKey: string;
   let byok: boolean;
@@ -163,8 +160,6 @@ export async function handleTts(
     engine = "eleven"; apiKey = userEleven; byok = true;
   } else if (chirpDemoKey) {
     engine = "chirp"; apiKey = chirpDemoKey; byok = false;
-  } else if (geminiDemoKey) {
-    engine = "gemini"; apiKey = geminiDemoKey; byok = false;
   } else if (elevenDemoKey) {
     engine = "eleven"; apiKey = elevenDemoKey; byok = false;
   } else {
