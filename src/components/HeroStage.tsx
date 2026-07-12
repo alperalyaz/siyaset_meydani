@@ -5,46 +5,56 @@ import { useT } from "../lib/i18n";
 // masada; konuşma balonları sırayla belirir, konuşan konuğun halkası parlar
 // ve altında mini ekolayzer oynar. Portreler en.wikipedia REST özetinden
 // çekilir ve localStorage'da önbelleklenir; yüklenene dek emoji gösterilir.
+// Kadro BİLEREK dört ayrı çağdan — "çağlar ötesi masa" iddiası ilk bakışta
+// okunmalı (iki antik figür yan yana bu zenginliği öldürüyordu).
 const CAST = [
   {
     key: "socrates",
     title: "Socrates",
     name: "Sokrates",
     nameEn: "Socrates",
+    eraTr: "Antik Yunan",
+    eraEn: "Ancient Greece",
     emoji: "🏛️",
     color: "#e0447a",
     qTr: "Peki… adalet tam olarak nedir?",
     qEn: "But tell me — what exactly is justice?",
   },
   {
-    key: "cleopatra",
-    title: "Cleopatra",
-    name: "Kleopatra",
-    nameEn: "Cleopatra",
-    emoji: "👑",
-    color: "#8e6cf0",
-    qTr: "İktidar istemekle olmaz, olunur.",
-    qEn: "Power isn't asked for — it's taken.",
-  },
-  {
-    key: "einstein",
-    title: "Albert_Einstein",
-    name: "Einstein",
-    nameEn: "Einstein",
-    emoji: "🧠",
-    color: "#3fb6c9",
-    qTr: "Hayal gücü bilgiden önemlidir!",
-    qEn: "Imagination beats knowledge!",
-  },
-  {
     key: "nasreddin",
     title: "Nasreddin",
     name: "Nasreddin Hoca",
     nameEn: "Nasreddin",
+    eraTr: "13. yüzyıl",
+    eraEn: "13th century",
     emoji: "🫏",
     color: "#f2b134",
     qTr: "Bu da böyle bir fıkra işte…",
     qEn: "Now that reminds me of a story…",
+  },
+  {
+    key: "leonardo",
+    title: "Leonardo_da_Vinci",
+    name: "Da Vinci",
+    nameEn: "Da Vinci",
+    eraTr: "Rönesans",
+    eraEn: "Renaissance",
+    emoji: "🎨",
+    color: "#8e6cf0",
+    qTr: "Basitlik, en büyük ustalıktır.",
+    qEn: "Simplicity is the ultimate sophistication.",
+  },
+  {
+    key: "curie",
+    title: "Marie_Curie",
+    name: "Marie Curie",
+    nameEn: "Marie Curie",
+    eraTr: "20. yüzyıl",
+    eraEn: "20th century",
+    emoji: "🧪",
+    color: "#3fb6c9",
+    qTr: "Korkma — sadece anla.",
+    qEn: "Nothing is to be feared, only understood.",
   },
 ];
 
@@ -120,6 +130,7 @@ export function HeroStage() {
             <i /><i /><i />
           </span>
           <span className="hero-guest__name">{lang === "en" ? c.nameEn : c.name}</span>
+          <span className="hero-guest__era">{lang === "en" ? c.eraEn : c.eraTr}</span>
         </div>
       ))}
     </div>
