@@ -7,16 +7,9 @@ import { suggestGuestNames, suggestTopicIdeas, moderateTopic } from "../lib/engi
 import { quickTopicBlock } from "../lib/safety";
 import { TOPIC_POOL, DEEP_TOPIC_POOL, casualPool, deepPool } from "../lib/pool";
 import { useT } from "../lib/i18n";
+import { HeroStage } from "./HeroStage";
 
 type TopicTab = "gunluk" | "derin";
-
-// Hero'daki stüdyo sahnesi kadrosu — sabit, maliyetsiz, iki dilli.
-const HERO_CAST = [
-  { name: "Sokrates", nameEn: "Socrates", emoji: "🏛️", color: "#e0447a", qTr: "Peki… adalet tam olarak nedir?", qEn: "But tell me — what exactly is justice?" },
-  { name: "Kleopatra", nameEn: "Cleopatra", emoji: "👑", color: "#8e6cf0", qTr: "İktidar istemekle olmaz, olunur.", qEn: "Power isn't asked for — it's taken." },
-  { name: "Einstein", nameEn: "Einstein", emoji: "🧠", color: "#3fb6c9", qTr: "Hayal gücü bilgiden önemlidir!", qEn: "Imagination beats knowledge!" },
-  { name: "Nasreddin Hoca", nameEn: "Nasreddin", emoji: "🫏", color: "#f2b134", qTr: "Bu da böyle bir fıkra işte…", qEn: "Now that reminds me of a story…" },
-];
 
 interface Props {
   onStart: (guests: Guest[], topic: string, difficulty: Difficulty, context?: string | null) => void;
@@ -359,18 +352,8 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           {topicTab === "gunluk" ? t("setup.tag.gunluk") : t("setup.tag.derin")}
         </p>
 
-        {/* Stüdyo sahnesi: ürünü anlatma, GÖSTER — konuşma balonları sırayla belirir. */}
-        <div className="hero-stage" aria-hidden="true">
-          {HERO_CAST.map((c, i) => (
-            <div key={c.name} className="hero-guest" style={{ animationDelay: `${i * 0.9}s` }}>
-              <span className="hero-guest__bubble" style={{ animationDelay: `${i * 3}s` }}>
-                {lang === "en" ? c.qEn : c.qTr}
-              </span>
-              <span className="hero-guest__avatar" style={{ background: c.color }}>{c.emoji}</span>
-              <span className="hero-guest__name">{lang === "en" ? c.nameEn : c.name}</span>
-            </div>
-          ))}
-        </div>
+        {/* Stüdyo sahnesi: ürünü anlatma, GÖSTER — gerçek portreler + efektler. */}
+        <HeroStage />
 
         <div className="hero-cta">
           <button className="btn btn--primary hero-cta__main" onClick={surprise} disabled={loading || checking}>
