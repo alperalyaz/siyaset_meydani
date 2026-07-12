@@ -13,10 +13,11 @@
 
 const ELEVEN_MODEL = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
 const GEMINI_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
-// Demo tadı: IP başına GÜNLÜK ~3 dakikalık ses (~3000 karakter Türkçe konuşma).
-// Faturalı anahtarda maliyeti makul tutar; kullanıcı bitince kendi Gemini
-// anahtarını girip devam eder. Env ile ayarlanır.
-const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "3000"); // IP/gün (~3 dk)
+// Demo: IP başına GÜNLÜK ~12 dakikalık ses (~12.000 karakter konuşma).
+// Chirp 3 HD'de ayda 1M karakter ücretsiz olduğu için eş-dost/lansman
+// döneminde cömert; trafik büyüyünce TTS_DEMO_CHAR_LIMIT env'i ile
+// kod değişmeden kısılır.
+const DEMO_CHAR_LIMIT = Number(process.env.TTS_DEMO_CHAR_LIMIT ?? "12000"); // IP/gün (~12 dk)
 // Tek istekte azami karakter. Konuşmalar ton bütünlüğü için TEK istekte
 // sentezlenir (bölmek ses değişimi hissi veriyor); 2-4 cümlelik replikler
 // rahat sığsın diye sınır geniş — yine de kötüye kullanım freni var.

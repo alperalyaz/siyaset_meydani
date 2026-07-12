@@ -56,8 +56,11 @@ function providerForKey(key: string, name?: ProviderName): Provider {
   }
 }
 
-// Demo modunda IP başına günlük istek limiti. Ortam değişkeniyle ayarlanabilir.
-const DEMO_DAILY_LIMIT = Number(process.env.DEMO_DAILY_LIMIT ?? "40");
+// Demo modunda IP başına günlük istek limiti. Eş-dost/lansman döneminde
+// cömert (DeepSeek v4-flash çok ucuz); trafik büyüyünce DEMO_DAILY_LIMIT
+// env'i ile kod değişmeden kısılır. Not: bir tartışma turu ~2 istek
+// (yönetmen + replik) tüketir; 150 istek ≈ ~70 replik ≈ 1+ saat oturum.
+const DEMO_DAILY_LIMIT = Number(process.env.DEMO_DAILY_LIMIT ?? "150");
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
