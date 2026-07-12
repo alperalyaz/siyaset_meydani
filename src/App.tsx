@@ -344,11 +344,11 @@ export function App() {
       setKeyModal(true);
     } else if (e instanceof ApiError && e.status === 429) {
       // Groq / upstream rate-limit — retry olarak handle edilecek, pause etme
-      setError("⏳ Hız limiti aşıldı, birkaç saniye içinde otomatik denenecek...");
+      setError(ct("err.rateRetrying"));
     } else if (e instanceof ApiError) {
       setError(e.message);
     } else {
-      setError("Beklenmedik bir hata oluştu. Tekrar deneyin.");
+      setError(ct("err.unexpected"));
     }
   }, []);
 
@@ -1014,7 +1014,7 @@ export function App() {
               pause();
               return;
             }
-            setError("⏳ Hız limiti aşıldı, birkaç saniye içinde otomatik denenecek...");
+            setError(ct("err.rateRetrying"));
             syncMeta();
             await delay(6000, new AbortController().signal);
             setError(null);
@@ -1701,7 +1701,7 @@ export function App() {
         </button>
         <div className="panel__topic">
           <span className="panel__live">
-             ● CANLI
+             {t("panel.live")}
           </span>
           <h1>{topic}</h1>
         </div>
@@ -1729,7 +1729,7 @@ export function App() {
       <div className="panel__body">
         <main className="panel__stage">
           {error && <div className="banner banner--error">{error}</div>}
-          {modPending && <div className="banner" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>⏳ Spiker sırada bekliyor — konuk bitince araya girecek...</div>}
+          {modPending && <div className="banner" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>{t("mod.pending")}</div>}
           <ChatStream utterances={utterances} guests={guests} thinking={thinking} streamingText={streamingText} prepping={prepping} />
           {bootStage > 0 && (
             <div className="boot-loading">

@@ -58,7 +58,7 @@ export function ChatStream({ utterances, guests, thinking, streamingText, preppi
         if (u.speaker === "moderator") {
           return (
             <div key={u.id} className="turn turn--mod">
-              <div className="turn--mod__badge">SPİKER</div>
+              <div className="turn--mod__badge">{t("stream.host")}</div>
               <p>{u.text}</p>
             </div>
           );
