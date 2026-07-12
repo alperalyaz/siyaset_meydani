@@ -1,5 +1,6 @@
 import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
 import { chat, chatStream, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
+import { detectTopicLang } from "./i18n";
 import type { ChatMessage } from "./store";
 import {
   introMessages,
@@ -276,6 +277,40 @@ export async function runIntro(
   return cleanReply(content, guest.name);
 }
 
+// ── DİL GÜVENLİK AĞI ── Prompt ne kadar sert olursa olsun model ara sıra
+// yanlış dile kayıyor (talimatlar Türkçe; özel personalar Türkçe). Cevap
+// geldikten sonra dili DETERMİNİSTİK kontrol edilir; yanlışsa modele tek
+// seferlik "aynı içeriği doğru dilde yeniden yaz" düzeltmesi yaptırılır.
+function wrongLang(topic: string, reply: string): boolean {
+  if (!reply.trim()) return false;
+  return detectTopicLang(topic) !== detectTopicLang(reply);
+}
+
+async function rewriteInSessionLang(
+  msgs: ChatMessage[],
+  draft: string,
+  topic: string,
+  guestName: string,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const fix =
+    detectTopicLang(topic) === "en"
+      ? "STOP — you wrote in the WRONG LANGUAGE. Rewrite your reply ENTIRELY in the language of the session topic (English). Keep the same content, persona and tone; only fix the language. Output ONLY the rewritten reply text."
+      : "DUR — YANLIŞ DİLDE yazdın. Repliğini aynı içerik, aynı karakter ve tonla TAMAMEN TÜRKÇE yeniden yaz. Sadece yeni replik metnini ver.";
+  try {
+    const { content } = await chat(
+      [...msgs, { role: "assistant", content: draft }, { role: "user", content: fix }],
+      apiKey,
+      { temperature: 0.7, max_tokens: 460, signal },
+    );
+    const fixed = cleanReply(content, guestName);
+    return fixed.trim() ? fixed : draft;
+  } catch {
+    return draft; // düzeltme başarısızsa taslağı koru (abort dahil)
+  }
+}
+
 // Açılış görüşü JSON döndürür ({hasStance, text}); bu yüzden AKIŞ KULLANILMAZ
 // (aksi halde ham JSON kullanıcıya sızardı). Tek seferde alınır, ayrıştırılır.
 export async function runOpeningStatement(
@@ -296,10 +331,15 @@ export async function runOpeningStatement(
     signal,
   });
   const parsed = parseJsonLoose<Partial<OpeningResult>>(content);
-  if (parsed && typeof parsed.text === "string" && parsed.text.trim()) {
-    return { text: cleanReply(parsed.text, guest.name), hasStance: parsed.hasStance !== false };
+  let text =
+    parsed && typeof parsed.text === "string" && parsed.text.trim()
+      ? cleanReply(parsed.text, guest.name)
+      : cleanReply(content, guest.name);
+  const hasStance = parsed && typeof parsed.text === "string" ? parsed.hasStance !== false : true;
+  if (wrongLang(topic, text)) {
+    text = await rewriteInSessionLang(msgs as ChatMessage[], text, topic, guest.name, apiKey, signal);
   }
-  return { text: cleanReply(content, guest.name), hasStance: true };
+  return { text, hasStance };
 }
 
 // Yönetmen: sadece reyting + kısa koçluk (sırayı kod belirler).
@@ -341,6 +381,7 @@ export async function runGuest(
   onToken?: (t: string) => void,
 ): Promise<string> {
   const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context);
+  let text: string;
   if (onToken) {
     const full = await streamReply(
       msgs as ChatMessage[],
@@ -349,12 +390,18 @@ export async function runGuest(
       signal,
       onToken,
     );
-    return cleanReply(full, guest.name);
+    text = cleanReply(full, guest.name);
+  } else {
+    const { content } = await chat(msgs as ChatMessage[], apiKey, {
+      temperature: 0.9, max_tokens: 460, signal,
+    });
+    text = cleanReply(content, guest.name);
   }
-  const { content } = await chat(msgs as ChatMessage[], apiKey, {
-    temperature: 0.9, max_tokens: 460, signal,
-  });
-  return cleanReply(content, guest.name);
+  // Dil güvenlik ağı: yanlış dilde geldiyse aynı içeriği doğru dilde yazdır.
+  if (wrongLang(topic, text)) {
+    text = await rewriteInSessionLang(msgs as ChatMessage[], text, topic, guest.name, apiKey, signal);
+  }
+  return text;
 }
 
 // Kızışma: bir konuğun söz kesişi + kesilenin tersleyişi (tek çağrı, JSON).

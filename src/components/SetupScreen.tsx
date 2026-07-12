@@ -10,6 +10,14 @@ import { useT } from "../lib/i18n";
 
 type TopicTab = "gunluk" | "derin";
 
+// Hero'daki stüdyo sahnesi kadrosu — sabit, maliyetsiz, iki dilli.
+const HERO_CAST = [
+  { name: "Sokrates", nameEn: "Socrates", emoji: "🏛️", color: "#e0447a", qTr: "Peki… adalet tam olarak nedir?", qEn: "But tell me — what exactly is justice?" },
+  { name: "Kleopatra", nameEn: "Cleopatra", emoji: "👑", color: "#8e6cf0", qTr: "İktidar istemekle olmaz, olunur.", qEn: "Power isn't asked for — it's taken." },
+  { name: "Einstein", nameEn: "Einstein", emoji: "🧠", color: "#3fb6c9", qTr: "Hayal gücü bilgiden önemlidir!", qEn: "Imagination beats knowledge!" },
+  { name: "Nasreddin Hoca", nameEn: "Nasreddin", emoji: "🫏", color: "#f2b134", qTr: "Bu da böyle bir fıkra işte…", qEn: "Now that reminds me of a story…" },
+];
+
 interface Props {
   onStart: (guests: Guest[], topic: string, difficulty: Difficulty, context?: string | null) => void;
   onOpenKey: () => void;
@@ -31,7 +39,8 @@ interface Props {
 }
 
 const MAX_GUESTS = 50;
-const DEFAULT_COUNT = 3;
+// Varsayılan 2 konuk: karşılıklı atışma en akıcı format (kullanıcı dilerse ekler).
+const DEFAULT_COUNT = 2;
 
 function initials(name: string): string {
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -225,6 +234,16 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     if (topic.trim()) void drawForTopic(topic);
   }, [topic, drawForTopic]);
 
+  // ⚡ Sürpriz oturum: havuzdan rastgele konu seç, konukları getir, sahneye kaydır.
+  const surprise = useCallback(() => {
+    const pool = topicTab === "derin" ? deepPool(lang) : casualPool(lang);
+    const t0 = pool[Math.floor(Math.random() * pool.length)];
+    pickTopic(t0);
+    setTimeout(() => {
+      document.getElementById("guests-block")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  }, [topicTab, lang, pickTopic]);
+
   // Önceden gösterilmiş tüm konular (tekrar üretmemek için) — iki havuz da.
   const seenTopicsRef = useRef<string[]>([...TOPIC_POOL, ...DEEP_TOPIC_POOL]);
   const loadTopics = useCallback(async () => {
@@ -332,10 +351,38 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
   return (
     <div className={`setup ${topicTab === "gunluk" ? "setup--gunluk" : ""}`}>
       <header className="setup__hero">
+        <div className="hero-live">
+          <span className="hero-live__dot" /> {t("hero.live")}
+        </div>
         <h1>{topicTab === "gunluk" ? t("setup.title.gunluk") : t("setup.title.derin")}</h1>
         <p className="setup__tag">
           {topicTab === "gunluk" ? t("setup.tag.gunluk") : t("setup.tag.derin")}
         </p>
+
+        {/* Stüdyo sahnesi: ürünü anlatma, GÖSTER — konuşma balonları sırayla belirir. */}
+        <div className="hero-stage" aria-hidden="true">
+          {HERO_CAST.map((c, i) => (
+            <div key={c.name} className="hero-guest" style={{ animationDelay: `${i * 0.9}s` }}>
+              <span className="hero-guest__bubble" style={{ animationDelay: `${i * 3}s` }}>
+                {lang === "en" ? c.qEn : c.qTr}
+              </span>
+              <span className="hero-guest__avatar" style={{ background: c.color }}>{c.emoji}</span>
+              <span className="hero-guest__name">{lang === "en" ? c.nameEn : c.name}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="hero-cta">
+          <button className="btn btn--primary hero-cta__main" onClick={surprise} disabled={loading || checking}>
+            ⚡ {t("hero.surprise")}
+          </button>
+          <button
+            className="btn btn--ghost"
+            onClick={() => document.getElementById("topic-block")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            {t("hero.pick")}
+          </button>
+        </div>
       </header>
 
       {savedSession && (
@@ -375,7 +422,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       )}
 
       {/* 1) KONU */}
-      <section className="setup__block">
+      <section className="setup__block" id="topic-block">
         <div className="setup__block-head">
           <h2>{t("setup.block1")}</h2>
           <div className="topic-tabs" role="tablist">
@@ -443,7 +490,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
       </section>
 
       {/* 2) KONUKLAR */}
-      <section className="setup__block">
+      <section className="setup__block" id="guests-block">
         <div className="setup__block-head">
           <h2>{t("setup.block2")}</h2>
           <div className="setup__draw-controls">
