@@ -9,9 +9,12 @@ interface Props {
   topic: string;
   guestNames: string[];
   onBack: () => void;
+  // Rızayla herkese açık galeriye yayınlama (onay penceresini App açar).
+  onPublish?: () => void;
+  publishedUrl?: string | null;
 }
 
-export function SessionResultScreen({ result, topic, guestNames, onBack }: Props) {
+export function SessionResultScreen({ result, topic, guestNames, onBack, onPublish, publishedUrl }: Props) {
   const { t, lang } = useT();
   const fmtSeconds = (s: number): string => {
     const m = Math.floor(s / 60);
@@ -143,6 +146,16 @@ export function SessionResultScreen({ result, topic, guestNames, onBack }: Props
         <button className="btn btn--primary result__share" onClick={shareKarne} disabled={sharing}>
           {sharing ? t("res.sharePrep") : t("res.share")}
         </button>
+        {onPublish && !publishedUrl && (
+          <button className="btn btn--ghost" onClick={onPublish}>
+            {t("publish.button")}
+          </button>
+        )}
+        {publishedUrl && (
+          <a className="btn btn--ghost" href={publishedUrl} target="_blank" rel="noopener">
+            {t("publish.view")}
+          </a>
+        )}
         <button className="btn btn--ghost" onClick={onBack}>
           {t("res.back")}
         </button>

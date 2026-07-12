@@ -9,6 +9,8 @@ import { RatingMeter } from "./components/RatingMeter";
 import { ModeratorBar } from "./components/ModeratorBar";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SessionResultScreen } from "./components/SessionResultScreen";
+import { PublicGallery } from "./components/PublicGallery";
+import { publishToGallery, fetchGallerySession } from "./lib/gallery";
 import {
   runOpeningStatement,
   runRatingDirector,
@@ -133,6 +135,11 @@ export function App() {
   // Zorunlu spiker müdahale ekranı: "idle" = 3 dk sessizlik molası,
   // "clash" = kızışma (konuklar birbirinin sözünü kesti, stüdyo karıştı).
   const [interjectModal, setInterjectModal] = useState<null | "idle" | "clash">(null);
+  // Galeriye yayınlama: rıza penceresi + sonuç durumu.
+  const [publishModal, setPublishModal] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [publishErr, setPublishErr] = useState<string | null>(null);
   // Oturum açılış hazırlığı göstergesi: 0 = gizli, 1 = kadrolama, 2 = ses/ilk
   // görüş hazırlığı. İlk konuk repliği ekrana düşünce kapanır.
   const [bootStage, setBootStage] = useState<0 | 1 | 2>(0);
@@ -285,7 +292,7 @@ export function App() {
     apiKeyRef.current = apiKey;
   }, [apiKey]);
 
-  // URL'den paylasilan oturumu oku.
+  // URL'den paylasilan oturumu oku (?share=base64 ya da ?s=galeri-slug).
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -300,6 +307,19 @@ export function App() {
             rating: payload.r,
           });
         }
+        return;
+      }
+      const slug = params.get("s");
+      if (slug) {
+        void fetchGallerySession(slug).then((g) => {
+          if (!g) return;
+          setSharedSession({
+            guests: g.guests as Guest[],
+            topic: g.topic,
+            utterances: g.utterances as Utterance[],
+            rating: g.rating,
+          });
+        });
       }
     } catch {
       /* gecersiz URL */
@@ -1544,8 +1564,54 @@ export function App() {
           result={sessionResult}
           topic={topic}
           guestNames={guests.map((g) => g.name)}
-          onBack={() => { leave(); }}
+          onBack={() => { setPublishedUrl(null); leave(); }}
+          onPublish={() => { setPublishErr(null); setPublishModal(true); }}
+          publishedUrl={publishedUrl}
         />
+        {publishModal && (
+          <div className="modal__backdrop" onClick={() => setPublishModal(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h2>{t("publish.title")}</h2>
+              <p className="modal__desc">{t("publish.body")}</p>
+              {publishErr && <p className="modal__reason">{publishErr}</p>}
+              <div className="modal__actions">
+                <button className="btn btn--ghost" onClick={() => setPublishModal(false)}>
+                  {t("publish.cancel")}
+                </button>
+                <button
+                  className="btn btn--primary"
+                  disabled={publishing}
+                  onClick={async () => {
+                    setPublishing(true);
+                    setPublishErr(null);
+                    try {
+                      const { url } = await publishToGallery(
+                        guestsRef.current,
+                        topicRef.current,
+                        utterRef.current,
+                        rating,
+                        sessionLangRef.current,
+                      );
+                      setPublishedUrl(url);
+                      setPublishModal(false);
+                      try {
+                        await navigator.clipboard.writeText(url);
+                      } catch {
+                        /* pano izni yoksa sorun değil */
+                      }
+                    } catch {
+                      setPublishErr(ct("publish.fail"));
+                    } finally {
+                      setPublishing(false);
+                    }
+                  }}
+                >
+                  {publishing ? t("publish.working") : t("publish.confirm")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1600,6 +1666,7 @@ export function App() {
           currentVoiceEngine={geminiKey ? "gemini" : elevenKey ? "eleven" : undefined}
           initialTab={keyModalTab}
         />
+        <PublicGallery />
         {blockedMsg && (
           <div className="modal__backdrop" onClick={() => setBlockedMsg(null)}>
             <div className="modal modal--block" onClick={(e) => e.stopPropagation()}>
