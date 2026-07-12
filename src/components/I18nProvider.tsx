@@ -11,6 +11,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     saveLang(lang);
     try {
       document.documentElement.lang = lang;
+      document.title =
+        lang === "en"
+          ? "debate.be — AI Panel Debate Arena"
+          : "debate.be · Siyaset Meydanı — Yapay Zeka Açık Oturumu";
     } catch {
       /* yoksay */
     }

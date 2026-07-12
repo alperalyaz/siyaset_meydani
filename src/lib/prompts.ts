@@ -588,7 +588,12 @@ export function guestSuggestMessages(
   context?: string | null,
   avoid?: string[],
   popular = false,
+  lang: "tr" | "en" = "tr",
 ) {
+  // Arayüz İngilizceyse isimler İNGİLİZCE Vikipedi başlığıyla istenir
+  // (yoksa "İbn Haldun" gibi Türkçe adlar gelip özet tr.wikipedia'dan düşüyor).
+  const en = lang === "en";
+  const wiki = en ? "İngilizce Vikipedi'de (en.wikipedia.org)" : "Türkçe Vikipedi'de";
   const ctx =
     context && context.trim()
       ? `\nGüncel bağlam (konuyu anlaman için): ${context.trim().slice(0, 500)}\n`
@@ -602,9 +607,9 @@ export function guestSuggestMessages(
 - Her ismin bu SPESİFİK konuyla somut, gerçek bir bağı OLMALI: ya bu konu hakkında kamuoyunda konuşmuş/röportaj vermiş/tartışma yaratmış, ya kişisel hayatında bu konuyla doğrudan ilgili bilinen bir olay yaşamış, ya da imajı/mesleği doğrudan bu konuya değiyor.
   Örnek eşleşmeler: "ilişki/evlilik/kavga" konusu → defalarca evlenip boşanmış, aşk hayatı hep magazin gündeminde olan, evlilik/çift programı sunan ya da jürisi olan biri; "para/zenginlik" konusu → serveti/iflası/tasarruf tavsiyeleriyle bilinen biri; "yemek" konusu → şef, gurme, diyet fenomeni; "trafik/araba" konusu → pilot, araba tutkunu ünlü; "sosyal medya" konusu → fenomen, influencer.
 - SIRF "çok ünlü/tanınmış" olmak YETERLİ DEĞİL. Konuyla hiçbir kişisel/mesleki bağı olmayan genel iş insanı, genel oyuncu, genel sunucu SEÇME. Test: bu isim masaya gelince spiker "bunun bu konuyla ne alakası var?" demeli mi? Diyorsa o ismi ELE.
-- 8 ismin HEPSİ Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan/spordan bildiği YAŞAYAN ünlüler olsun.
+- 8 ismin HEPSİ ${en ? "küresel popüler kültürden (Hollywood, müzik, spor, sosyal medya — uluslararası tanınan)" : "Türk popüler kültüründen, halkın magazinden/TV'den/müzikten/sosyal medyadan/spordan bildiği"} YAŞAYAN ünlüler olsun.
 - TARİHÎ/ÇAĞLAR ÖTESİ figür KARIŞTIRMA — bu listede sadece güncel, yaşayan isimler olsun; tarihî figürler ayrı bir bölümde zaten var.
-- Hepsinin Türkçe Vikipedi'de maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
+- Hepsinin ${wiki} maddesi OLMALI; madde varlığından emin olmadığın marjinal isimleri önerme.`
     : `ÇOK ÖNEMLİ — ÖNCE KONUYLA GERÇEK BAĞ, SONRA ÇEŞİTLİLİK:
 - 1) KONUYLA BAĞ ŞART (en kritik): Her ismin bu SPESİFİK konuyla somut, gerçek bir bağı olmalı — ya konunun uzmanı/otoritesi, ya o dönemi/kişiyi/olayı bizzat yaşamış/yönetmiş, ya da bu mesele üzerine bilinen güçlü bir görüşü olan biri. Test: isim masaya gelince "bunun bu konuyla ne alakası var?" denecekse o ismi ELE. Sırf "ünlü filozof" olması YETMEZ.
 - 2) KONU BELLİ BİR ÜLKE/KİŞİ/DÖNEMLE İLGİLİYSE (ör. Osmanlı, Türk tarihi, belirli bir padişah/lider, bir ülkenin siyaseti): konukların EN AZ YARISI o ülkeden/dönemden ya da o konunun UZMANI (tarihçi, siyaset bilimci, o coğrafyadan düşünür) olsun. Türk tarihi/siyaseti konusuysa Türk tarihçi/düşünür/devlet adamlarını (ör. Halil İnalcık, İlber Ortaylı, Kemal Karpat, İbn Haldun, ilgili dönemin aktörleri) öne al; alakasız Batılı filozofları (Locke, Hume, Gandhi vb.) SIRF ünlü diye masaya OTURTMA.
@@ -614,20 +619,20 @@ export function guestSuggestMessages(
     {
       role: "system" as const,
       content:
-        "Sen bir açık oturum yapımcısısın. Verilen konuyla İLGİLİ, gerçek ve Türkçe Vikipedi'de maddesi olan ünlü KİŞİLER önerirsin. Sadece insan öner; ülke, film, kavram, kurum önerme. Zaman ötesi, çağlar arası, beklenmedik eşleşmeler senin imzandır.",
+        `Sen bir açık oturum yapımcısısın. Verilen konuyla İLGİLİ, gerçek ve ${wiki} maddesi olan ünlü KİŞİLER önerirsin. Sadece insan öner; ülke, film, kavram, kurum önerme. Zaman ötesi, çağlar arası, beklenmedik eşleşmeler senin imzandır.`,
     },
     {
       role: "user" as const,
       content: `Konu: "${topic}"${ctx}
 
-Bu konuyla ilgili, gerçek ve Türkçe Vikipedi'de maddesi bulunan 8 farklı ünlü KİŞİ öner.
+Bu konuyla ilgili, gerçek ve ${wiki} maddesi bulunan 8 farklı ünlü KİŞİ öner.
 ${mixRules}
 - ASLA peygamber ya da bir dinin kutsal saydığı figürleri önerme (Muhammed, İsa, Musa, Davud, İbrahim, Buda vb.). Onları bir tartışma masasına oturtmak saygısızlık olur. Onların yerine dinî konularda âlim, teolog, filozof, tarihçi ya da hükümdar öner.
 - Mustafa Kemal Atatürk'ü ve Recep Tayyip Erdoğan'ı da önerme; uygulama bu isimleri konuk olarak kabul etmez, önerirsen o koltuk boşa gider.
 İSİM YAZIMI (kritik — Vikipedi'de aranacak):
 - "Ad Soyad" sırasıyla yaz; "Soyad, Ad" biçimi YASAK (yanlış: "Makhmalbaf, Möhsün" → doğru: "Muhsin Mahmelbaf").
 - Yabancı isimleri Türkçe okunuşuyla YAZMA; Vikipedi'deki özgün yazımı kullan (yanlış: "Sesil B. DeMille" → doğru: "Cecil B. DeMille").
-- İsmi Türkçe Vikipedi madde başlığıyla aynen yaz; unvan, parantez, açıklama ekleme.${avoidLine}
+- İsmi ${en ? "İNGİLİZCE Vikipedi madde başlığıyla AYNEN yaz (ör. \"Ibn Khaldun\", \"Peter the Great\", \"Suleiman the Magnificent\")" : "Türkçe Vikipedi madde başlığıyla aynen yaz"}; unvan, parantez, açıklama ekleme.${avoidLine}
 
 Sadece şu JSON: {"names": ["...", "...", "...", "...", "...", "...", "...", "..."]}`,
     },

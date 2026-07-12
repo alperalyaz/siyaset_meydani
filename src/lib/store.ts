@@ -132,17 +132,17 @@ export function saveProvider(p: ProviderKind): void {
 
 // --- TTS hız tercihi ---
 
-// v2: varsayılan 1.5x'e geçiş. Eski "..._tts_rate" anahtarındaki (çoğu
-// test kullanıcısında 1.0 kalmış) değer yok sayılır; herkes bir kez 1.5'e
-// döner, sonra kendi seçimi bu yeni anahtarda saklanır.
-const TTS_RATE_KEY = "siyaset_meydani_tts_rate_v2";
+// v3: varsayılan 1.0x'e dönüş (HD sesler doğal hızında en iyi; 1.5x tarayıcı
+// sesi dönemindendi). Eski anahtar yok sayılır; kullanıcı seçimi bu yeni
+// anahtarda saklanır.
+const TTS_RATE_KEY = "siyaset_meydani_tts_rate_v3";
 
 export function loadTtsRate(): number {
   try {
     const raw = localStorage.getItem(TTS_RATE_KEY);
-    if (raw === null) return 1.5;
+    if (raw === null) return 1.0;
     const v = parseFloat(raw);
-    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.0, v)) : 1.5;
+    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.0, v)) : 1.0;
   } catch {
     return 1.0;
   }

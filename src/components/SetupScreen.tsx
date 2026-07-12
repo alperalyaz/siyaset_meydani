@@ -189,6 +189,7 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
           apiKey,
           undefined,
           popularMode,
+          lang,
         );
         if (names.length === 0) {
           setNotice(t("notice.noGuests"));
