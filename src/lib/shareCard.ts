@@ -5,8 +5,8 @@
 // Çıktı 1080×1350 (Instagram/Story dostu) PNG blob'u.
 
 export const APP_NAME = "Siyaset Meydanı";
-export const APP_NAME_EN = "Debate Arena";
-export const APP_URL = "siyaset-meydani.vercel.app";
+export const APP_NAME_EN = "debate.be";
+export const APP_URL = "debate.be";
 
 export interface MomentCardData {
   kind: "moment";

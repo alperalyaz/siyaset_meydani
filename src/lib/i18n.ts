@@ -272,7 +272,7 @@ const EN: Record<string, string> = {
   "footer.disclaimerLabel": "Disclaimer:",
   "footer.disclaimer": " This is a thought-and-debate platform attempting something impossible in the real world: seating every recorded mind in history at the same table — a meeting only AI can make possible. Session dialogue consists of FICTIONAL, AI-generated portrayals; it does not reflect, and does not speak for, the real views, statements, or personalities of the real or historical people named. The aim is to provoke thought and nourish the culture of debate; content may be wrong, incomplete, or misleading, and is neither an academic source nor advice. The Chat Arena side is good-natured entertainment — and should be watched as such.",
   "footer.by": "'s personal project",
-  "setup.title.derin": "Debate Arena",
+  "setup.title.derin": "debate.be",
   "setup.title.gunluk": "Chat Arena",
   "setup.tag.derin": "Bring the sharpest minds of the ages to one table. You're the host of the big questions.",
   "setup.tag.gunluk": "Today's gossip, buzz, and chatter… Stars at the table, mic in your hand! ✨",
