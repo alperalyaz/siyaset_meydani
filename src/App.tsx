@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Guest, Utterance, SessionPhase, Difficulty, SessionResult, SessionEvent, Badge } from "./types";
 import type { GuestRole } from "./lib/prompts";
 import { setSessionMode } from "./lib/prompts";
-import { modLines } from "./lib/moderatorLines";
+import { modLines, naturalJoin } from "./lib/moderatorLines";
 import { SetupScreen } from "./components/SetupScreen";
 import { ChatStream } from "./components/ChatStream";
 import { RatingMeter } from "./components/RatingMeter";
@@ -1158,7 +1158,10 @@ export function App() {
             } else if (activeRef.current.length === 1) {
               // TEK KALDI → meydan okuyan kapanış + solo (spiker-röportajı) modu.
               const sole = activeRef.current[0];
-              const leftNames = [...walkedOutRef.current].map((i) => g[i].name).join(", ");
+              const leftNames = naturalJoin(
+                [...walkedOutRef.current].map((i) => g[i].name),
+                sessionLangRef.current,
+              );
               const stand = await runLastStanding(
                 g[sole], g, t, leftNames, stancesRef.current[sole] ?? null, apiKeyRef.current, ctrl.signal,
               ).catch(() => "");
@@ -1337,7 +1340,7 @@ export function App() {
 
     // Tek-nefes açılış: spiker konukları isimle tanıtır + konu + doğrudan
     // görüşlere geçer. Ayrı tanışma turu YOK (tekrarı önler, hızlı başlar).
-    const names = g.map((x) => x.name).join(", ");
+    const names = naturalJoin(g.map((x) => x.name), sessionLangRef.current);
     const welcome: Utterance = {
       id: uid(),
       speaker: "moderator",

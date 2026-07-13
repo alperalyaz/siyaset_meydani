@@ -1,5 +1,14 @@
 import type { Lang } from "./i18n";
 
+// İsim listesini doğal dille bağla: "A ve B", "A, B ve C" (EN: "A and B").
+// Düz virgül ("Mao Zedong, Sun Tzu var") kulağa robotik geliyor — "ve" şart.
+export function naturalJoin(names: string[], lang: Lang = "tr"): string {
+  const and = lang === "en" ? "and" : "ve";
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} ${and} ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} ${and} ${names[names.length - 1]}`;
+}
+
 // Spiker (moderatör) senaryo replikleri — iki tonda (gündelik/ciddi) ve iki
 // dilde (TR/EN). Dil OTURUMUN dilidir (= konunun dili), arayüz dili değil;
 // böylece İngilizce konuda spiker de İngilizce konuşur.
