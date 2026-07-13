@@ -48,6 +48,8 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
         ? "Sweethearts, please, one at a time! 😅 Everyone's talking over each other, I can't hear a thing!"
         : "Dear guests, please! Everyone is talking at once and nothing can be heard — order in the studio, please! 🗯️",
       walkoutNote: (name: string) => `🚪 ${name} has stormed off the show and left the table!`,
+      scandalNote:
+        "📺 CONTROL ROOM: That language cannot go on air. All guests have left the studio — with no one at the table, the broadcast is being cut. The show ends here.",
     };
   }
   return {
@@ -83,5 +85,7 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
       ? "Ayy canlarım, birbirinize girmeyin! 😅 Herkes aynı anda konuşuyor, hiçbir şey anlamıyorum ki!"
       : "Sayın konuklar, lütfen! Herkes aynı anda konuşuyor, hiçbir şey anlaşılmıyor — stüdyoya bir sükûnet lütfen! 🗯️",
     walkoutNote: (name: string) => `🚪 ${name} programı terk etti, masayı bırakıp gitti!`,
+    scandalNote:
+      "📺 REJİ: Bu dil yayına çıkamaz. Tüm konuklar stüdyoyu terk etti — masada kimse kalmadığı için yayın kesiliyor. Program burada sona erdi.",
   };
 }

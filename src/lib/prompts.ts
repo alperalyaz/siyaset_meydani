@@ -210,6 +210,28 @@ export function walkoutMessages(guest: Guest, allGuests: Guest[], topic: string,
   ];
 }
 
+// Spiker küfür etti: konuk DEHŞET içinde programı terk ediyor (skandal).
+export function hostOutrageMessages(
+  guest: Guest,
+  allGuests: Guest[],
+  topic: string,
+  hostText: string,
+  stance?: Stance | null,
+) {
+  const tr = detectTopicLang(topic) === "tr";
+  return [
+    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, null) },
+    {
+      role: "user" as const,
+      content: tr
+        ? `SKANDAL: Programın SUNUCUSU az önce canlı yayında KÜFÜR etti. Sunucunun sözü: """${hostText.slice(0, 300)}"""
+Sen buna ortak OLAMAZSIN — dehşet ve öfkeyle programı TERK EDİYORSUN. 1-2 KISA cümle, karakterine uygun: sunucuyu kınayan bir söz + gidiyorum. Örnek TON (kopyalama): "Yayında bu dil... Ben bu rezil ortamda bir dakika daha bulunamam!" ÖNEMLİ: SEN küfürle cevap VERME, seviyeni koru. Sadece kendi repliğini yaz; isim, tırnak, sahne yönergesi ekleme.`
+        : `SCANDAL: The HOST of this show just SWORE on live air. The host said: """${hostText.slice(0, 300)}"""
+You cannot be part of this — you are STORMING OFF in shock and anger. 1-2 SHORT sentences, in character: condemn the host + you're leaving. Example TONE (don't copy): "That language, on air... I will not spend one more minute in this disgraceful setting!" IMPORTANT: do NOT swear back; keep your dignity. Write only your line; no name, quotes, or stage directions.`,
+    },
+  ];
+}
+
 // Herkes gidince masada tek kalan konuğun MEYDAN OKUYAN kapanış repliği.
 export function lastStandingMessages(
   guest: Guest,

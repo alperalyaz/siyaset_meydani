@@ -22,7 +22,9 @@ import {
   runModeratorBridge,
   runWalkout,
   runLastStanding,
+  runHostOutrage,
 } from "./lib/engine";
+import { hasProfanity, maskProfanity } from "./lib/profanity";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
@@ -153,7 +155,13 @@ export function App() {
     if (utterRef.current.length < 4) return; // cılız oturumları yayınlama
     autoPublishRef.current = true;
     setPublishing(true);
-    publishToGallery(guestsRef.current, topicRef.current, utterRef.current, rating, sessionLangRef.current)
+    // Yayın kopyasında küfürler TV usulü [bip]lenir; canlı oturum metnine
+    // dokunulmaz. Sahne küfür yüzünden yayından ATILMAZ — sadece maskelenir.
+    const lang = sessionLangRef.current;
+    const maskedUtts = utterRef.current.map((u) =>
+      hasProfanity(u.text) ? { ...u, text: maskProfanity(u.text, lang) } : u,
+    );
+    publishToGallery(guestsRef.current, maskProfanity(topicRef.current, lang), maskedUtts, rating, lang)
       .then(({ slug, url }) => {
         setPublishedSlug(slug);
         setPublishedUrl(url);
@@ -856,6 +864,68 @@ export function App() {
             const mctrl = new AbortController();
             void speakVoice(modText, 9, undefined, mctrl.signal);
           }
+        }
+
+        // ── KÜFÜR SKANDALI ── Spiker (kullanıcı) canlı yayında küfür ederse
+        // sansürlemeyiz — ama bedeli var: TÜM konuklar (lehte/aleyhte fark
+        // etmez) sırayla söz alıp "bu rezil ortamda bulunamam" diyerek stüdyoyu
+        // terk eder; masada kimse kalmayınca yayın rejiden kesilir ve oturum
+        // otomatik sonlanır. (Galeriye yayında küfürler [bip]lenir.)
+        if (modNoteRef.current && hasProfanity(modNoteRef.current)) {
+          const hostText = modNoteRef.current;
+          modNoteRef.current = undefined;
+          discardAhead();
+          const sctrl = new AbortController();
+          abortRef.current = sctrl;
+          const leavers = g.map((_, i) => i).filter((i) => !walkedOutRef.current.has(i));
+          for (const idx of leavers) {
+            if (!runningRef.current) return;
+            setThinking(idx);
+            const fallback =
+              sessionLangRef.current === "en"
+                ? "That language, on live air... I will not spend one more minute in this disgraceful setting. I'm leaving!"
+                : "Yayında bu sözler... Ben bu rezil ortamda bir dakika daha bulunamam. Gidiyorum!";
+            const bye =
+              (await runHostOutrage(
+                g[idx], g, t, hostText, stancesRef.current[idx] ?? null, apiKeyRef.current, sctrl.signal,
+              ).catch(() => "")) || fallback;
+            setThinking(null);
+            if (!runningRef.current) return;
+            append({ id: uid(), speaker: idx, text: bye, mode: "walkout" });
+            speakingRef.current = true;
+            await prepareVoice(bye, idx, g[idx].gender, sctrl.signal);
+            await pace(bye, idx, g[idx].gender, sctrl.signal);
+            speakingRef.current = false;
+            walkedOutRef.current.add(idx);
+            setWalkedOut(new Set(walkedOutRef.current));
+            append({
+              id: uid(), speaker: "moderator", mode: "system",
+              text: modLines(gunlukRef.current, sessionLangRef.current).walkoutNote(g[idx].name),
+            });
+            await delay(400 + Math.random() * 400, sctrl.signal);
+          }
+          activeRef.current = [];
+          append({
+            id: uid(), speaker: "moderator", mode: "system",
+            text: modLines(gunlukRef.current, sessionLangRef.current).scandalNote,
+          });
+          runningRef.current = false;
+          setRunning(false);
+          setThinking(null);
+          sessionPhaseRef.current = "ended";
+          const result = computeSessionResult(
+            utterRef.current,
+            g,
+            ratingTracker.current.allSnapshots(),
+            startTimeRef.current,
+            difficultyRef.current,
+            earnedBadgesRef.current,
+            false,
+          );
+          result.badges = evaluateBadges(result, utterRef.current, g, ratingTracker.current.allSnapshots());
+          setSessionResult(result);
+          setPhase("result");
+          return;
         }
 
         const { speaker, role } = nextSpeaker();

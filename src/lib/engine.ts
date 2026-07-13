@@ -16,6 +16,7 @@ import {
   clashMessages,
   moderatorBridgeMessages,
   walkoutMessages,
+  hostOutrageMessages,
   lastStandingMessages,
   type GuestRole,
 } from "./prompts";
@@ -449,6 +450,24 @@ export async function runWalkout(
   signal?: AbortSignal,
 ): Promise<string> {
   const { content } = await chat(walkoutMessages(guest, guests, topic, stance) as ChatMessage[], apiKey, {
+    temperature: 0.9,
+    max_tokens: 160,
+    signal,
+  });
+  return cleanReply(content, guest.name);
+}
+
+// Spiker küfür etti → konuğun dehşet içinde programı terk repliği.
+export async function runHostOutrage(
+  guest: Guest,
+  guests: Guest[],
+  topic: string,
+  hostText: string,
+  stance: Stance | null,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { content } = await chat(hostOutrageMessages(guest, guests, topic, hostText, stance) as ChatMessage[], apiKey, {
     temperature: 0.9,
     max_tokens: 160,
     signal,
