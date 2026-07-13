@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ProviderKind } from "../lib/store";
 import { useT } from "../lib/i18n";
+import { PremiumWaitlist } from "./PremiumWaitlist";
 
 interface Props {
   open: boolean;
@@ -188,6 +189,8 @@ export function ApiKeyModal({
                 {t("key.save")}
               </button>
             </div>
+
+            <PremiumWaitlist source="settings-llm" />
           </>
         )}
 
