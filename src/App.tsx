@@ -536,29 +536,59 @@ export function App() {
       return { speaker: alt, role: "redirect" };
     }
 
-    // Spiker yön verdiyse: adı geçen konuk (metinde en erken geçen isim),
-    // yoksa en uzun susan aktif konuk. Ama az önce konuşanı atla.
+    // Spiker yön verdiyse: SORUNUN yöneldiği konuk cevaplar. Sunucu çoğu
+    // zaman önce birini özetleyip SONRA başkasına döner ("Fresco'yu dinledik…
+    // peki ya siz Sayın Marx?"); bu yüzden "ilk geçen isim" yanlış olur.
+    // Doğrusu: hitap/soru işaretlerine (peki ya, siz, sizce, ?, what about…)
+    // en YAKIN olan isim. İşaret yoksa soru genelde sonda yönelir → son isim.
     if (modNoteRef.current) {
       const note = modNoteRef.current.toLocaleLowerCase("tr");
-      // En erken geçen isim token'ını bul (ilk eşleşen değil, metinde önce geçen)
-      let bestIdx = -1;
-      let bestPos = Infinity;
+      const mentions: { i: number; pos: number }[] = [];
       active.forEach((i) => {
         guestsRef.current[i].name
           .toLocaleLowerCase("tr")
           .split(/\s+/)
           .forEach((tok) => {
             if (tok.length > 3) {
-              const pos = note.indexOf(tok);
-              if (pos >= 0 && pos < bestPos) { bestPos = pos; bestIdx = i; }
+              let from = 0;
+              let pos = note.indexOf(tok, from);
+              while (pos >= 0) {
+                mentions.push({ i, pos });
+                from = pos + tok.length;
+                pos = note.indexOf(tok, from);
+              }
             }
           });
       });
-      const named = bestIdx >= 0 ? bestIdx : undefined;
+
+      let named: number | undefined;
+      if (mentions.length) {
+        // 1) PIVOT: "peki ya (siz) X" / "ya sizin sayın X" / "what about X"
+        //    yeni muhataba açık dönüş; işaretten SONRAKİ ilk isim cevaplar.
+        const pivot = /(?:peki\s+)?\bya\s+(?:siz(?:in)?\s+)?(?:sayın\s+)?|what about\s+/i.exec(note);
+        if (pivot) {
+          const after = pivot.index;
+          let bestP = Infinity;
+          for (const men of mentions) {
+            if (men.pos >= after && men.pos < bestP) { bestP = men.pos; named = men.i; }
+          }
+        }
+        // 2) BAŞTA HİTAP: ilk isim metnin başındaysa (~ilk 30 karakter) odur
+        //    ("Fresco, Marx'ı dinlediniz…" → Fresco; "Sayın Marx, …" → Marx).
+        if (named === undefined) {
+          const first = mentions.reduce((a, b) => (b.pos < a.pos ? b : a));
+          if (first.pos <= 30) named = first.i;
+        }
+        // 3) YEDEK: en son anılan isim (soru genelde sonda yönelir).
+        if (named === undefined) {
+          named = mentions.reduce((a, b) => (b.pos > a.pos ? b : a)).i;
+        }
+      }
+
       let speaker = named ?? leastRecentActive();
       // "Az önce konuşanı atla" kuralı yalnızca İSİMSİZ hitapta geçerli:
       // spiker birini İSMİYLE çağırdıysa, az önce konuşmuş olsa bile CEVAP
-      // VERMESİ gereken odur (Petro'ya sorulan soruyu Platon cevaplamasın).
+      // VERMESİ gereken odur (ithamı yiyen susup sözü başkasına vermez).
       if (named === undefined && speaker === last && active.length > 1) {
         speaker = active.find((i) => i !== last) ?? speaker;
       }
