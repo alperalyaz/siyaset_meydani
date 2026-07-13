@@ -280,6 +280,14 @@ function clean(text: string): string {
     .replace(/[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}☀-➿️]/gu, "")
     .replace(/[*_]/g, "")
     .replace(/\bspiker\b/gi, "sunucu")
+    // TTS drone freni: uzatılmış/belirsiz filler'lar Chirp'i "ıııı" gibi tek
+    // bir sese kilitleyebiliyor (nadir ama komik bir bug). Üç noktayı kısa
+    // duraklamaya (virgül) çevir — "trailing-off" sinyali droneu tetikliyor;
+    // aynı harfin 3+ tekrarını 2'ye indir; belirsiz i/ı kümesini (Iıı…) tek
+    // ı'ya sadeleştir. Yazıdaki metin değişmez, YALNIZCA seslendirilen metin.
+    .replace(/[.]{2,}|…/g, ", ")
+    .replace(/([\p{L}])\1{2,}/gu, "$1$1")
+    .replace(/[iıIİ]{3,}/gu, "ı")
     .replace(/\s+/g, " ")
     .trim();
 }
