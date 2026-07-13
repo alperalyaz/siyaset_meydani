@@ -1108,6 +1108,16 @@ html.theme-gunluk .panel {
 .modbar__input {
   flex: 1;
 }
+/* Spiker giriş kutusu artık textarea: Enter satır atlar, Ctrl/Cmd+Enter
+   gönderir. Tek satır yüksekliğinde başlar, çok satırda kısıtlı büyür. */
+textarea.modbar__input {
+  resize: none;
+  min-height: 2.75rem;
+  max-height: 8rem;
+  line-height: 1.4;
+  font-family: inherit;
+  overflow-y: auto;
+}
 .modbar__hint {
   color: var(--muted);
   font-size: 0.75rem;

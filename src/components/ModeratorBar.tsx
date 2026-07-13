@@ -75,12 +75,19 @@ export function ModeratorBar({
           {running ? t("mod.pause") : t("mod.resume")}
         </button>
 
-        <input
+        <textarea
           className="modbar__input"
           placeholder={t("mod.input")}
           value={text}
+          rows={1}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
+          onKeyDown={(e) => {
+            // Enter → satır atla; Ctrl/Cmd+Enter → gönder.
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              send();
+            }
+          }}
         />
 
         <button
