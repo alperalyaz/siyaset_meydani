@@ -1032,13 +1032,11 @@ export function App() {
               }
               speakingRef.current = false;
               if (!runningRef.current) return;
-              // Spiker mecburen duruma el koyar: kaos repliği + müdahale ekranı.
-              const chaosLine = modLines(gunlukRef.current, sessionLangRef.current).clashChaos;
-              append({ id: uid(), speaker: "moderator", text: chaosLine, mode: "normal" });
-              {
-                const mctrl = new AbortController();
-                void speakVoice(chaosLine, 9, undefined, mctrl.signal);
-              }
+              // Duraklat ve KARARI kullanıcıya bırak — sunucu HENÜZ konuşmaz.
+              // Modal karar noktasıdır: bir soruyla el koyarsa sunucu o soruyu
+              // sorar; "bırakın kapışsınlar" derse sunucu hiç araya girmez,
+              // kavga kaldığı yerden sürer. (Önceden sunucu "sükûnet lütfen"
+              // deyip müdahaleyi kullanıcı seçmeden yapıyordu — çelişkiydi.)
               pause();
               persistSession();
               setInterjectModal("clash");
