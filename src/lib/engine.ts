@@ -391,8 +391,9 @@ export async function runGuest(
   apiKey: string | null,
   signal?: AbortSignal,
   onToken?: (t: string) => void,
+  postBridge = false,
 ): Promise<string> {
-  const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context);
+  const msgs = guestMessages(guest, guests, topic, utterances, cue, role, stance, context, postBridge);
   let text: string;
   if (onToken) {
     const full = await streamReply(
@@ -482,11 +483,12 @@ export async function runModeratorBridge(
   gunluk: boolean,
   apiKey: string | null,
   signal?: AbortSignal,
+  lead = false,
 ): Promise<string> {
   const { content } = await chat(
-    moderatorBridgeMessages(prevName, prevText, nextName, topic, gunluk) as ChatMessage[],
+    moderatorBridgeMessages(prevName, prevText, nextName, topic, gunluk, lead) as ChatMessage[],
     apiKey,
-    { temperature: 0.7, max_tokens: 160, signal },
+    { temperature: 0.75, max_tokens: 160, signal },
   );
   return cleanReply(content, "");
 }

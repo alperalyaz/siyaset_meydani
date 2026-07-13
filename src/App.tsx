@@ -250,6 +250,8 @@ export function App() {
   const lastClashRef = useRef(0);
   // Son sunucu köprüsünün olduğu andaki utterance sayısı (soğuma süresi için).
   const lastBridgeRef = useRef(0);
+  // Sunucu ÖZET yaptıysa: sıradaki konuk özeti önceki konuğa mal etmesin.
+  const justBridgedRef = useRef(false);
   // Masayı terk eden konukların index'leri; ve masada tek kalınca "solo"
   // (spiker-röportajı) modu — herkes gidince kalan konuk spikerin sorularını
   // bekler. walkedOutRef görsel işaretleme için de kullanılır.
@@ -941,26 +943,38 @@ export function App() {
         // sıradaki konuğa fikrini sorar — akışı gerçek bir açık oturum gibi
         // yumuşatır. ÖNEMLİ: bu SPİKER MÜDAHALESİ SAYILMAZ; boşta sayacını
         // (lastActivityRef) SIFIRLAMAZ, yani 3 dk sessizlik molası yine işler.
+        // Sunucu, bir ORKESTRA ŞEFİ gibi: konuklar KIZIŞIP birbirine laf
+        // yetiştirirken (yüksek reyting) SUSAR, kendi hallerine bırakır;
+        // ortam DURGUNKEN / BAŞLANGIÇTA çok aktif olur — canlandırır, yönlendirir.
+        // Sıklık reytingle TERS orantılı; başlangıçta ekstra aktif.
         {
           const prevSp = lastGuestSpeaker();
           const prevText =
             prevSp !== null ? utterRef.current.filter((u) => u.speaker === prevSp).slice(-1)[0]?.text ?? "" : "";
+          // Reytinge göre taban olasılık: 72+ neredeyse sus, düşükte çok aktif.
+          const base =
+            dec.rating >= 72 ? 0.05 : dec.rating >= 58 ? 0.25 : dec.rating >= 44 ? 0.5 : 0.8;
+          // Açılış civarı (ilk ~12 mesaj) sunucu belirgin biçimde daha aktif.
+          const prob = utterRef.current.length < 12 ? Math.max(base, 0.6) : base;
           const bridgeOk =
             role === "continue" &&
             !modNoteRef.current &&
             prevSp !== null &&
             prevSp !== speaker &&
-            prevText.length > 180 &&
-            utterRef.current.length - lastBridgeRef.current >= 6 &&
-            Math.random() < 0.45;
+            prevText.length > 120 &&
+            utterRef.current.length - lastBridgeRef.current >= 3 &&
+            Math.random() < prob;
           if (bridgeOk) {
+            // Düşük reyting/başta daha çok NÖTR "canlandır" üslubu; yüksekte özet.
+            const lead = Math.random() < (dec.rating < 52 ? 0.55 : 0.25);
             setThinking(null);
             const bridge = await runModeratorBridge(
-              g[prevSp!].name, prevText, g[speaker].name, t, gunlukRef.current, apiKeyRef.current, ctrl.signal,
+              g[prevSp!].name, prevText, g[speaker].name, t, gunlukRef.current, apiKeyRef.current, ctrl.signal, lead,
             ).catch(() => "");
             if (bridge.trim() && runningRef.current) {
               lastBridgeRef.current = utterRef.current.length;
               append({ id: uid(), speaker: "moderator", text: bridge, mode: "normal" });
+              justBridgedRef.current = !lead; // özet yaptıysa konuk karışmasın
               speakingRef.current = true;
               await pace(bridge, 9, undefined, ctrl.signal); // 9 = sunucu sesi
               speakingRef.current = false;
@@ -971,6 +985,8 @@ export function App() {
           }
         }
 
+        const postBridge = justBridgedRef.current;
+        justBridgedRef.current = false;
         const text =
           pre?.text ??
           (await runGuest(
@@ -986,6 +1002,7 @@ export function App() {
             apiKeyRef.current,
             ctrl.signal,
             (token) => setStreamingText((p) => p + token),
+            postBridge,
           ));
         rate429Ref.current = 0; // tur başarılı — limit sayacını sıfırla
         syncMeta();
@@ -1314,6 +1331,11 @@ export function App() {
     setWalkedOut(new Set());
     soloRef.current = false;
     lastWalkoutRef.current = 0;
+    // Soğuma sayaçlarını da sıfırla — yoksa aynı sekmede açılan sonraki
+    // oturumlarda (utterance sayısı sıfırlanır ama sayaç birikmiş kalırdı)
+    // köprü/kızışma çok geç tetikleniyordu.
+    lastBridgeRef.current = 0;
+    lastClashRef.current = 0;
     setRating(50);
     setRatingNote("");
     setSuggestions([]);

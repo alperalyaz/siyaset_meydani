@@ -239,25 +239,35 @@ export function moderatorBridgeMessages(
   nextName: string,
   topic: string,
   gunluk: boolean,
+  lead = false, // true: nötr "canlandır+yönlendir"; false: özet+devir
 ) {
   const tr = detectTopicLang(topic) === "tr";
   const toneTr = gunluk
     ? "Sıcak, neşeli bir gündüz kuşağı sunucusu tonuyla (ama abartmadan)."
-    : "Sakin, profesyonel bir TV sunucusu tonuyla.";
+    : "Sakin, sıcak, profesyonel bir TV sunucusu tonuyla.";
   const toneEn = gunluk
     ? "In a warm, cheerful daytime-host tone (without overdoing it)."
-    : "In a calm, professional TV-host tone.";
-  return [
-    {
-      role: "system" as const,
-      content: tr
-        ? `Sen bir televizyon açık oturumunun KADIN sunucususun. Görevin: söz bir konuktan diğerine geçerken kısa bir KÖPRÜ cümlesi kurmak. ${toneTr} Taraf TUTMAZSIN, kendi görüşünü KATMAZSIN, yeni bilgi eklemezsin — sadece önceki konuşmayı sadeleştirip sözü devredersin.`
-        : `You are the female HOST of a TV panel debate. Your job: a short BRIDGE line as the floor passes between guests. ${toneEn} You take NO side, add NO opinion of your own, add no new facts — you just distill the previous point and hand off.`,
-    },
-    {
-      role: "user" as const,
-      content: tr
-        ? `Konu: "${topic}"
+    : "In a calm, warm, professional TV-host tone.";
+  const system = tr
+    ? `Sen bir televizyon açık oturumunun KADIN sunucususun — programı canlı tutan, akışı YÖNETEN kişi. ${toneTr} Taraf TUTMAZSIN, konunun özüne dair kendi görüşünü KATMAZSIN, yeni bilgi/iddia eklemezsin. Yalnızca herkesin kabul edebileceği, zararsız, birleştirici sözlerle sözü devredersin.`
+    : `You are the female HOST of a TV panel debate — the one who keeps it lively and STEERS the flow. ${toneEn} You take NO side, add NO opinion on the substance, add no new facts/claims. You hand off with warm, harmless, unifying remarks everyone can accept.`;
+
+  const userLead = tr
+    ? `Konu: "${topic}"
+
+Ortam biraz durgun; SEN CANLILIK GETİRECEKSİN. KISA (1-2 cümle), sıcak ve TARAFSIZ bir sunucu repliği yaz:
+- Herkesin kabul edebileceği zararsız bir vurgu yap ("Gerçekten çok önemli bir noktaya değindiniz", "İtiraf edeyim ben de merak içindeyim", "İşte tam da bu yüzden bu masadasınız").
+- Sonra sözü ${nextName}'e sıcakça ver ("Sayın ${nextName}, sizden dinleyelim", "Peki ${nextName}, siz bu işe nasıl bakıyorsunuz?").
+Görüş bildirme, özet yapma, taraf tutma. Sadece sunucu repliğini yaz; isim etiketi/tırnak/sahne yönergesi ekleme.`
+    : `Topic: "${topic}"
+
+Things are a bit flat; YOU bring the energy. Write a SHORT (1-2 sentence), warm, NEUTRAL host line:
+- A harmless remark everyone can accept ("You've touched on something really important", "I'll admit I'm just as curious", "This is exactly why you're all here").
+- Then warmly hand off to ${nextName} ("${nextName}, let's hear from you", "So ${nextName}, how do you see this?").
+No opinion, no summary, no side-taking. Write only the host line; no label/quotes/stage directions.`;
+
+  const userSummary = tr
+    ? `Konu: "${topic}"
 
 Az önce ${prevName} konuştu ve şunu söyledi:
 """${prevText.slice(0, 700)}"""
@@ -268,7 +278,7 @@ Az önce ${prevName} konuştu ve şunu söyledi:
 - Sonra ${nextName}'e dönüp fikrini sor ("siz ne düşünüyorsunuz?" / "buna katılıyor musunuz?").
 Örnek biçim: "Evet Sayın ${nextName}, ${prevName}'i dinlediniz — kendisi [tek cümle özet] diyor. Peki siz ne düşünüyorsunuz?"
 Sadece sunucu repliğini yaz; isim etiketi, tırnak, sahne yönergesi ekleme.`
-        : `Topic: "${topic}"
+    : `Topic: "${topic}"
 
 ${prevName} just spoke and said:
 """${prevText.slice(0, 700)}"""
@@ -278,8 +288,11 @@ Now hand the floor to ${nextName}. Write a SHORT (1-2 sentence) bridge in THIS s
 - YOU summarize ${prevName}'s long point in ONE plain sentence ("They're saying ...").
 - Then turn to ${nextName} and ask for their view ("what do you think?" / "do you agree?").
 Example: "Yes ${nextName}, you heard ${prevName} — they're arguing [one-sentence summary]. So what's your take?"
-Write only the host line; no name label, quotes, or stage directions.`,
-    },
+Write only the host line; no name label, quotes, or stage directions.`;
+
+  return [
+    { role: "system" as const, content: system },
+    { role: "user" as const, content: lead ? userLead : userSummary },
   ];
 }
 
@@ -444,11 +457,13 @@ export function guestMessages(
   role: GuestRole,
   stance?: Stance | null,
   context?: string | null,
+  postBridge = false, // sunucu az önce özetleyip sözü SANA verdi
 ) {
   const transcript = transcriptForModel(utterances, allGuests);
 
-  const roleHint =
-    role === "redirect"
+  const roleHint = postBridge
+    ? "SUNUCU az önce önceki konuşmacının sözünü ÖZETLEYİP sözü SANA verdi ve fikrini sordu. DİKKAT: o özeti SUNUCU yaptı, önceki konuk DEĞİL — sakın önceki konuğa 'çok güzel özetledin' deme. Önceki konuğun ASIL argümanına doğrudan gir (katıl ya da karşı çık), kendi net fikrini savun. İstersen sunucuya bir cümleyle sıcak bir selam ver, sonra konuya dal."
+    : role === "redirect"
       ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir."
       : role === "answerHost"
         ? "SPİKER AZ ÖNCE SANA HİTABEN BİR ŞEY SÖYLEDİ. Bu konuşma sırası SADECE spikere cevap vermen için. Diğer konuklara laf yetiştirme, tartışmaya devam etme — ÖNCE spikere dön: sorduğu soruyu DOĞRUDAN yanıtla, söylediğine NET tepki ver. Spikeri görmezden gelip diğer konuklarla tartışmaya devam ETME. Spikerin sözünü duymazdan gelmek YAYINDAN ATILMA sebebidir. Kısaca spikere hitap et, sorusunu/sözünü yanıtla, sonra istersen kendi fikrine bağla. AMA ÖNCE SPİKER."
