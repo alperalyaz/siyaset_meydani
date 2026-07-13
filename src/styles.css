@@ -1168,6 +1168,42 @@ html.theme-gunluk .panel {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* Ayarlar modalı: geniş; başlık/sekmeler sabit, YALNIZCA sekme içeriği
+   (modal__scroll) gerekirse kayar — dış scroll asla oluşmaz. İçeriğe göre
+   büyür ama görünür alanı aşmaz (premium sekmesi kompakt, manuel gerekince
+   iç-scroll). */
+.modal--settings {
+  max-width: 560px;
+  max-height: min(90vh, 90dvh);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 0.2rem;
+  padding-right: 0.2rem;
+}
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.settings-premium__alt {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
 .modal h2 {
   margin: 0 0 0.8rem;
 }

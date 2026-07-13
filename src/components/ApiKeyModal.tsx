@@ -16,7 +16,7 @@ interface Props {
   onClearEleven?: () => void;
   // Hangi HD anahtarı kayıtlı (sekme içi varsayılan seçim için).
   currentVoiceEngine?: "gemini" | "eleven";
-  // Modal açıldığında hangi sekme görünsün (panel ⚙️ → seslendirme).
+  // Modal açıldığında hangi manuel alt sekme görünsün (panel ⚙️ → seslendirme).
   initialTab?: "llm" | "voice";
 }
 
@@ -104,16 +104,22 @@ export function ApiKeyModal({
   initialTab,
 }: Props) {
   const { t } = useT();
+  // Üst düzey: Premium (yakında) vs Manuel yapılandırma (BYOK).
+  const [topTab, setTopTab] = useState<"premium" | "manual">("premium");
   const [tab, setTab] = useState<"llm" | "voice">(initialTab ?? "llm");
   const [value, setValue] = useState(currentKey ?? "");
   const [provider, setProvider] = useState<ProviderKind>(currentProvider ?? "deepseek");
   const [engine, setEngine] = useState<"gemini" | "eleven">(currentVoiceEngine ?? "gemini");
   const [elevenVal, setElevenVal] = useState(currentElevenKey ?? "");
 
-  // Her açılışta istenen sekmeyle başla (panel ⚙️ → seslendirme).
+  // Açılışta doğru sekme: hata varsa (deneme bitti/anahtar hatası) ya da
+  // seslendirme anahtarı istendi ise doğrudan Manuel'e düş; yoksa Premium'u
+  // vitrine koy. Alt sekme initialTab'e göre.
   useEffect(() => {
-    if (open) setTab(initialTab ?? "llm");
-  }, [open, initialTab]);
+    if (!open) return;
+    setTab(initialTab ?? "llm");
+    setTopTab(reason || initialTab === "voice" ? "manual" : "premium");
+  }, [open, initialTab, reason]);
 
   if (!open) return null;
 
@@ -123,124 +129,150 @@ export function ApiKeyModal({
 
   return (
     <div className="modal__backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--settings" onClick={(e) => e.stopPropagation()}>
         <h2>{t("key.title")}</h2>
         {reason && <p className="modal__reason">{reason}</p>}
 
-        {onSaveEleven && (
-          <div className="modal__tabs modal__tabs--top">
-            <button
-              className={`btn btn--sm ${tab === "llm" ? "btn--primary" : "btn--ghost"}`}
-              onClick={() => setTab("llm")}
-            >
-              {t("key.tab.llm")}
-            </button>
-            <button
-              className={`btn btn--sm ${tab === "voice" ? "btn--primary" : "btn--ghost"}`}
-              onClick={() => setTab("voice")}
-            >
-              {t("key.tab.voice")}
-            </button>
-          </div>
-        )}
+        <div className="modal__tabs modal__tabs--top">
+          <button
+            className={`btn btn--sm ${topTab === "premium" ? "btn--primary" : "btn--ghost"}`}
+            onClick={() => setTopTab("premium")}
+          >
+            {t("settings.tab.premium")}
+          </button>
+          <button
+            className={`btn btn--sm ${topTab === "manual" ? "btn--primary" : "btn--ghost"}`}
+            onClick={() => setTopTab("manual")}
+          >
+            {t("settings.tab.manual")}
+          </button>
+        </div>
 
-        {!showVoice && (
-          <>
-            <p className="modal__desc">{t("key.desc")}</p>
-
-            <div className="modal__tabs">
-              {PROVIDERS.map((p) => (
-                <button
-                  key={p.id}
-                  className={`btn btn--sm ${provider === p.id ? "btn--primary" : "btn--ghost"}`}
-                  onClick={() => setProvider(p.id)}
-                >
-                  {p.label}
-                </button>
-              ))}
+        <div className="modal__scroll">
+          {topTab === "premium" && (
+            <div className="settings-premium">
+              <PremiumWaitlist source="settings-tab" />
+              <p className="settings-premium__alt">
+                {t("settings.premium.altPre")}{" "}
+                <button className="linklike" onClick={() => setTopTab("manual")}>
+                  {t("settings.premium.altLink")}
+                </button>{" "}
+                {t("settings.premium.altPost")}
+              </p>
             </div>
+          )}
 
-            <div className="modal__prov">
-              {sel.noteKey && <p>{t(sel.noteKey)}</p>}
-              <LinkedLine template={t("key.prov.get")} href={sel.link} linkText={sel.linkText} />
-            </div>
-
-            <input
-              type="password"
-              placeholder={sel.placeholder}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              autoFocus
-            />
-            <div className="modal__actions">
-              {currentKey && (
-                <button className="btn btn--ghost" onClick={onClear}>
-                  {t("key.delete")}
-                </button>
+          {topTab === "manual" && (
+            <>
+              {onSaveEleven && (
+                <div className="modal__tabs">
+                  <button
+                    className={`btn btn--sm ${tab === "llm" ? "btn--primary" : "btn--ghost"}`}
+                    onClick={() => setTab("llm")}
+                  >
+                    {t("key.tab.llm")}
+                  </button>
+                  <button
+                    className={`btn btn--sm ${tab === "voice" ? "btn--primary" : "btn--ghost"}`}
+                    onClick={() => setTab("voice")}
+                  >
+                    {t("key.tab.voice")}
+                  </button>
+                </div>
               )}
-              <button className="btn btn--ghost" onClick={onClose}>
-                {t("key.close")}
-              </button>
-              <button
-                className="btn btn--primary"
-                disabled={!value.trim()}
-                onClick={() => onSave(value.trim(), provider)}
-              >
-                {t("key.save")}
-              </button>
-            </div>
 
-            <PremiumWaitlist source="settings-llm" />
-          </>
-        )}
-
-        {showVoice && (
-          <>
-            <p className="modal__desc">{t("key.voice.desc")}</p>
-
-            <div className="modal__tabs">
-              {VOICE_ENGINES.map((e) => (
-                <button
-                  key={e.id}
-                  className={`btn btn--sm ${engine === e.id ? "btn--primary" : "btn--ghost"}`}
-                  onClick={() => setEngine(e.id)}
-                >
-                  {e.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="modal__prov">
-              <p>{t(eng.descKey)}</p>
-              <LinkedLine template={t("key.prov.get")} href={eng.link} linkText={eng.linkText} />
-            </div>
-
-            <input
-              type="password"
-              placeholder={eng.placeholder}
-              value={elevenVal}
-              onChange={(e) => setElevenVal(e.target.value)}
-              autoFocus
-            />
-            <div className="modal__actions">
-              {currentElevenKey && onClearEleven && (
-                <button className="btn btn--ghost" onClick={() => { setElevenVal(""); onClearEleven(); }}>
-                  {t("key.eleven.delete")}
-                </button>
+              {!showVoice && (
+                <>
+                  <p className="modal__desc">{t("key.desc")}</p>
+                  <div className="modal__tabs">
+                    {PROVIDERS.map((p) => (
+                      <button
+                        key={p.id}
+                        className={`btn btn--sm ${provider === p.id ? "btn--primary" : "btn--ghost"}`}
+                        onClick={() => setProvider(p.id)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="modal__prov">
+                    {sel.noteKey && <p>{t(sel.noteKey)}</p>}
+                    <LinkedLine template={t("key.prov.get")} href={sel.link} linkText={sel.linkText} />
+                  </div>
+                  <input
+                    type="password"
+                    placeholder={sel.placeholder}
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="modal__actions">
+                    {currentKey && (
+                      <button className="btn btn--ghost" onClick={onClear}>
+                        {t("key.delete")}
+                      </button>
+                    )}
+                    <button className="btn btn--ghost" onClick={onClose}>
+                      {t("key.close")}
+                    </button>
+                    <button
+                      className="btn btn--primary"
+                      disabled={!value.trim()}
+                      onClick={() => onSave(value.trim(), provider)}
+                    >
+                      {t("key.save")}
+                    </button>
+                  </div>
+                </>
               )}
-              <button className="btn btn--ghost" onClick={onClose}>
-                {t("key.close")}
-              </button>
-              <button
-                className="btn btn--primary"
-                disabled={!elevenVal.trim()}
-                onClick={() => onSaveEleven!(elevenVal.trim())}
-              >
-                {t("key.eleven.save")}
-              </button>
-            </div>
-          </>
-        )}
+
+              {showVoice && (
+                <>
+                  <p className="modal__desc">{t("key.voice.desc")}</p>
+                  <div className="modal__tabs">
+                    {VOICE_ENGINES.map((e) => (
+                      <button
+                        key={e.id}
+                        className={`btn btn--sm ${engine === e.id ? "btn--primary" : "btn--ghost"}`}
+                        onClick={() => setEngine(e.id)}
+                      >
+                        {e.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="modal__prov">
+                    <p>{t(eng.descKey)}</p>
+                    <LinkedLine template={t("key.prov.get")} href={eng.link} linkText={eng.linkText} />
+                  </div>
+                  <input
+                    type="password"
+                    placeholder={eng.placeholder}
+                    value={elevenVal}
+                    onChange={(e) => setElevenVal(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="modal__actions">
+                    {currentElevenKey && onClearEleven && (
+                      <button className="btn btn--ghost" onClick={() => { setElevenVal(""); onClearEleven(); }}>
+                        {t("key.eleven.delete")}
+                      </button>
+                    )}
+                    <button className="btn btn--ghost" onClick={onClose}>
+                      {t("key.close")}
+                    </button>
+                    <button
+                      className="btn btn--primary"
+                      disabled={!elevenVal.trim()}
+                      onClick={() => onSaveEleven!(elevenVal.trim())}
+                    >
+                      {t("key.eleven.save")}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
