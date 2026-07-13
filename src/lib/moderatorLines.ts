@@ -42,8 +42,8 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
         ? "Well my dears, sadly the show ends here. 🥹 Thank you each so much, you were absolute sweethearts. Take care, see you next week okay? Kisses, byee! 💋"
         : "Dear guests, we've reached the end of our program. Thank you all for your participation and valuable contributions. See you in the next program, goodbye.",
       idlePause: gunluk
-        ? "Aww dears, since you went quiet the chat drifted off — I took a little break so it wouldn't go to waste. 🌸 Come pick a question below or hit ▶ Resume, let's have fun together!"
-        : "You've been quiet for a while; I paused so the session wouldn't run on its own. Jump in with one of the questions below, or continue with ▶ Resume.",
+        ? "Aww dears, the guests have been steering the chat for a while — maybe it's your turn, so I took a little break. 🌸 Come pick a question below or hit ▶ Resume, let's have fun together!"
+        : "The guests have been steering the flow for a while; I took a short break in case it's your turn to take the wheel. Jump in with one of the questions below, or continue with ▶ Resume.",
       clashChaos: gunluk
         ? "Sweethearts, please, one at a time! 😅 Everyone's talking over each other, I can't hear a thing!"
         : "Dear guests, please! Everyone is talking at once and nothing can be heard — order in the studio, please! 🗯️",
@@ -77,8 +77,8 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
       ? "Eee canlarım, ne yazık ki program burada bitiyor. 🥹 Hepinize ayrı ayrı teşekkürler, bir dünya tatlıydınız valla. Kendinize iyi bakın, haftaya yine görüşürüz olur mu? Öptüm sizi, bayy! 💋"
       : "Sayın konuklar, programımızın sonuna geldik. Hepinize katılımınız ve değerli katkılarınız için çok teşekkür ederiz. Bir sonraki programda görüşmek üzere, hoşçakalın.",
     idlePause: gunluk
-      ? "Ay canlarım, siz bir şey demeyince muhabbet başıboş kaldı — boşa gitmesin diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
-      : "Bir süredir söz almadınız; oturum kendi başına sürmesin diye ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
+      ? "Ay canlarım, muhabbete bir süredir konuklar yön veriyor — belki de sıra sizdedir diye ufak bir mola verdim. 🌸 Hadi aşağıdan bir soru seçin ya da ▶ Devam deyin, birlikte coşalım!"
+      : "Bir süredir akışa konuklar yön veriyor; belki de sizin yön verme zamanınız gelmiştir diye kısa bir ara verdim. Aşağıdaki sorulardan biriyle söze girin ya da ▶ Devam ile sürdürün.",
     clashChaos: gunluk
       ? "Ayy canlarım, birbirinize girmeyin! 😅 Herkes aynı anda konuşuyor, hiçbir şey anlamıyorum ki!"
       : "Sayın konuklar, lütfen! Herkes aynı anda konuşuyor, hiçbir şey anlaşılmıyor — stüdyoya bir sükûnet lütfen! 🗯️",
