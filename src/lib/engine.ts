@@ -524,7 +524,19 @@ function cleanReply(text: string, name: string): string {
   t = t.replace(prefix, "");
   t = t.replace(/^["'“”]|["'“”]$/g, "");
   t = t.replace(/^\((.*?)\)\s*/, "");
+  t = stripLatex(t);
   return stripNonLatin(t.trim());
+}
+
+// DeepSeek nadiren ifadeyi LaTeX'e sarıyor: '\( \text{😏} \)' gibi.
+// Komut kabuklarını söküp içeriği bırakır; düz metne dokunmaz.
+function stripLatex(text: string): string {
+  return text
+    .replace(/\\text(?:bf|it|rm|tt)?\s*\{([^{}]*)\}/g, "$1") // \text{X} → X
+    .replace(/\\(?:mathrm|mathbf|emph|mbox)\s*\{([^{}]*)\}/g, "$1")
+    .replace(/\\[()[\]]/g, "") // \( \) \[ \] sınırlayıcıları
+    .replace(/\$\$([^$]*)\$\$/g, "$1") // $$...$$ (tek $ para işareti olabilir, dokunma)
+    .replace(/ {2,}/g, " ");
 }
 
 // Groq/Llama gibi modellerden araya sızabilen CJK (Çin/Japon/Kore),

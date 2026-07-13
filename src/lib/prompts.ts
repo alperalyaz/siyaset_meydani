@@ -255,15 +255,23 @@ export function moderatorBridgeMessages(
   const userLead = tr
     ? `Konu: "${topic}"
 
+Az önce ${prevName} konuştu ve şunu söyledi:
+"""${prevText.slice(0, 500)}"""
+
 Ortam biraz durgun; SEN CANLILIK GETİRECEKSİN. KISA (1-2 cümle), sıcak ve TARAFSIZ bir sunucu repliği yaz:
-- Herkesin kabul edebileceği zararsız bir vurgu yap ("Gerçekten çok önemli bir noktaya değindiniz", "İtiraf edeyim ben de merak içindeyim", "İşte tam da bu yüzden bu masadasınız").
-- Sonra sözü ${nextName}'e sıcakça ver ("Sayın ${nextName}, sizden dinleyelim", "Peki ${nextName}, siz bu işe nasıl bakıyorsunuz?").
+- İlk cümlen az önce SÖYLENENE gerçekten OTURSUN: iddialı bir çıkışsa "Ne iddialı bir söz!", sert bir benzetmeyse "Bu benzetme masayı hareketlendirecek", merak uyandırdıysa "İtiraf edeyim, ben de merak ettim şimdi" gibi. HAZIR KALIP YAPIŞTIRMA: ortada soru yokken "can alıcı soru" deme, örnek verilmemişken "güzel örnek" deme — uymayan tepki sırıtır.
+- Sonra sözü ${nextName}'e sıcakça ver ("siz bu işe nasıl bakıyorsunuz?", "sizden dinleyelim").
+- HİTAP DOĞAL OLSUN: konuğun tam adını sayıp dökme ("Marcus Junius Brutus" değil), en bilinen kısa haliyle seslen ("Sayın Brutus" gibi).
 Görüş bildirme, özet yapma, taraf tutma. Sadece sunucu repliğini yaz; isim etiketi/tırnak/sahne yönergesi ekleme.`
     : `Topic: "${topic}"
 
+${prevName} just spoke and said:
+"""${prevText.slice(0, 500)}"""
+
 Things are a bit flat; YOU bring the energy. Write a SHORT (1-2 sentence), warm, NEUTRAL host line:
-- A harmless remark everyone can accept ("You've touched on something really important", "I'll admit I'm just as curious", "This is exactly why you're all here").
-- Then warmly hand off to ${nextName} ("${nextName}, let's hear from you", "So ${nextName}, how do you see this?").
+- Your first sentence must genuinely FIT what was just said: a bold claim → "Now that's a bold statement!", a sharp metaphor → "That image will stir this table", something intriguing → "I'll admit, now I'm curious too". NO canned filler: don't call it "a crucial question" when nobody asked a question, don't praise "a great example" when no example was given — a mismatched reaction sticks out.
+- Then warmly hand off to ${nextName} ("how do you see this?", "let's hear from you").
+- Address guests NATURALLY: don't recite full names ("Marcus Junius Brutus"), use the short, familiar form ("Brutus").
 No opinion, no summary, no side-taking. Write only the host line; no label/quotes/stage directions.`;
 
   const userSummary = tr
@@ -277,6 +285,7 @@ Az önce ${prevName} konuştu ve şunu söyledi:
 - ${prevName}'in uzun sözünü SEN, BİR cümlede, sade bir dille özetle ("Kendisi ... diyor" gibi).
 - Sonra ${nextName}'e dönüp fikrini sor ("siz ne düşünüyorsunuz?" / "buna katılıyor musunuz?").
 Örnek biçim: "Evet Sayın ${nextName}, ${prevName}'i dinlediniz — kendisi [tek cümle özet] diyor. Peki siz ne düşünüyorsunuz?"
+HİTAP DOĞAL OLSUN: konukların tam adını sayıp dökme ("Marcus Junius Brutus" değil), en bilinen kısa haliyle seslen ("Sayın Brutus" gibi).
 Sadece sunucu repliğini yaz; isim etiketi, tırnak, sahne yönergesi ekleme.`
     : `Topic: "${topic}"
 
