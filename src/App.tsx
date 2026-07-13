@@ -1987,9 +1987,25 @@ export function App() {
 
       {interjectModal && (
         <div className="modal__backdrop" onClick={() => setInterjectModal(null)}>
-          <div className="modal modal--idle" onClick={(e) => e.stopPropagation()}>
+          <div
+            className={`modal modal--idle${interjectModal === "idle" ? " modal--reji" : ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {interjectModal === "idle" && (
+              <div className="reji-tag">{t("idle.tag")} · {t("panel.live")}</div>
+            )}
             <h2>{t(interjectModal === "clash" ? "clash.title" : interjectModal === "solo" ? "solo.title" : "idle.title")}</h2>
-            <p className="modal__desc">{t(interjectModal === "clash" ? "clash.body" : interjectModal === "solo" ? "solo.body" : "idle.body")}</p>
+            <p className="modal__desc">
+              {t(
+                interjectModal === "clash"
+                  ? "clash.body"
+                  : interjectModal === "solo"
+                    ? "solo.body"
+                    : gunlukTheme
+                      ? "idle.bodyGunluk"
+                      : "idle.body",
+              )}
+            </p>
 
             {loadingSuggestions ? (
               <p className="idle-loading">{t("idle.loading")}</p>

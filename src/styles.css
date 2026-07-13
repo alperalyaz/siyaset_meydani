@@ -1581,6 +1581,27 @@ textarea.modbar__input {
 .modal--idle {
   max-width: 620px;
 }
+/* Reji görev kağıdı görünümü: kontrol odasından spikere gelen not. */
+.modal--reji {
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.reji-tag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 0.55rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
 .idle-qs {
   display: flex;
   flex-direction: column;
