@@ -196,6 +196,40 @@ KARAKTER VE TAVIR — burası gerçek, kızışabilen bir canlı yayın:
 Spiker araya girdiğinde (sana soru sorduğunda veya yönlendirdiğinde), TÜM TARTIŞMAYI ANINDA KES. Diğer konuklarla konuşmayı BIRAK. ÖNCE spikere dön: "buyrun sayın spiker", "tabii efendim", "dinliyorum" gibi karakterine uygun bir geçişle spikeri muhatap al. Sonra spikerin sorusunu/sözünü DOĞRUDAN yanıtla — cevapla, eleştir, terslen, reddet ama MUTLAKA yanıtla. Spikeri GÖRMEZDEN GELMEK YOK. Spikere cevap vermeden diğer konuklara laf yetiştirmeye devam edersen yayından atılırsın. Spikere cevap verdikten SONRA dilersen tartışmaya dönebilirsin. Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.${sessionGunluk ? "\n" + GUNLUK_PERSONA_BLOCK : ""}`;
 }
 
+// Konuk masayı ÖFKEYLE terk ederken söylediği ayrılık repliği.
+export function walkoutMessages(guest: Guest, allGuests: Guest[], topic: string, stance?: Stance | null) {
+  const tr = detectTopicLang(topic) === "tr";
+  return [
+    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, null) },
+    {
+      role: "user" as const,
+      content: tr
+        ? `Tartışma çığırından çıktı; bu masada oturmanın ONURUNA yakışmadığına karar verdin. ÖFKEYLE ve gururla programı TERK EDİYORSUN — çekip gidiyorsun. 1-2 KISA cümle: neden gittiğini karakterine uygun söyle, masadakilere/sunucuya son bir laf sok, sonra git. Örnek TON (kopyalama): "Bu maskaralığa bir dakika daha ortak olmam! Sizinle tartışmak vakit kaybı — ben gidiyorum." Sadece kendi repliğini yaz; isim, tırnak, sahne yönergesi ekleme.`
+        : `The debate has gone off the rails; you've decided sitting at this table is beneath your dignity. You're STORMING OFF the show, angrily and proudly. 1-2 SHORT sentences: say why you're leaving (in character), throw one last jab at the table/host, then leave. Example TONE (don't copy): "I won't be part of this circus one more minute! Arguing with you is a waste of time — I'm leaving." Write only your line; no name, quotes, or stage directions.`,
+    },
+  ];
+}
+
+// Herkes gidince masada tek kalan konuğun MEYDAN OKUYAN kapanış repliği.
+export function lastStandingMessages(
+  guest: Guest,
+  allGuests: Guest[],
+  topic: string,
+  leftNames: string,
+  stance?: Stance | null,
+) {
+  const tr = detectTopicLang(topic) === "tr";
+  return [
+    { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, null) },
+    {
+      role: "user" as const,
+      content: tr
+        ? `Diğer konuklar (${leftNames}) tartışmaya dayanamayıp masayı TERK ETTİ; masada tek başına SEN kaldın. MUZAFFER ve MEYDAN OKUYAN bir tonda konuş: (1) bu konudaki kendi görüşünü 1-2 cümlede net özetle, (2) sonra doğrudan SUNUCUYA dön ve "ben kaçmam" tavrıyla onu soru sormaya davet et. Örnek TON (kopyalama): "İşte kaçtılar! Söyleyecek bir şeyleri kalmayınca masayı terk etmek kolay. Ama ben buradayım — diyeceğimi dedim, arkasındayım. Sayın sunucu, siz sorun, ben cevaplayayım; ben bu korkaklar gibi kaçıp gitmem!" 2-3 cümle. Sadece kendi repliğini yaz.`
+        : `The other guests (${leftNames}) couldn't take the debate and WALKED OFF; you're the only one left at the table. Speak in a TRIUMPHANT, DEFIANT tone: (1) crisply summarize your own view in 1-2 sentences, (2) then turn directly to the HOST and, with an "I don't run" attitude, invite them to ask you questions. Example TONE (don't copy): "There they go! Easy to walk off once you've run out of things to say. But I'm still here — I stand by every word. Mr. Host, you ask, I'll answer; I don't flee like these cowards!" 2-3 sentences. Write only your line.`,
+    },
+  ];
+}
+
 // Sunucu köprüsü: söz bir konuktan diğerine geçerken sunucu ara sıra araya
 // girip önceki (uzun) konuşmayı BİR cümlede özetler ve sıradaki konuğa dönüp
 // fikrini sorar. Taraf tutmaz, kendi görüşünü katmaz — sadece akışı bağlar.
@@ -304,9 +338,10 @@ Her konuğa, aşağıdaki gerçek kimliğine bakarak bu konuda GERÇEKTE tutaca�
 - Şart değil ama mümkünse görüşler birbirinden ayrışsın; yine de sadakat her zaman önce gelir.
 - "aci": o kişinin kendi ağzından, karakterine uygun, tek cümlelik özgün ve iddialı savunma açısı.
 - "cinsiyet": her konuğun cinsiyeti — "erkek" ya da "kadın" (bilmiyorsan boş bırak).
+- "uslup": o kişinin GERÇEK mizacına en uygun tartışma üslubu — ŞUNLARDAN BİRİ: "agresif", "pasif-agresif", "alaycı", "bilgiç", "duygusal", "soğukkanlı", "provokatör", "arabulucu", "nükteli", "otoriter". (Tarihte sert/otoriter/kavgacı/kışkırtıcı biriyse öyle ver; uzlaşmacı/bilge biriyse ona göre. Gerçek kişiliğine sadık kal.)
 
 Sadece şu JSON'u döndür:
-{"roles":[{"i":0,"pozisyon":"Lehte/Aleyhte/Kısmen","aci":"...","cinsiyet":"erkek"},{"i":1,"pozisyon":"...","aci":"...","cinsiyet":"kadın"}]}`,
+{"roles":[{"i":0,"pozisyon":"Lehte/Aleyhte/Kısmen","aci":"...","cinsiyet":"erkek","uslup":"otoriter"},{"i":1,"pozisyon":"...","aci":"...","cinsiyet":"kadın","uslup":"nükteli"}]}`,
     },
   ];
 }

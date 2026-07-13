@@ -38,8 +38,9 @@ export interface Utterance {
   speaker: Speaker;
   text: string;
   /** "redirect" = sözü alıp yönlendirme, "interrupt" = söz kesme (kızışma),
-   *  "system" = sahne notu, "normal" = sıradan */
-  mode: "normal" | "redirect" | "interrupt" | "system";
+   *  "walkout" = konuk masayı terk ederken, "system" = sahne notu,
+   *  "normal" = sıradan */
+  mode: "normal" | "redirect" | "interrupt" | "walkout" | "system";
 }
 
 // Yönetmen artık sadece reyting + koçluk üretir; sırayı kod belirler.

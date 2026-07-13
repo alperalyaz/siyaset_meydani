@@ -20,6 +20,8 @@ import {
   moderateTopic,
   runClash,
   runModeratorBridge,
+  runWalkout,
+  runLastStanding,
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
@@ -135,7 +137,7 @@ export function App() {
   const [leaveModal, setLeaveModal] = useState(false);
   // Zorunlu spiker müdahale ekranı: "idle" = 3 dk sessizlik molası,
   // "clash" = kızışma (konuklar birbirinin sözünü kesti, stüdyo karıştı).
-  const [interjectModal, setInterjectModal] = useState<null | "idle" | "clash">(null);
+  const [interjectModal, setInterjectModal] = useState<null | "idle" | "clash" | "solo">(null);
   // Galeriye yayın: VARSAYILAN yayınlanır (sonuç ekranında otomatik).
   // Kullanıcı tek tıkla YAYINDAN KALDIRABİLİR (opt-out). Bilgilendirme,
   // "Programı Bitir" onayında ve sonuç ekranındaki yayın notunda.
@@ -248,6 +250,13 @@ export function App() {
   const lastClashRef = useRef(0);
   // Son sunucu köprüsünün olduğu andaki utterance sayısı (soğuma süresi için).
   const lastBridgeRef = useRef(0);
+  // Masayı terk eden konukların index'leri; ve masada tek kalınca "solo"
+  // (spiker-röportajı) modu — herkes gidince kalan konuk spikerin sorularını
+  // bekler. walkedOutRef görsel işaretleme için de kullanılır.
+  const walkedOutRef = useRef<Set<number>>(new Set());
+  const [walkedOut, setWalkedOut] = useState<Set<number>>(new Set());
+  const soloRef = useRef(false);
+  const lastWalkoutRef = useRef(0);
   const activeRef = useRef<number[]>([]); // net fikri olan konuklar
   const threadRef = useRef<Thread | null>(null);
   const modNoteRef = useRef<string | undefined>(undefined);
@@ -657,6 +666,11 @@ export function App() {
         cast.genders.forEach((gd, idx) => {
           if (gd && g[idx] && !g[idx].gender) g[idx].gender = gd;
         });
+        // Tartışma üslubunu LLM'den doldur (havuz-dışı Wikipedia konuklarında
+        // yoktu): kızışma, ses tonu ve "programı terk" bu üsluba göre işler.
+        cast.styles.forEach((st, idx) => {
+          if (st && g[idx] && !g[idx].debateStyle) g[idx].debateStyle = st;
+        });
         // HD sesleri: cinsiyet + dönem + üsluba göre her konuğa AYRI, kişiliğine
         // uygun ElevenLabs sesi ata (panelde tekrar yok). Konuşmadan ÖNCE olmalı.
         assignVoicesForPanel(g, gunlukRef.current);
@@ -797,6 +811,16 @@ export function App() {
         if (pendingIdlePauseRef.current) {
           pendingIdlePauseRef.current = false;
           performIdlePauseRef.current();
+          return;
+        }
+        // SOLO (spiker-röportajı) modu: herkes gitti, tek konuk kaldı. Kullanıcı
+        // soru sorana kadar bekle — modal ile spikeri davet et. Soru gelince
+        // (modNote) aşağıdaki akış konuğun cevabını üretir.
+        if (soloRef.current && !pendingModNoteRef.current && !modNoteRef.current) {
+          pause();
+          persistSession();
+          setInterjectModal("solo");
+          void doSuggest();
           return;
         }
         // Bekleyen spiker mesajını devreye sok
@@ -1049,6 +1073,70 @@ export function App() {
           }
         }
 
+        // ── PROGRAMI TERK ── Ciddi fikir ayrılığı + yüksek tansiyon + AYKIRI
+        // karakterli konuk → öfkeyle masayı terk eder. Tek kişi kalınca meydan
+        // okuyan bir kapanış + spiker-röportajı (solo) moduna geçilir.
+        // Nadir ve dramatik; gündelik modda kapalı, soğuma süreli.
+        {
+          const DRAMATIC = new Set(["provokatör", "agresif", "otoriter", "alaycı", "pasif-agresif"]);
+          const cands = activeRef.current.filter((i) => DRAMATIC.has(g[i].debateStyle ?? ""));
+          const walkoutNow =
+            !gunlukRef.current &&
+            dec.rating >= 80 &&
+            activeRef.current.length >= 2 &&
+            cands.length > 0 &&
+            utterRef.current.length - lastWalkoutRef.current >= 10 &&
+            Math.random() < 0.22;
+          if (walkoutNow) {
+            const walker = DRAMATIC.has(g[speaker].debateStyle ?? "") ? speaker : cands[0];
+            lastWalkoutRef.current = utterRef.current.length;
+            discardAhead();
+            const bye = await runWalkout(
+              g[walker], g, t, stancesRef.current[walker] ?? null, apiKeyRef.current, ctrl.signal,
+            ).catch(() => "");
+            if (bye.trim() && runningRef.current) {
+              append({ id: uid(), speaker: walker, text: bye, mode: "walkout" });
+              speakingRef.current = true;
+              await prepareVoice(bye, walker, g[walker].gender, ctrl.signal);
+              await pace(bye, walker, g[walker].gender, ctrl.signal);
+              speakingRef.current = false;
+            }
+            if (!runningRef.current) return;
+            // Masadan çıkar + görsel işaretle + sahne notu.
+            walkedOutRef.current.add(walker);
+            setWalkedOut(new Set(walkedOutRef.current));
+            activeRef.current = activeRef.current.filter((i) => i !== walker);
+            append({
+              id: uid(), speaker: "moderator", mode: "system",
+              text: modLines(gunlukRef.current, sessionLangRef.current).walkoutNote(g[walker].name),
+            });
+
+            if (activeRef.current.length >= 2) {
+              threadRef.current = mostOpposedPair(activeRef.current); // kalanlar sürsün
+            } else if (activeRef.current.length === 1) {
+              // TEK KALDI → meydan okuyan kapanış + solo (spiker-röportajı) modu.
+              const sole = activeRef.current[0];
+              const leftNames = [...walkedOutRef.current].map((i) => g[i].name).join(", ");
+              const stand = await runLastStanding(
+                g[sole], g, t, leftNames, stancesRef.current[sole] ?? null, apiKeyRef.current, ctrl.signal,
+              ).catch(() => "");
+              if (stand.trim() && runningRef.current) {
+                append({ id: uid(), speaker: sole, text: stand, mode: "normal" });
+                speakingRef.current = true;
+                await prepareVoice(stand, sole, g[sole].gender, ctrl.signal);
+                await pace(stand, sole, g[sole].gender, ctrl.signal);
+                speakingRef.current = false;
+              }
+              soloRef.current = true;
+              threadRef.current = { a: sole, b: sole, turns: 0 };
+            } else {
+              pause(); // teorik: 0 kaldı
+              return;
+            }
+            continue;
+          }
+        }
+
         // ── AKIŞ BORUSU (üretici): sıradaki tur, bu konuşma çalarken arkada
         // hazırlanır (yönetmen kararı + replik + ses). Spiker notu beklemede
         // değilse plan deterministiktir; araya girilirse geçerlilik anahtarı
@@ -1222,6 +1310,10 @@ export function App() {
     threadRef.current = null;
     modNoteRef.current = undefined;
     stancesRef.current = [];
+    walkedOutRef.current = new Set();
+    setWalkedOut(new Set());
+    soloRef.current = false;
+    lastWalkoutRef.current = 0;
     setRating(50);
     setRatingNote("");
     setSuggestions([]);
@@ -1760,12 +1852,12 @@ export function App() {
           {guests.map((g, i) => (
             <div
               key={i}
-              className={`panel__chip ${thinking === i ? "panel__chip--active" : ""}`}
+              className={`panel__chip ${thinking === i ? "panel__chip--active" : ""} ${walkedOut.has(i) ? "panel__chip--left" : ""}`}
               style={{ borderColor: g.color }}
-              title={g.era}
+              title={walkedOut.has(i) ? `${g.name} — ${t("stream.walksOff")}` : g.era}
             >
               <span style={{ background: g.color }} />
-              {g.name}
+              {walkedOut.has(i) ? "🚪 " : ""}{g.name}
             </div>
           ))}
         </div>
@@ -1846,8 +1938,8 @@ export function App() {
       {interjectModal && (
         <div className="modal__backdrop" onClick={() => setInterjectModal(null)}>
           <div className="modal modal--idle" onClick={(e) => e.stopPropagation()}>
-            <h2>{t(interjectModal === "clash" ? "clash.title" : "idle.title")}</h2>
-            <p className="modal__desc">{t(interjectModal === "clash" ? "clash.body" : "idle.body")}</p>
+            <h2>{t(interjectModal === "clash" ? "clash.title" : interjectModal === "solo" ? "solo.title" : "idle.title")}</h2>
+            <p className="modal__desc">{t(interjectModal === "clash" ? "clash.body" : interjectModal === "solo" ? "solo.body" : "idle.body")}</p>
 
             {loadingSuggestions ? (
               <p className="idle-loading">{t("idle.loading")}</p>
@@ -1872,16 +1964,28 @@ export function App() {
               <button className="btn btn--ghost" onClick={() => setInterjectModal(null)}>
                 {t("idle.stay")}
               </button>
-              <button
-                className="btn btn--primary"
-                onClick={() => {
-                  setInterjectModal(null);
-                  setSuggestions([]);
-                  drive();
-                }}
-              >
-                {t(interjectModal === "clash" ? "clash.silent" : "idle.silent")}
-              </button>
+              {interjectModal === "solo" ? (
+                <button
+                  className="btn btn--final"
+                  onClick={() => {
+                    setInterjectModal(null);
+                    setLeaveModal(true);
+                  }}
+                >
+                  🏁 {t("mod.finish")}
+                </button>
+              ) : (
+                <button
+                  className="btn btn--primary"
+                  onClick={() => {
+                    setInterjectModal(null);
+                    setSuggestions([]);
+                    drive();
+                  }}
+                >
+                  {t(interjectModal === "clash" ? "clash.silent" : "idle.silent")}
+                </button>
+              )}
             </div>
           </div>
         </div>

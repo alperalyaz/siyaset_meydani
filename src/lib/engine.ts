@@ -1,4 +1,4 @@
-import type { Guest, OpeningResult, RatingDecision, Stance, Utterance } from "../types";
+import type { Guest, OpeningResult, RatingDecision, Stance, Utterance, DebateStyle } from "../types";
 import { chat, chatStream, parseJsonLoose, ApiError, API_BASE } from "./deepseek";
 import { detectTopicLang } from "./i18n";
 import type { ChatMessage } from "./store";
@@ -15,6 +15,8 @@ import {
   topicIdeasMessages,
   clashMessages,
   moderatorBridgeMessages,
+  walkoutMessages,
+  lastStandingMessages,
   type GuestRole,
 } from "./prompts";
 
@@ -181,7 +183,13 @@ export async function suggestGuestNames(
 export interface CastResult {
   stances: (Stance | null)[];
   genders: ("male" | "female" | undefined)[];
+  styles: (DebateStyle | undefined)[];
 }
+
+const DEBATE_STYLES = new Set<DebateStyle>([
+  "agresif", "pasif-agresif", "alaycı", "bilgiç", "duygusal",
+  "soğukkanlı", "provokatör", "arabulucu", "nükteli", "otoriter",
+]);
 
 export async function assignStances(
   guests: Guest[],
@@ -192,6 +200,7 @@ export async function assignStances(
 ): Promise<CastResult> {
   const stances: (Stance | null)[] = guests.map(() => null);
   const genders: ("male" | "female" | undefined)[] = guests.map(() => undefined);
+  const styles: (DebateStyle | undefined)[] = guests.map(() => undefined);
   try {
     const { content } = await chat(castingMessages(guests, topic, context), apiKey, {
       json: true,
@@ -200,7 +209,7 @@ export async function assignStances(
       signal,
     });
     const parsed = parseJsonLoose<{
-      roles?: { i: number; pozisyon: string; aci: string; cinsiyet?: string }[];
+      roles?: { i: number; pozisyon: string; aci: string; cinsiyet?: string; uslup?: string }[];
     }>(content);
     for (const r of parsed?.roles ?? []) {
       if (r.i >= 0 && r.i < guests.length) {
@@ -208,13 +217,15 @@ export async function assignStances(
         const c = (r.cinsiyet || "").toLocaleLowerCase("tr");
         if (c.startsWith("kad")) genders[r.i] = "female";
         else if (c.startsWith("erk")) genders[r.i] = "male";
+        const u = (r.uslup || "").toLocaleLowerCase("tr").trim() as DebateStyle;
+        if (DEBATE_STYLES.has(u)) styles[r.i] = u;
       }
     }
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     // Kadrolama başarısızsa pozisyonsuz devam (yine de fikir turu çalışır).
   }
-  return { stances, genders };
+  return { stances, genders, styles };
 }
 
 // Token akışını görünür metne yazar ve TAM metni biriktirip döndürür.
@@ -425,6 +436,41 @@ export async function runClash(
     interrupt: typeof parsed?.interrupt === "string" ? parsed.interrupt.trim() : "",
     retort: typeof parsed?.retort === "string" ? parsed.retort.trim() : "",
   };
+}
+
+// Konuk öfkeyle masayı terk ederken ayrılık repliği.
+export async function runWalkout(
+  guest: Guest,
+  guests: Guest[],
+  topic: string,
+  stance: Stance | null,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { content } = await chat(walkoutMessages(guest, guests, topic, stance) as ChatMessage[], apiKey, {
+    temperature: 0.9,
+    max_tokens: 160,
+    signal,
+  });
+  return cleanReply(content, guest.name);
+}
+
+// Masada tek kalan konuğun meydan okuyan kapanış özeti.
+export async function runLastStanding(
+  guest: Guest,
+  guests: Guest[],
+  topic: string,
+  leftNames: string,
+  stance: Stance | null,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { content } = await chat(
+    lastStandingMessages(guest, guests, topic, leftNames, stance) as ChatMessage[],
+    apiKey,
+    { temperature: 0.9, max_tokens: 240, signal },
+  );
+  return cleanReply(content, guest.name);
 }
 
 // Sunucu köprüsü: önceki konuşmayı özetleyip sözü sıradaki konuğa devreder.

@@ -38,6 +38,7 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
       clashChaos: gunluk
         ? "Sweethearts, please, one at a time! 😅 Everyone's talking over each other, I can't hear a thing!"
         : "Dear guests, please! Everyone is talking at once and nothing can be heard — order in the studio, please! 🗯️",
+      walkoutNote: (name: string) => `🚪 ${name} has stormed off the show and left the table!`,
     };
   }
   return {
@@ -72,5 +73,6 @@ export function modLines(gunluk: boolean, lang: Lang = "tr") {
     clashChaos: gunluk
       ? "Ayy canlarım, birbirinize girmeyin! 😅 Herkes aynı anda konuşuyor, hiçbir şey anlamıyorum ki!"
       : "Sayın konuklar, lütfen! Herkes aynı anda konuşuyor, hiçbir şey anlaşılmıyor — stüdyoya bir sükûnet lütfen! 🗯️",
+    walkoutNote: (name: string) => `🚪 ${name} programı terk etti, masayı bırakıp gitti!`,
   };
 }
