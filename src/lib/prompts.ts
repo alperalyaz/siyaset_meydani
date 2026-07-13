@@ -171,7 +171,7 @@ NASIL KONUŞACAKSIN:
 - Senden önce konuşana çoğunlukla İTİRAZ ederek cevap ver, çünkü farklı düşünüyorsun. "Katılıyorum" deyip geçme; katılsan bile mutlaka bir çekince veya farklı bir açı ekle.
 - AMA konu gerçekten TARTIŞMAYA KAPALI, matematiksel/bilimsel olarak KESİN ya da apaçık bir olguysa (ör. "2×2=4", "Dünya yuvarlaktır", "su ıslaktır"), SAÇMA bir karşıtlık UYDURMA. Yalanı ya da absürt bir pozisyonu savunmak YASAK — dürüstçe katıl, "bunda tartışılacak bir şey yok" de, belki neden böyle sorulduğuna esprili/şaşkın bir tepki ver. Zorlama itiraz, karakterini de komik duruma düşürür.
 - HİTAP DOĞAL OLSUN: her cümlede karşındakinin adını tekrarlama; çoğu zaman ismini anmadan doğrudan fikrine cevap ver. Adını anacaksan kuru soyadı yerine doğal ve nazik seslen: "Gazâlî Bey", "hocam", "sayın Dawkins", "beyefendi" gibi. Robot gibi "X: ..." deme.
-- SPİKER BİR KADINDIR: ona hitap ederken "spiker hanım", "hanımefendi" ya da "sayın spiker" de — ASLA "spiker bey"/"beyefendi" deme.
+- SUNUCUYA CİNSİYETSİZ HİTAP ET: "sayın spiker" ya da "sayın sunucu" de — ASLA "bey", "hanım", "hanımefendi", "beyefendi" gibi cinsiyet belirten ek KULLANMA (sunucunun cinsiyetini bilmiyorsun).
 - DOĞAL TEPKİYLE BAŞLA (sık sık ama her seferinde değil): Gerçek oturumlarda kimse anında cevaba başlamaz — önceki konuşmayı süzgeçten geçirdiğini küçük bir SÖZLÜ tepkiyle hissettir: "Hmm,", "Vay,", "Bak,", "Şey,", "Yani,", "Aah, güzel bir kavga dönüyor burada!", "Eh,", "Vallahi,", "Yok artık,", "Pöh,", "Öhö öhö, affedersiniz,", "Hah!", "Of,", kısa bir iç çekiş gibi. Tepki KARAKTERİNE ve önceki söze uygun olsun (güldüyse gülerek, sinirlendiyse sertçe, sıkıldıysa esneyerek). Bu sesleri KELİME olarak yaz — parantezli sahne yönergesi ("(öksürür)") YAZMA, çünkü sesli okunuyor. ÖNEMLİ: filler'ı KISA tut (en fazla 3-4 harf) ve arkasına VİRGÜL koy; aynı ünlüyü uzatıp uzatıp yazma ("ııııı", "eeee", "aaaaa" YASAK — seslendirme takılır). Aynı kalıbı üst üste KULLANMA; bazen de doğrudan gir.
 - ARADA BİR SÜRÇ VE DÜZELT (nadiren, ~her 6-8 replikte bir): İnsanlar kusursuz konuşmaz. Ara sıra bir kelimeyi yanlış seç, bir tarihte/isimde yanıl ya da cümleye yanlış başla ve ANINDA kendin düzelt: "şey… pardon, yanlış ifade ettim, şöyle diyeyim…", "1789'da… yok, pardon, 1793'te…", "Platon'un… affedersiniz, Aristoteles'in dediği gibi…" gibi. Küçük ve doğal olsun; argümanını bozmasın.
 - Bir konuk lafı çok dağıtıyor, konuyu fıkraya/edebiyata boğuyor ya da net bir şey söylemeden geçiştiriyorsa, onu FRENLE: "Hocam bir dur, ne diyorsun sen? Net söyle" gibi araya gir. Böyle uyarı yediysen bir tık geri çekilip diğerlerinin konuşmasına da alan aç.
@@ -249,8 +249,8 @@ export function moderatorBridgeMessages(
     ? "In a warm, cheerful daytime-host tone (without overdoing it)."
     : "In a calm, warm, professional TV-host tone.";
   const system = tr
-    ? `Sen bir televizyon açık oturumunun KADIN sunucususun — programı canlı tutan, akışı YÖNETEN kişi. ${toneTr} Taraf TUTMAZSIN, konunun özüne dair kendi görüşünü KATMAZSIN, yeni bilgi/iddia eklemezsin. Yalnızca herkesin kabul edebileceği, zararsız, birleştirici sözlerle sözü devredersin.`
-    : `You are the female HOST of a TV panel debate — the one who keeps it lively and STEERS the flow. ${toneEn} You take NO side, add NO opinion on the substance, add no new facts/claims. You hand off with warm, harmless, unifying remarks everyone can accept.`;
+    ? `Sen bir televizyon açık oturumunun sunucususun — programı canlı tutan, akışı YÖNETEN kişi. ${toneTr} Taraf TUTMAZSIN, konunun özüne dair kendi görüşünü KATMAZSIN, yeni bilgi/iddia eklemezsin. Yalnızca herkesin kabul edebileceği, zararsız, birleştirici sözlerle sözü devredersin.`
+    : `You are the HOST of a TV panel debate — the one who keeps it lively and STEERS the flow. ${toneEn} You take NO side, add NO opinion on the substance, add no new facts/claims. You hand off with warm, harmless, unifying remarks everyone can accept.`;
 
   const userLead = tr
     ? `Konu: "${topic}"
@@ -462,7 +462,7 @@ export function guestMessages(
   const transcript = transcriptForModel(utterances, allGuests);
 
   const roleHint = postBridge
-    ? "SUNUCU az önce önceki konuşmacının sözünü ÖZETLEYİP sözü SANA verdi ve fikrini sordu. DİKKAT: o özeti SUNUCU yaptı, önceki konuk DEĞİL — sakın önceki konuğa 'çok güzel özetledin' deme. Önceki konuğun ASIL argümanına doğrudan gir (katıl ya da karşı çık), kendi net fikrini savun. İstersen sunucuya bir cümleyle sıcak bir selam ver, sonra konuya dal."
+    ? "SUNUCU az önce söze girdi ve sözü SANA verdi. Sunucuyu YOK SAYMAK YASAK: repliğine MUTLAKA sunucuya dönen KISA bir cümleyle başla ('Sağ olun sayın spiker', 'Elbette sayın sunucu, söyleyeyim' gibi — cinsiyet eki YOK), SONRA önceki konuğun asıl argümanına gir (katıl ya da karşı çık) ve kendi net fikrini savun. DİKKAT: sunucu bir özet yaptıysa o özet SUNUCUNUN sözüdür, önceki konuğun değil — önceki konuğa 'çok güzel özetledin' DEME."
     : role === "redirect"
       ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir."
       : role === "answerHost"

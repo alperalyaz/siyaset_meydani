@@ -803,6 +803,26 @@ export function App() {
         speakingRef.current = true;
         await pace(text, i, g[i].gender, ctrl.signal);
         speakingRef.current = false;
+        // ── SUNUCU AÇILIŞTA HEP SAHNEDE ── Görüş turunda her konuğun ardından
+        // sunucu DETERMİNİSTİK olarak köprü kurar: uzun görüşü tek cümlede
+        // özetleyip sözü sıradaki konuğa verir; kısa görüşte nötr canlandırır.
+        // (Sıradaki görüş arkada hazırlandığı için bu köprü akışı geciktirmez;
+        // görüş replikleri transkripte bakmadığı için hazır tur geçerli kalır.)
+        if (runningRef.current && i + 1 < g.length) {
+          const oLead = text.length < 160;
+          const bridge = await runModeratorBridge(
+            g[i].name, text, g[i + 1].name, t, gunlukRef.current, apiKeyRef.current, ctrl.signal, oLead,
+          ).catch(() => "");
+          if (bridge.trim() && runningRef.current) {
+            lastBridgeRef.current = utterRef.current.length;
+            append({ id: uid(), speaker: "moderator", text: bridge, mode: "normal" });
+            speakingRef.current = true;
+            await pace(bridge, 9, undefined, ctrl.signal); // 9 = sunucu sesi
+            speakingRef.current = false;
+            if (!runningRef.current) return;
+            await delay(300 + Math.random() * 500, ctrl.signal);
+          }
+        }
       }
 
       // --- SERBEST TARTIŞMA ---
@@ -954,8 +974,9 @@ export function App() {
           // Reytinge göre taban olasılık: 72+ neredeyse sus, düşükte çok aktif.
           const base =
             dec.rating >= 72 ? 0.05 : dec.rating >= 58 ? 0.25 : dec.rating >= 44 ? 0.5 : 0.8;
-          // Açılış civarı (ilk ~12 mesaj) sunucu belirgin biçimde daha aktif.
-          const prob = utterRef.current.length < 12 ? Math.max(base, 0.6) : base;
+          // Açılış civarı (ilk ~14 mesaj) sunucu GARANTİ devrede — adamları
+          // boş bırakmaz, her söz devrinde köprü kurar (cooldown yine işler).
+          const prob = utterRef.current.length < 14 ? 1.0 : base;
           const bridgeOk =
             role === "continue" &&
             !modNoteRef.current &&
@@ -974,7 +995,11 @@ export function App() {
             if (bridge.trim() && runningRef.current) {
               lastBridgeRef.current = utterRef.current.length;
               append({ id: uid(), speaker: "moderator", text: bridge, mode: "normal" });
-              justBridgedRef.current = !lead; // özet yaptıysa konuk karışmasın
+              // Konuk sunucuyu YOK SAYMASIN: her iki üslupta da cevap sunucuya
+              // dönen bir cümleyle başlamalı. Arkada hazırlanan tur (pre) bu
+              // köprüyü görmeden üretildi — çöpe at ki cevap canlı üretilsin.
+              justBridgedRef.current = true;
+              pre = null;
               speakingRef.current = true;
               await pace(bridge, 9, undefined, ctrl.signal); // 9 = sunucu sesi
               speakingRef.current = false;
