@@ -196,6 +196,59 @@ KARAKTER VE TAVIR — burası gerçek, kızışabilen bir canlı yayın:
 Spiker araya girdiğinde (sana soru sorduğunda veya yönlendirdiğinde), TÜM TARTIŞMAYI ANINDA KES. Diğer konuklarla konuşmayı BIRAK. ÖNCE spikere dön: "buyrun sayın spiker", "tabii efendim", "dinliyorum" gibi karakterine uygun bir geçişle spikeri muhatap al. Sonra spikerin sorusunu/sözünü DOĞRUDAN yanıtla — cevapla, eleştir, terslen, reddet ama MUTLAKA yanıtla. Spikeri GÖRMEZDEN GELMEK YOK. Spikere cevap vermeden diğer konuklara laf yetiştirmeye devam edersen yayından atılırsın. Spikere cevap verdikten SONRA dilersen tartışmaya dönebilirsin. Spiker durmanı isterse durursun; ama fikrinden ve tavrından vazgeçmezsin.${sessionGunluk ? "\n" + GUNLUK_PERSONA_BLOCK : ""}`;
 }
 
+// Sunucu köprüsü: söz bir konuktan diğerine geçerken sunucu ara sıra araya
+// girip önceki (uzun) konuşmayı BİR cümlede özetler ve sıradaki konuğa dönüp
+// fikrini sorar. Taraf tutmaz, kendi görüşünü katmaz — sadece akışı bağlar.
+export function moderatorBridgeMessages(
+  prevName: string,
+  prevText: string,
+  nextName: string,
+  topic: string,
+  gunluk: boolean,
+) {
+  const tr = detectTopicLang(topic) === "tr";
+  const toneTr = gunluk
+    ? "Sıcak, neşeli bir gündüz kuşağı sunucusu tonuyla (ama abartmadan)."
+    : "Sakin, profesyonel bir TV sunucusu tonuyla.";
+  const toneEn = gunluk
+    ? "In a warm, cheerful daytime-host tone (without overdoing it)."
+    : "In a calm, professional TV-host tone.";
+  return [
+    {
+      role: "system" as const,
+      content: tr
+        ? `Sen bir televizyon açık oturumunun KADIN sunucususun. Görevin: söz bir konuktan diğerine geçerken kısa bir KÖPRÜ cümlesi kurmak. ${toneTr} Taraf TUTMAZSIN, kendi görüşünü KATMAZSIN, yeni bilgi eklemezsin — sadece önceki konuşmayı sadeleştirip sözü devredersin.`
+        : `You are the female HOST of a TV panel debate. Your job: a short BRIDGE line as the floor passes between guests. ${toneEn} You take NO side, add NO opinion of your own, add no new facts — you just distill the previous point and hand off.`,
+    },
+    {
+      role: "user" as const,
+      content: tr
+        ? `Konu: "${topic}"
+
+Az önce ${prevName} konuştu ve şunu söyledi:
+"""${prevText.slice(0, 700)}"""
+
+Şimdi sözü ${nextName}'e vereceksin. ŞU KALIPTA, KISA (1-2 cümle) bir köprü kur:
+- Önce ${nextName}'e nazikçe seslen ("Evet Sayın ${nextName}," / "Peki ${nextName},").
+- ${prevName}'in uzun sözünü SEN, BİR cümlede, sade bir dille özetle ("Kendisi ... diyor" gibi).
+- Sonra ${nextName}'e dönüp fikrini sor ("siz ne düşünüyorsunuz?" / "buna katılıyor musunuz?").
+Örnek biçim: "Evet Sayın ${nextName}, ${prevName}'i dinlediniz — kendisi [tek cümle özet] diyor. Peki siz ne düşünüyorsunuz?"
+Sadece sunucu repliğini yaz; isim etiketi, tırnak, sahne yönergesi ekleme.`
+        : `Topic: "${topic}"
+
+${prevName} just spoke and said:
+"""${prevText.slice(0, 700)}"""
+
+Now hand the floor to ${nextName}. Write a SHORT (1-2 sentence) bridge in THIS shape:
+- Address ${nextName} warmly ("Yes, ${nextName}," / "So, ${nextName},").
+- YOU summarize ${prevName}'s long point in ONE plain sentence ("They're saying ...").
+- Then turn to ${nextName} and ask for their view ("what do you think?" / "do you agree?").
+Example: "Yes ${nextName}, you heard ${prevName} — they're arguing [one-sentence summary]. So what's your take?"
+Write only the host line; no name label, quotes, or stage directions.`,
+    },
+  ];
+}
+
 // Kızışma anı: tansiyon tavan yapınca bir konuk diğerinin sözünü KESER,
 // kesilen de tersler. İki kısa replik tek çağrıda üretilir.
 export function clashMessages(interrupter: Guest, speaker: Guest, topic: string, lastText: string) {

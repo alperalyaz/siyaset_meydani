@@ -288,6 +288,10 @@ function clean(text: string): string {
     .replace(/[.]{2,}|…/g, ", ")
     .replace(/([\p{L}])\1{2,}/gu, "$1$1")
     .replace(/[iıIİ]{3,}/gu, "ı")
+    // Türkçe kesme işareti eki ("Marx'ın") TTS'te harf harf okunuyordu;
+    // kelime içi kesmeyi kaldır → "Marxın" (doğal okunur). İngilizce
+    // "don't"→"dont", "1990'da"→"1990da" de sorunsuz. Kıvrık ' ' ` ´ dahil.
+    .replace(/([\p{L}\p{N}])['’‘`´]([\p{L}])/gu, "$1$2")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -19,6 +19,7 @@ import {
   assignStances,
   moderateTopic,
   runClash,
+  runModeratorBridge,
 } from "./lib/engine";
 import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
@@ -245,6 +246,8 @@ export function App() {
   }, []);
   // Son kızışmanın olduğu andaki utterance sayısı (soğuma süresi için).
   const lastClashRef = useRef(0);
+  // Son sunucu köprüsünün olduğu andaki utterance sayısı (soğuma süresi için).
+  const lastBridgeRef = useRef(0);
   const activeRef = useRef<number[]>([]); // net fikri olan konuklar
   const threadRef = useRef<Thread | null>(null);
   const modNoteRef = useRef<string | undefined>(undefined);
@@ -877,6 +880,41 @@ export function App() {
           setSessionResult(result);
           setPhase("result");
           return;
+        }
+
+        // ── SUNUCU KÖPRÜSÜ ── Söz bir konuktan diğerine geçerken sunucu ara
+        // sıra araya girip önceki (uzun) konuşmayı tek cümlede özetler ve
+        // sıradaki konuğa fikrini sorar — akışı gerçek bir açık oturum gibi
+        // yumuşatır. ÖNEMLİ: bu SPİKER MÜDAHALESİ SAYILMAZ; boşta sayacını
+        // (lastActivityRef) SIFIRLAMAZ, yani 3 dk sessizlik molası yine işler.
+        {
+          const prevSp = lastGuestSpeaker();
+          const prevText =
+            prevSp !== null ? utterRef.current.filter((u) => u.speaker === prevSp).slice(-1)[0]?.text ?? "" : "";
+          const bridgeOk =
+            role === "continue" &&
+            !modNoteRef.current &&
+            prevSp !== null &&
+            prevSp !== speaker &&
+            prevText.length > 180 &&
+            utterRef.current.length - lastBridgeRef.current >= 6 &&
+            Math.random() < 0.45;
+          if (bridgeOk) {
+            setThinking(null);
+            const bridge = await runModeratorBridge(
+              g[prevSp!].name, prevText, g[speaker].name, t, gunlukRef.current, apiKeyRef.current, ctrl.signal,
+            ).catch(() => "");
+            if (bridge.trim() && runningRef.current) {
+              lastBridgeRef.current = utterRef.current.length;
+              append({ id: uid(), speaker: "moderator", text: bridge, mode: "normal" });
+              speakingRef.current = true;
+              await pace(bridge, 9, undefined, ctrl.signal); // 9 = sunucu sesi
+              speakingRef.current = false;
+              if (!runningRef.current) return;
+              await delay(300 + Math.random() * 500, ctrl.signal);
+            }
+            setThinking(speaker);
+          }
         }
 
         const text =

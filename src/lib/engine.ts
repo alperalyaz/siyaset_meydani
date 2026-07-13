@@ -14,6 +14,7 @@ import {
   trendTopicsMessages,
   topicIdeasMessages,
   clashMessages,
+  moderatorBridgeMessages,
   type GuestRole,
 } from "./prompts";
 
@@ -424,6 +425,24 @@ export async function runClash(
     interrupt: typeof parsed?.interrupt === "string" ? parsed.interrupt.trim() : "",
     retort: typeof parsed?.retort === "string" ? parsed.retort.trim() : "",
   };
+}
+
+// Sunucu köprüsü: önceki konuşmayı özetleyip sözü sıradaki konuğa devreder.
+export async function runModeratorBridge(
+  prevName: string,
+  prevText: string,
+  nextName: string,
+  topic: string,
+  gunluk: boolean,
+  apiKey: string | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { content } = await chat(
+    moderatorBridgeMessages(prevName, prevText, nextName, topic, gunluk) as ChatMessage[],
+    apiKey,
+    { temperature: 0.7, max_tokens: 160, signal },
+  );
+  return cleanReply(content, "");
 }
 
 // Konuya göre kışkırtıcı spiker soruları.
