@@ -1100,8 +1100,14 @@ export function App() {
             postBridge,
           ));
         rate429Ref.current = 0; // tur başarılı — limit sayacını sıfırla
+        setError(null); // önceki geçici hata bandını temizle (takılı kalmasın)
         syncMeta();
         if (!runningRef.current) return;
+
+        // Dil güvenlik ağı devreye girdiyse streaming taslağı (yanlış dil)
+        // ekranda kaldı; baloncuğu DOĞRULANMIŞ metne eşitle ki ses kaydı
+        // boyunca Türkçe taslak durup sonra İngilizceye "zıplamasın".
+        if (!pre) setStreamingText(text);
 
         // Akış baloncuğu ekranda kalır; ses hazır olunca yazı mesaja dönüşür
         // ve ses HEMEN başlar (uzun "sessiz okuma" gecikmesi yok).

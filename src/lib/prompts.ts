@@ -491,21 +491,33 @@ export function guestMessages(
   postBridge = false, // sunucu az önce özetleyip sözü SANA verdi
 ) {
   const transcript = transcriptForModel(utterances, allGuests);
+  const tr = detectTopicLang(topic) === "tr";
 
+  // ÖNEMLİ: roleHint'ler İKİ DİLLİ olmalı. Türkçe örnek cümleler ('Sağ olun
+  // sayın spiker' gibi) İngilizce oturumda modele SIZIYOR — konuk repliğe
+  // Türkçe başlayıp sonra İngilizceye "zıplıyor". Bu yüzden EN oturumda hint
+  // ve örnekler de İngilizce verilir.
   const roleHint = postBridge
-    ? "SUNUCU az önce söze girdi ve sözü SANA verdi. Sunucuyu YOK SAYMAK YASAK: repliğine MUTLAKA sunucuya dönen KISA bir cümleyle başla ('Sağ olun sayın spiker', 'Elbette sayın sunucu, söyleyeyim' gibi — cinsiyet eki YOK), SONRA önceki konuğun asıl argümanına gir (katıl ya da karşı çık) ve kendi net fikrini savun. DİKKAT: sunucu bir özet yaptıysa o özet SUNUCUNUN sözüdür, önceki konuğun değil — önceki konuğa 'çok güzel özetledin' DEME."
+    ? tr
+      ? "SUNUCU az önce söze girdi ve sözü SANA verdi. Sunucuyu YOK SAYMAK YASAK: repliğine MUTLAKA sunucuya dönen KISA bir cümleyle başla ('Sağ olun sayın spiker', 'Elbette sayın sunucu, söyleyeyim' gibi — cinsiyet eki YOK), SONRA önceki konuğun asıl argümanına gir (katıl ya da karşı çık) ve kendi net fikrini savun. DİKKAT: sunucu bir özet yaptıysa o özet SUNUCUNUN sözüdür, önceki konuğun değil — önceki konuğa 'çok güzel özetledin' DEME."
+      : "The HOST just stepped in and handed the floor to YOU. Do NOT ignore the host: you MUST open with a SHORT line back to the host ('Thank you, host', 'Of course, let me answer' — no gendered title), THEN engage the previous guest's actual argument (agree or push back) and defend your own clear view. NOTE: if the host gave a summary, that summary is the HOST's words, not the previous guest's — do NOT tell the previous guest 'nicely summarized'."
     : role === "redirect"
-      ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir."
+      ? tr
+        ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir."
+        : "Two people have been going back and forth for a while and it's getting stuck. Now YOU take the floor: briefly touch on what both said, then steer the debate in a new direction with your own CLEAR view."
       : role === "answerHost"
-        ? "SPİKER AZ ÖNCE SANA HİTABEN BİR ŞEY SÖYLEDİ. Bu konuşma sırası SADECE spikere cevap vermen için. Diğer konuklara laf yetiştirme, tartışmaya devam etme — ÖNCE spikere dön: sorduğu soruyu DOĞRUDAN yanıtla, söylediğine NET tepki ver. Spikeri görmezden gelip diğer konuklarla tartışmaya devam ETME. Spikerin sözünü duymazdan gelmek YAYINDAN ATILMA sebebidir. Kısaca spikere hitap et, sorusunu/sözünü yanıtla, sonra istersen kendi fikrine bağla. AMA ÖNCE SPİKER."
-        : "Sıra sende. Bir önceki konuşana doğrudan cevap ver (katıl ya da itiraz et) ve kendi net fikrini savun.";
+        ? tr
+          ? "SPİKER AZ ÖNCE SANA HİTABEN BİR ŞEY SÖYLEDİ. Bu konuşma sırası SADECE spikere cevap vermen için. Diğer konuklara laf yetiştirme, tartışmaya devam etme — ÖNCE spikere dön: sorduğu soruyu DOĞRUDAN yanıtla, söylediğine NET tepki ver. Spikeri görmezden gelip diğer konuklarla tartışmaya devam ETME. Spikerin sözünü duymazdan gelmek YAYINDAN ATILMA sebebidir. Kısaca spikere hitap et, sorusunu/sözünü yanıtla, sonra istersen kendi fikrine bağla. AMA ÖNCE SPİKER."
+          : "The HOST just addressed YOU directly. This turn is ONLY for answering the host. Don't fire back at the other guests or keep the argument going — turn to the host FIRST: answer the question DIRECTLY, react clearly to what they said. Do NOT ignore the host and keep debating the others; ignoring the host is grounds for being cut from the show. Briefly address the host, answer them, then you may tie it back to your own view. BUT THE HOST FIRST."
+        : tr
+          ? "Sıra sende. Bir önceki konuşana doğrudan cevap ver (katıl ya da itiraz et) ve kendi net fikrini savun."
+          : "Your turn. Reply directly to the previous speaker (agree or object) and defend your own clear view.";
 
-  const cueHint = cue ? `\nYönetmen notu: ${cue}` : "";
+  const cueHint = cue ? (tr ? `\nYönetmen notu: ${cue}` : `\nDirector's note: ${cue}`) : "";
 
-  const langReminder =
-    detectTopicLang(topic) === "tr"
-      ? ""
-      : "\n⚠️ Reply ONLY in the language of the topic (NOT Turkish).";
+  const langReminder = tr
+    ? ""
+    : "\n⚠️ Reply ONLY in English (the topic's language). Do NOT write a single Turkish word — not even the host address. Never start in one language and switch.";
   return [
     { role: "system" as const, content: guestSystemPrompt(guest, allGuests, topic, stance, context) },
     {
@@ -559,8 +571,10 @@ REYTİNG (0-100) — CİMRİ OL, tüm aralığı kullan (herkese 85 vermek YASAK
 
 Sıradaki konuşacak: ${nextName} — rolü: ${roleDesc}.
 
+DİL: Hem "note" (ekranda gösterilir) hem "cue" (konuğa beslenir) ${detectTopicLang(topic) === "tr" ? "TÜRKÇE" : "oturum konusunun dilinde (İngilizce konu → İNGİLİZCE) yazılmalı — cue Türkçe olursa İngilizce konuşan konuğu yanlış dile çeker"} olmalı.
+
 Sadece şu JSON'u döndür:
-{"rating": <0-100 tam sayı>, "note": "<reytingin nedeni, kısa Türkçe>", "cue": "<${nextName}'a 1 cümlelik yönerge>"}${roleCueHint}`;
+{"rating": <0-100 tam sayı>, "note": "<reytingin nedeni, kısa ${detectTopicLang(topic) === "tr" ? "Türkçe" : "İngilizce"}>", "cue": "<${nextName}'a 1 cümlelik yönerge, ${detectTopicLang(topic) === "tr" ? "Türkçe" : "İngilizce"}>"}${roleCueHint}`;
 
   const modNote = lastModeratorNote
     ? `\n\nSpiker az önce şunu söyledi: "${lastModeratorNote}"`
