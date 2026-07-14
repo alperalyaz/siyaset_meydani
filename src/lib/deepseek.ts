@@ -103,14 +103,58 @@ export function parseJsonLoose<T>(text: string): T | null {
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     if (start >= 0 && end > start) {
+      const slice = text.slice(start, end + 1);
       try {
-        return JSON.parse(text.slice(start, end + 1)) as T;
+        return JSON.parse(slice) as T;
       } catch {
-        return null;
+        // En sık hata: model bir string DEĞERİNİN içine gerçek satır başı /
+        // sekme (kaçışsız kontrol karakteri) koyuyor; JSON.parse bunu reddeder.
+        // String içindeyken kontrol karakterlerini kaçışlayıp yeniden dene.
+        try {
+          return JSON.parse(escapeControlCharsInStrings(slice)) as T;
+        } catch {
+          return null;
+        }
       }
     }
     return null;
   }
+}
+
+// JSON metninde YALNIZCA string değerlerin içindeki kaçışsız kontrol
+// karakterlerini (satır başı, sekme, CR) geçerli kaçış dizilerine çevirir.
+// String dışındaki boşluklara dokunmaz (aralarındaki newline JSON'da geçerli).
+function escapeControlCharsInStrings(s: string): string {
+  let out = "";
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (esc) {
+      out += c;
+      esc = false;
+      continue;
+    }
+    if (c === "\\") {
+      out += c;
+      esc = true;
+      continue;
+    }
+    if (c === '"') {
+      inStr = !inStr;
+      out += c;
+      continue;
+    }
+    if (inStr) {
+      if (c === "\n") out += "\\n";
+      else if (c === "\r") out += "\\r";
+      else if (c === "\t") out += "\\t";
+      else out += c;
+    } else {
+      out += c;
+    }
+  }
+  return out;
 }
 
 // Token bazında yayın (streaming). OpenAI uyumlu SSE akışını okur,

@@ -344,10 +344,13 @@ export async function runOpeningStatement(
     signal,
   });
   const parsed = parseJsonLoose<Partial<OpeningResult>>(content);
+  // Güvenlik ağı: parse patlasa bile ham JSON'u EKRANA BASMA. content hâlâ
+  // {"hasStance":...,"text":"..."} gibi görünüyorsa "text" alanını regex'le çek.
+  const fallbackText = extractJsonTextField(content) ?? content;
   let text =
     parsed && typeof parsed.text === "string" && parsed.text.trim()
       ? cleanReply(parsed.text, guest.name)
-      : cleanReply(content, guest.name);
+      : cleanReply(fallbackText, guest.name);
   const hasStance = parsed && typeof parsed.text === "string" ? parsed.hasStance !== false : true;
   if (wrongLang(topic, text)) {
     text = await rewriteInSessionLang(msgs as ChatMessage[], text, topic, guest.name, apiKey, signal);
@@ -528,6 +531,18 @@ export async function suggestQuestions(
   });
   const parsed = parseJsonLoose<{ questions?: string[] }>(content);
   return Array.isArray(parsed?.questions) ? parsed!.questions!.slice(0, 4) : [];
+}
+
+// JSON parse tamamen başarısız olduğunda "text":"..." alanının değerini
+// kaba kuvvetle çeker (kaçış dizilerini çözerek). Bulamazsa null.
+function extractJsonTextField(raw: string): string | null {
+  const m = raw.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+  if (!m) return null;
+  try {
+    return JSON.parse(`"${m[1]}"`) as string;
+  } catch {
+    return m[1].replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
 }
 
 function clampRating(r: unknown): number {
