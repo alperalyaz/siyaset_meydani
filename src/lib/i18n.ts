@@ -77,7 +77,7 @@ const TR: Record<string, string> = {
   // App: toasts / bildirimler
   "toast.saved": "✅ Oturum kaydedildi",
   "toast.shared": "🔗 Paylaşım linki kopyalandı!",
-  "err.providerLimit": "Sağlayıcı limiti sürüyor — anahtarınızın günlük kotası dolmuş olabilir (özellikle Groq'un ücretsiz kotası hızlı dolar). Bir süre sonra ▶ Devam ile deneyin ya da farklı bir API anahtarı girin.",
+  "err.providerLimit": "Sunucu şu an yoğun ve sağlayıcı isteği geçici olarak sınırladı (kotanızla ilgili değil). Birkaç dakika sonra ▶ Devam deyin; devam ederse kendi API anahtarınızı girerek kesintisiz sürdürebilirsiniz.",
   "err.rateRetrying": "⏳ Hız limiti aşıldı, birkaç saniye içinde otomatik denenecek...",
   "err.unexpected": "Beklenmedik bir hata oluştu. Tekrar deneyin.",
   "panel.live": "● CANLI",
@@ -298,7 +298,7 @@ const EN: Record<string, string> = {
   "leave.confirm": "End Session",
   "toast.saved": "✅ Session saved",
   "toast.shared": "🔗 Share link copied!",
-  "err.providerLimit": "Provider rate limit persists — your key's daily quota may be exhausted (Groq's free quota fills up fast). Try ▶ Resume in a while or enter a different API key.",
+  "err.providerLimit": "The server is busy right now and the provider throttled the request briefly (not related to your quota). Try ▶ Resume in a few minutes; if it persists, enter your own API key for uninterrupted use.",
   "err.rateRetrying": "⏳ Rate limit hit — retrying automatically in a few seconds...",
   "err.unexpected": "An unexpected error occurred. Please try again.",
   "panel.live": "● LIVE",

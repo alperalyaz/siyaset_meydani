@@ -271,7 +271,10 @@ export async function handleChat(
   }
 
   let upstream: Response | undefined;
-  const maxRetries = 2;
+  // DeepSeek eşzamanlı yükte ara sıra 429/503 döner (kota değil, anlık
+  // throttle). Cömert, JİTTERLİ backoff ile çoğu geçici hatayı burada yut ki
+  // istemci alarm vermesin. 4 deneme: ~0.8s, ~1.8s, ~3.2s (+ rastgele jitter).
+  const maxRetries = 4;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -285,7 +288,7 @@ export async function handleChat(
       });
     } catch (err) {
       if (attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 1500));
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 700 + Math.random() * 400));
         continue;
       }
       return { status: 502, body: { error: "Sağlayıcıya ulaşılamadı.", detail: String(err) } };
@@ -294,7 +297,7 @@ export async function handleChat(
     if (upstream.ok) break;
 
     if ((upstream.status === 429 || upstream.status === 503) && attempt < maxRetries) {
-      await new Promise((r) => setTimeout(r, (attempt + 1) * 1500));
+      await new Promise((r) => setTimeout(r, (attempt + 1) * 700 + Math.random() * 400));
       continue;
     }
 

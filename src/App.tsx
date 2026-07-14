@@ -1298,21 +1298,27 @@ export function App() {
         }
 
         } catch (e) {
+          // Demo hakkı GERÇEKTEN bittiyse (RATE_LIMITED) tekrar denemek boşuna:
+          // anahtar modalını aç. Bu, aşağıdaki geçici-429 yeniden deneme
+          // yolundan AYRI ele alınmalı (ikisi de status 429 döner).
+          if (e instanceof ApiError && e.code === "RATE_LIMITED") {
+            throw e; // dış catch → handleError → anahtar modalı
+          }
           if (e instanceof ApiError && e.status === 429 && runningRef.current) {
             rate429Ref.current += 1;
-            // Kota gerçekten bittiyse sonsuza dek "deneniyor..." göstermek
-            // kullanıcıya "uygulama bozuk" hissi verir; 3 denemede dürüstçe dur.
-            if (rate429Ref.current >= 3) {
+            // DeepSeek anlık throttle'ı geçici; sunucu zaten jitterli backoff
+            // ile yeniden deniyor. İstemci de sabırlı olsun: 6 denemeden sonra
+            // dürüstçe dur (kota bitti demez — sunucu yoğun der).
+            if (rate429Ref.current >= 6) {
               rate429Ref.current = 0;
-              setError(
-                ct("err.providerLimit"),
-              );
+              setError(ct("err.providerLimit"));
               pause();
               return;
             }
             setError(ct("err.rateRetrying"));
             syncMeta();
-            await delay(6000, new AbortController().signal);
+            // Artan bekleme: 3s, 4.5s, 6s… (kısa başlar, ısrarcıysa uzar).
+            await delay(3000 + rate429Ref.current * 1500, new AbortController().signal);
             setError(null);
             continue;
           }
