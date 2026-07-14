@@ -938,7 +938,7 @@ export function App() {
         // ── AKIŞ BORUSU: önceki konuşma çalarken hazırlanan tur geçerliyse
         // kullan. Geçerlilik: transkript değişmemiş, spiker notu yok ve plan
         // aynı konuşmacı/rol için yapılmış.
-        let pre: { dec: Awaited<ReturnType<typeof runRatingDirector>>; text: string } | null = null;
+        let pre: { dec: Awaited<ReturnType<typeof runRatingDirector>>; text: string; voiceReady?: boolean } | null = null;
         {
           const ahead = aheadRef.current;
           if (ahead) {
@@ -1113,7 +1113,9 @@ export function App() {
         // Akış baloncuğu ekranda kalır; ses hazır olunca yazı mesaja dönüşür
         // ve ses HEMEN başlar (uzun "sessiz okuma" gecikmesi yok).
         if (text.trim()) {
-          if (!pre) setPrepping(true);
+          // Ön-sentez yapılmadıysa (köprü olasılığı yüksekti) sesi burada üret;
+          // "kayıt" göstergesi de o zaman gösterilsin ki sessiz bekleme olmasın.
+          if (!pre || !pre.voiceReady) setPrepping(true);
           await prepareVoice(text, speaker, g[speaker].gender, ctrl.signal);
           setPrepping(false);
           // Doğal nefes: gerçek oturumda cevap ANINDA gelmez — önceki sözü
@@ -1268,6 +1270,16 @@ export function App() {
           const actrl = new AbortController();
           const forCount = utterRef.current.length;
           const transcript = utterRef.current;
+          // HD KARAKTER İSRAFINI ÖNLE: köprü neredeyse kesin devreye girecekse
+          // (erken oyun + soğuma dolmuş + continue) bu hazırlanan turun METNİ
+          // çöpe gidecek (köprü sonrası postBridge ile canlı yeniden üretilir).
+          // O yüzden sesini ÖNCEDEN sentezleme — boşa giden Chirp karakterleri
+          // demo süresini ve serbest kotayı yiyor. Metni yine hazırla (dec ve
+          // çoğu zaman replik kullanılır); ses tur kesinleşince üretilir.
+          const bridgeLikely =
+            plan.role === "continue" &&
+            utterRef.current.length < 14 &&
+            utterRef.current.length - lastBridgeRef.current >= 3;
           const promise = (async () => {
             try {
               const d = await runRatingDirector(
@@ -1280,8 +1292,11 @@ export function App() {
                 topicContextRef.current, plan.speaker,
                 apiKeyRef.current, actrl.signal,
               );
-              if (tx.trim()) await prepareVoice(tx, plan.speaker, g[plan.speaker].gender, actrl.signal);
-              return { dec: d, text: tx };
+              const voiceReady = Boolean(tx.trim()) && !bridgeLikely;
+              if (voiceReady) {
+                await prepareVoice(tx, plan.speaker, g[plan.speaker].gender, actrl.signal);
+              }
+              return { dec: d, text: tx, voiceReady };
             } catch {
               return null; // hata/iptal → sıra gelince canlı üretilir
             }
