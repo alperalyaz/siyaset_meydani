@@ -382,7 +382,8 @@ export function App() {
   const handleError = useCallback((e: unknown) => {
     if (isAbort(e)) return;
     if (e instanceof ApiError && (e.code === "RATE_LIMITED" || e.code === "NO_DEMO_KEY")) {
-      setKeyReason(e.message);
+      // Sunucu mesajı sabit Türkçe; oturum dilinde yerelleştirilmiş metni kullan.
+      setKeyReason(ct(e.code === "NO_DEMO_KEY" ? "err.noDemo" : "err.demoExhausted"));
       setKeyModalTab("llm");
       setKeyModal(true);
     } else if (e instanceof ApiError && e.status === 429) {
