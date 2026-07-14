@@ -11,7 +11,8 @@ export function PublicGallery() {
 
   useEffect(() => {
     let alive = true;
-    fetchGalleryList(8)
+    // Dil filtresi render'da yapıldığı için geniş çek: 8 gösterim için 40 kayıt.
+    fetchGalleryList(40)
       .then((list) => {
         if (alive) setItems(list);
       })
@@ -23,7 +24,13 @@ export function PublicGallery() {
     };
   }, []);
 
-  if (items === null || items.length === 0) return null; // boşken bölüm hiç görünmez
+  // Dil karmaşası olmasın: Türkçe arayüze YALNIZCA Türkçe oturumlar,
+  // diğer arayüz dillerine Türkçe DIŞI oturumlar gösterilir.
+  const visible = (items ?? [])
+    .filter((s) => (lang === "tr" ? s.lang === "tr" : s.lang !== "tr"))
+    .slice(0, 8);
+
+  if (items === null || visible.length === 0) return null; // boşken bölüm hiç görünmez
 
   const fmt = (iso: string) => {
     try {
@@ -42,7 +49,7 @@ export function PublicGallery() {
         <h2>{t("gallery.title")}</h2>
       </div>
       <div className="gallery__list">
-        {items.map((s) => (
+        {visible.map((s) => (
           <a key={s.slug} className="gallery__item" href={`/s/${s.slug}`} target="_blank" rel="noopener">
             <div className="gallery__topic">{s.topic}</div>
             <div className="gallery__meta">
