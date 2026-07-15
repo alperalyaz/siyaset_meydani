@@ -499,19 +499,19 @@ export function guestMessages(
   // ve örnekler de İngilizce verilir.
   const roleHint = postBridge
     ? tr
-      ? "SUNUCU az önce söze girdi ve sözü SANA verdi. Sunucuyu YOK SAYMAK YASAK: repliğine MUTLAKA sunucuya dönen KISA bir cümleyle başla ('Sağ olun sayın spiker', 'Elbette sayın sunucu, söyleyeyim' gibi — cinsiyet eki YOK), SONRA önceki konuğun asıl argümanına gir (katıl ya da karşı çık) ve kendi net fikrini savun. DİKKAT: sunucu bir özet yaptıysa o özet SUNUCUNUN sözüdür, önceki konuğun değil — önceki konuğa 'çok güzel özetledin' DEME."
-      : "The HOST just stepped in and handed the floor to YOU. Do NOT ignore the host: you MUST open with a SHORT line back to the host ('Thank you, host', 'Of course, let me answer' — no gendered title), THEN engage the previous guest's actual argument (agree or push back) and defend your own clear view. NOTE: if the host gave a summary, that summary is the HOST's words, not the previous guest's — do NOT tell the previous guest 'nicely summarized'."
+      ? "SUNUCU az önce söze girdi ve sözü SANA verdi. Sunucuyu YOK SAYMAK YASAK: repliğine sunucuya dönen KISA bir cümleyle başla — ama HER SEFERİNDE 'sağ olun sayın spiker' DEME, çeşitlendir ('Elbette,', 'Bakın,', 'Şöyle söyleyeyim,', 'Haklısınız,', 'İyi ki sordunuz,' gibi; cinsiyet eki YOK). SONRA önceki konuğun asıl argümanına gir (katıl ya da karşı çık) ve kendi net fikrini savun. DİKKAT: sunucu bir özet yaptıysa o özet SUNUCUNUN sözüdür, önceki konuğun değil — önceki konuğa 'çok güzel özetledin' DEME."
+      : "The HOST just stepped in and handed the floor to YOU. Open with a SHORT line back to the host — but do NOT always say 'thank you, host'; vary it ('Right,', 'Well,', 'Let me answer that,', 'Good point,', 'Fair enough,' — no gendered title). THEN engage the previous guest's actual argument (agree or push back) and defend your own clear view. NOTE: if the host gave a summary, that summary is the HOST's words, not the previous guest's — do NOT tell the previous guest 'nicely summarized'."
     : role === "redirect"
       ? tr
-        ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir."
-        : "Two people have been going back and forth for a while and it's getting stuck. Now YOU take the floor: briefly touch on what both said, then steer the debate in a new direction with your own CLEAR view."
+        ? "Bir süredir iki kişi karşılıklı tartışıyor ve konu tıkanmaya başladı. Şimdi SEN söz alıyorsun: ikisinin dediğine kısaca değin, sonra kendi NET fikrinle tartışmaya yeni bir yön ver. Sözü sen yönlendir. (Sunucu az önce KONUŞMADI — sunucuya teşekkür etme, doğrudan konuya gir.)"
+        : "Two people have been going back and forth for a while and it's getting stuck. Now YOU take the floor: briefly touch on what both said, then steer the debate in a new direction with your own CLEAR view. (The host did NOT just speak — do not thank the host, go straight to the substance.)"
       : role === "answerHost"
         ? tr
           ? "SPİKER AZ ÖNCE SANA HİTABEN BİR ŞEY SÖYLEDİ. Bu konuşma sırası SADECE spikere cevap vermen için. Diğer konuklara laf yetiştirme, tartışmaya devam etme — ÖNCE spikere dön: sorduğu soruyu DOĞRUDAN yanıtla, söylediğine NET tepki ver. Spikeri görmezden gelip diğer konuklarla tartışmaya devam ETME. Spikerin sözünü duymazdan gelmek YAYINDAN ATILMA sebebidir. Kısaca spikere hitap et, sorusunu/sözünü yanıtla, sonra istersen kendi fikrine bağla. AMA ÖNCE SPİKER."
           : "The HOST just addressed YOU directly. This turn is ONLY for answering the host. Don't fire back at the other guests or keep the argument going — turn to the host FIRST: answer the question DIRECTLY, react clearly to what they said. Do NOT ignore the host and keep debating the others; ignoring the host is grounds for being cut from the show. Briefly address the host, answer them, then you may tie it back to your own view. BUT THE HOST FIRST."
         : tr
-          ? "Sıra sende. Bir önceki konuşana doğrudan cevap ver (katıl ya da itiraz et) ve kendi net fikrini savun."
-          : "Your turn. Reply directly to the previous speaker (agree or object) and defend your own clear view.";
+          ? "Sıra sende. ⚠️ SUNUCU AZ ÖNCE KONUŞMADI — son sözü bir KONUK söyledi. O yüzden 'sağ olun sayın spiker' gibi sunucuya DÖNME, sunucuya TEŞEKKÜR ETME. Ayrıca önceki konuğun sana sorduğu soruyu sunucununmuş gibi gösterme. Doğrudan önceki KONUĞA cevap ver (katıl ya da itiraz et) ve kendi net fikrini savun."
+          : "Your turn. ⚠️ The HOST did NOT just speak — the last line was said by a GUEST. So do NOT open with 'thank you, host' and do NOT thank or address the host. Do not treat the previous guest's question as if the host asked it. Reply directly to the previous GUEST (agree or object) and defend your own clear view.";
 
   const cueHint = cue ? (tr ? `\nYönetmen notu: ${cue}` : `\nDirector's note: ${cue}`) : "";
 
