@@ -259,6 +259,50 @@ export function SetupScreen({ onStart, onOpenKey, onError, apiKey, demoRemaining
     // closure'ı kalır ve konular yanlış dilde üretilir.
   }, [apiKey, onError, topicTab, lang, t]);
 
+  // ── HAFTALIK OTOMATİK KONU TAZELEME ── "Bugünün konusu" havuzu statikti,
+  // çok gezen kullanıcıya "hep aynı" hissi veriyordu. Artık her HAFTA bir kez
+  // (dil + sekme başına) LLM'den taze konular çekilip tarayıcıda önbelleğe
+  // alınır; hafta boyunca aynı taze set gösterilir, yeni hafta gelince otomatik
+  // yenilenir. Bakım gerektirmez, LLM maliyeti haftada ~1 istek. Havuz yine
+  // yedek/karışım olarak durur; LLM erişilemezse sessizce havuza düşülür.
+  useEffect(() => {
+    const week = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+    const key = `siyaset_weekly_topics_v1_${lang}_${topicTab}`;
+    let alive = true;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const cached = JSON.parse(raw) as { week: number; topics: string[] };
+        if (cached?.week === week && Array.isArray(cached.topics) && cached.topics.length) {
+          setExtraTopics(cached.topics.slice(0, 6));
+          return;
+        }
+      }
+    } catch {
+      /* önbellek okunamadı — taze çek */
+    }
+    // Yeni hafta (ya da ilk ziyaret): taze konu üret, haftalık önbelleğe yaz.
+    void suggestTopicIdeas(seenTopicsRef.current, apiKey, undefined, topicTab === "derin", lang)
+      .then((fresh) => {
+        if (!alive || !fresh?.length) return;
+        const six = fresh.slice(0, 6);
+        seenTopicsRef.current = [...seenTopicsRef.current, ...six].slice(-80);
+        setExtraTopics(six);
+        try {
+          localStorage.setItem(key, JSON.stringify({ week, topics: six }));
+        } catch {
+          /* kota/gizli mod — sorun değil, hafta içi yine çeker */
+        }
+      })
+      .catch(() => {
+        /* LLM erişilemedi — statik havuz zaten gösteriliyor */
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, topicTab]);
+
   // Sekme değişince üretilmiş (diğer sekmeye ait) taze konuları temizle.
   const switchTab = useCallback((tab: TopicTab) => {
     setTopicTab((cur) => {
