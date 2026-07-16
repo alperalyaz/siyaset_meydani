@@ -854,7 +854,10 @@ export function App() {
           void doSuggest();
           return;
         }
-        // Bekleyen spiker mesajını devreye sok
+        // Bekleyen spiker mesajını devreye sok. ÖNEMLİ: spikerin sesi TAM
+        // bitmeden konuğun turu başlamamalı (yoksa iki ses üst üste biner).
+        // Bu yüzden fire-and-forget DEĞİL — awaited çalar ve speakingRef ile
+        // kilitlenir; konuk üretimi/sesi ancak spiker susunca başlar.
         if (pendingModNoteRef.current) {
           const modText = pendingModNoteRef.current;
           pendingModNoteRef.current = null;
@@ -863,7 +866,13 @@ export function App() {
           modNoteRef.current = modText;
           if (ttsRef.current && modText.trim()) {
             const mctrl = new AbortController();
-            void speakVoice(modText, 9, undefined, mctrl.signal);
+            abortRef.current = mctrl;
+            speakingRef.current = true;
+            await prepareVoice(modText, 9, undefined, mctrl.signal);
+            await pace(modText, 9, undefined, mctrl.signal);
+            speakingRef.current = false;
+            if (!runningRef.current) return;
+            await delay(250 + Math.random() * 400, mctrl.signal);
           }
         }
 
@@ -1385,31 +1394,21 @@ export function App() {
     else drive();
   }, [pause, drive]);
 
-  // Spiker müdahalesi: mevcut konuşmayı KESMEDEN kuyruğa al, konuk bitirince devreye gir.
+  // Spiker müdahalesi: HER ZAMAN kuyruğa al. Döngü, spiker mesajını AWAITED
+  // seslendirir (pendingModNote bloğu); konuğun turu ancak spiker TAM susunca
+  // başlar. Eskiden boşlukta doğrudan fire-and-forget seslendiriliyordu —
+  // konuk sesi spikerin üstüne biniyordu (iki ses karışıyordu). Duraklamışsa
+  // döngüyü başlatırız ki kuyruğu hemen işlesin.
   const moderate = useCallback(
     (text: string) => {
       markActivity(); // spiker söz aldı = etkileşim
       setError(null);
       setSuggestions([]);
-      // Konuşma yoksa direkt ekle, yoksa kuyruğa al. "thinking === null" tek
-      // başına yeterli değil: TTS, thinking null'a dönüp pace() başladıktan
-      // SONRA çalar; speakingRef bu boşluğu kapatıp iki sesin üst üste
-      // binmesini (spiker + konuk aynı anda) engeller.
-      if (!runningRef.current || (thinking === null && !speakingRef.current)) {
-        append({ id: uid(), speaker: "moderator", text, mode: "normal" });
-        if (ttsRef.current && text.trim()) {
-          const ctrl = new AbortController();
-          void speakVoice(text, 9, undefined, ctrl.signal);
-        }
-        modNoteRef.current = text;
-        if (!runningRef.current && phase === "panel") drive();
-        return;
-      }
-      // Konuşma sürüyor: kuyruğa al (son mesaj geçerli, öncekini override)
-      pendingModNoteRef.current = text;
+      pendingModNoteRef.current = text; // son mesaj geçerli (öncekini override)
       setModPending(true);
+      if (!runningRef.current && phase === "panel") drive();
     },
-    [append, drive, thinking, phase],
+    [drive, phase],
   );
 
   const startSession = useCallback((g: Guest[], t: string, diff: Difficulty, context?: string | null) => {
