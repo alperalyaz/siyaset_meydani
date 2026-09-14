@@ -86,6 +86,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
 <meta property="og:image" content="https://debate.be/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">${jsonLd}</script>
+<script defer src="/_vercel/insights/script.js"></script>
 <style>
   :root { color-scheme: dark; }
   body { margin:0; background:#0b0e1a; color:#e8ecf8; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.6; }

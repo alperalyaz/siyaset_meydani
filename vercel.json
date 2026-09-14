@@ -4,6 +4,6 @@
   "rewrites": [
     { "source": "/s/:slug", "destination": "/api/session-page?slug=:slug" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
-    { "source": "/((?!api/).*)", "destination": "/" }
+    { "source": "/((?!api/|_vercel/).*)", "destination": "/" }
   ]
 }
