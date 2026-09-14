@@ -23,6 +23,13 @@ export function setElevenKey(key: string | null): void {
 export function setGeminiKey(key: string | null): void {
   userGeminiKey = key && key.trim() ? key.trim() : null;
 }
+// Oturumun dili. Sunucudaki Chirp yerel seçimi metinden tahmine düşmesin diye
+// gönderilir: "Sen ne dersin" gibi Türkçe harf İÇERMEYEN kısa replikler aksi
+// halde İngilizce sesle okunuyordu. App, oturum dilini belirlediği an çağırır.
+let ttsLang: "tr" | "en" | null = null;
+export function setTtsLang(l: "tr" | "en" | null): void {
+  ttsLang = l === "tr" || l === "en" ? l : null;
+}
 export function hasElevenKey(): boolean {
   return !!userElevenKey;
 }
@@ -342,7 +349,7 @@ async function synthesize(
   settings?: VoiceSettings,
   gemini?: { voice: string; style: string },
 ): Promise<string> {
-  const key = `${voiceId}|${text}`;
+  const key = `${voiceId}|${ttsLang ?? "-"}|${text}`;
   const hit = cacheGet(key);
   if (hit) return hit;
 
@@ -352,6 +359,7 @@ async function synthesize(
   // Hem ElevenLabs (voiceId+settings) hem Gemini (voice+style) bilgisini gönder;
   // sunucu hangi motoru kullanıyorsa ona göre seçer.
   const body: Record<string, unknown> = { text, voiceId };
+  if (ttsLang) body.lang = ttsLang;
   if (settings) body.settings = settings;
   if (gemini) body.gemini = gemini;
   const res = await fetch(`${API_BASE}/api/tts`, {

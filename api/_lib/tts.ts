@@ -35,6 +35,10 @@ const GEMINI_VOICES = new Set([
 export interface TtsRequestBody {
   text?: string;
   voiceId?: string;
+  /** Oturumun dili ("tr" | "en"). İstemci bunu BİLİR (konudan tespit edilir),
+   *  bu yüzden metinden tahmine her zaman üstün tutulur. Eski istemciler
+   *  göndermez; o zaman guessLocale() devreye girer. */
+  lang?: string;
   settings?: {
     stability?: number;
     similarity_boost?: number;
@@ -187,7 +191,7 @@ export async function handleTts(
 
   const result =
     engine === "chirp"
-      ? await chirpGenerate(text, body.gemini, apiKey, headers)
+      ? await chirpGenerate(text, body.gemini, body.lang, apiKey, headers)
       : engine === "gemini"
         ? await geminiGenerate(text, body.gemini, apiKey, headers)
         : await elevenGenerate(text, voiceId, sanitizeSettings(body?.settings), apiKey, headers);
@@ -199,6 +203,65 @@ export async function handleTts(
   return result;
 }
 
+// --- Yerel (locale) seçimi — yalnızca Chirp içindir. ElevenLabs
+// (multilingual) ve Gemini metnin dilini kendileri tespit eder.
+
+// Türkçeye ÖZGÜ harf içermeyen sık Türkçe kelimeler. Türkçe harfli metin
+// zaten birinci kuralda yakalanır; bu liste tam da onun kaçırdığı durum
+// için: "Sen ne dersin", "Bana bak" gibi kısa, aksansız replikler.
+// "her" bilerek YOK — İngilizce "her" ile çakışıyor.
+const TR_WORDS = new Set([
+  "ve", "bir", "bu", "su", "ben", "sen", "biz", "siz", "onlar", "ama", "ancak",
+  "de", "da", "ki", "mi", "ne", "kim", "daha", "sonra", "var", "yok", "evet",
+  "tamam", "bana", "sana", "bize", "size", "ona", "onu", "beni", "seni", "bunu",
+  "gibi", "kadar", "zaten", "belki", "tabii", "gerek", "olur", "oldu", "dedi",
+  "diyor", "bak", "dinle", "anlat", "yani", "hem", "ise", "bile", "sadece",
+  "herkes", "kendi", "hep", "peki", "hani", "iste", "yine", "insan", "sey",
+  "zaman", "olarak", "yoksa", "aynen", "elbette", "asla", "hemen",
+]);
+
+const EN_WORDS = new Set([
+  "the", "and", "of", "to", "in", "is", "it", "that", "this", "you", "for",
+  "with", "not", "but", "have", "from", "they", "we", "what", "which", "there",
+  "their", "would", "could", "should", "about", "been", "were", "are", "was",
+  "his", "her", "him", "she", "he", "my", "me", "do", "does", "did", "can",
+  "will", "just", "very", "more", "than", "then", "when", "where", "who", "how",
+  "all", "any", "some", "only", "also", "because", "while", "your", "our",
+  "has", "had", "them", "these", "those", "its", "if", "as", "on", "at", "by",
+]);
+
+// İngilizce kelimelerde görülmeyen, aksansız yazılabilen Türkçe ek kalıpları
+// ("diyor", "yapacak", "gelmek"). Hiçbiri İngilizce kelime sonu değildir.
+const TR_SUFFIX = /\b[a-z]{2,}(?:yor|acak|ecek|mak|mek)\b/;
+
+// Metinden dil tahmini — SADECE istemci lang göndermediğinde kullanılır.
+function guessLocale(text: string): "tr-TR" | "en-US" {
+  // 1) Türkçeye özgü harf: tek başına kesin sinyal.
+  if (/[çğıİöşüÇĞİÖŞÜ]/.test(text)) return "tr-TR";
+  const lower = text.toLowerCase();
+  // 2) Türkçe ek kalıbı.
+  if (TR_SUFFIX.test(lower)) return "tr-TR";
+  // 3) Sık kelimeleri say, hangisi öndeyse o.
+  let tr = 0;
+  let en = 0;
+  for (const w of lower.match(/[a-z]+/g) ?? []) {
+    if (TR_WORDS.has(w)) tr++;
+    else if (EN_WORDS.has(w)) en++;
+  }
+  if (tr > en) return "tr-TR";
+  if (en > tr) return "en-US";
+  // 4) Hiç sinyal yok (sayı, tek özel ad, noktalama): eski davranışı koru.
+  return "en-US";
+}
+
+// Oturum dili varsa o kazanır; yoksa metinden tahmin.
+function resolveLocale(text: string, lang?: string): "tr-TR" | "en-US" {
+  const l = (lang ?? "").toString().trim().toLowerCase();
+  if (l === "tr") return "tr-TR";
+  if (l === "en") return "en-US";
+  return guessLocale(text);
+}
+
 // Cloud Text-to-Speech (Chirp 3 HD). Gemini TTS ile aynı hazır sesler
 // (Aoede, Puck, Charon...) — ses adı "{locale}-Chirp3-HD-{Ad}" biçiminde
 // yerelle birleştirilir. Yerel, metnin dilinden kabaca tespit edilir
@@ -207,11 +270,13 @@ export async function handleTts(
 async function chirpGenerate(
   text: string,
   gemini: TtsRequestBody["gemini"],
+  lang: string | undefined,
   apiKey: string,
   headers: Record<string, string>,
 ): Promise<TtsResult> {
   const voice = gemini?.voice && GEMINI_VOICES.has(gemini.voice) ? gemini.voice : "Kore";
-  const locale = /[çğıİöşüÇĞİÖŞÜ]/.test(text) ? "tr-TR" : "en-US";
+  const locale = resolveLocale(text, lang);
+  headers["x-tts-locale"] = locale;
   const payload = {
     input: { text },
     voice: { languageCode: locale, name: `${locale}-Chirp3-HD-${voice}` },

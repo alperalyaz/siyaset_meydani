@@ -29,7 +29,7 @@ import type { Stance } from "./types";
 import { ApiError, getLastMeta } from "./lib/deepseek";
 import { loadApiKey, saveApiKey, clearApiKey, loadSession, clearSession, saveSessionAndIndex, loadSessionById, deleteSessionById, listSessionMetas, loadTtsRate, saveTtsRate, loadProvider, saveProvider, type SavedSession, type SessionMeta, type ProviderKind } from "./lib/store";
 import { speak, cancelSpeech, voiceForGuest, ttsSupported, setSpeechRate } from "./lib/tts";
-import { elevenSpeak, prepareSpeech, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey } from "./lib/elevenTts";
+import { elevenSpeak, prepareSpeech, ElevenError, loadHdEnabled, saveHdEnabled, markHdExhausted, isHdExhausted, resetHdExhausted, probeEleven, assignVoicesForPanel, setElevenKey, setGeminiKey, setTtsLang } from "./lib/elevenTts";
 import { loadElevenKey, saveElevenKey, clearElevenKey, loadGeminiKey, saveGeminiKey, clearGeminiKey } from "./lib/store";
 import { quickTopicBlock } from "./lib/safety";
 import { useT, ct, detectTopicLang } from "./lib/i18n";
@@ -1433,6 +1433,7 @@ export function App() {
 
     activeSessionIdRef.current = ""; // yeni oturum → ilk otomatik kayıtta id alır
     sessionLangRef.current = detectTopicLang(t); // spiker replikleri konu dilinde
+    setTtsLang(sessionLangRef.current); // HD ses de aynı dilde okunsun
     markActivity();
 
     // Tek-nefes açılış: spiker konukları isimle tanıtır + konu + doğrudan
@@ -1665,6 +1666,7 @@ export function App() {
 
     activeSessionIdRef.current = id; // devam eden oturum aynı kaydı günceller
     sessionLangRef.current = detectTopicLang(s.topic);
+    setTtsLang(sessionLangRef.current); // kayıtlı oturum devam ederken de
     markActivity();
     assignVoicesForPanel(s.guests, gunlukRef.current); // kayıtlı konuklar için de HD ses ataması
 
