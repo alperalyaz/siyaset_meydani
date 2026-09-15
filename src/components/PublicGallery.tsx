@@ -47,6 +47,11 @@ export function PublicGallery() {
     <section className="setup__block gallery">
       <div className="setup__block-head">
         <h2>{t("gallery.title")}</h2>
+        {/* Galeri yalnizca 8 kayit ve TEK dil gosterir; tarayicinin tum
+            oturumlara ulasabilmesi icin sunucudan cizilen dizine baglanti. */}
+        <a className="gallery__all" href="/oturumlar">
+          {t("gallery.all")}
+        </a>
       </div>
       <div className="gallery__list">
         {visible.map((s) => (

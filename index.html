@@ -44,7 +44,10 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Tarayıcılar (Googlebot dahil) JavaScript çalışmadan ÖNCE bu HTML'i görür.
+         React bağlanınca içerik değiştirilir, yani kullanıcı bunu görmez. Amacı:
+         oturum dizininin JS render'ını beklemeden keşfedilebilmesi. -->
+    <div id="root"><a href="/oturumlar">Yayınlanan oturumlar</a></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

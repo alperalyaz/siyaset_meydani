@@ -15,6 +15,7 @@ export default async function handler(_req: Req, res: Res): Promise<void> {
   const items = await listSessions(1000);
   const urls = [
     `  <url><loc>https://debate.be/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`,
+    `  <url><loc>https://debate.be/oturumlar</loc><changefreq>daily</changefreq><priority>0.9</priority></url>`,
     ...items.map(
       (s) =>
         `  <url><loc>https://debate.be/s/${esc(s.slug)}</loc><lastmod>${esc((s.created_at ?? "").slice(0, 10))}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`,

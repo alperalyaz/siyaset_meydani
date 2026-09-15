@@ -2,7 +2,7 @@
 // Amaç: yayınlanan oturumların Google tarafından İNDEKSLENEBİLİR olması
 // (SPA'nın aksine içerik doğrudan HTML'de). vercel.json rewrite:
 //   /s/:slug → /api/session-page?slug=:slug
-import { getSession, esc } from "./_lib/gallery.js";
+import { getSession, listSessions, esc, type GalleryListItem } from "./_lib/gallery.js";
 
 interface Req {
   method?: string;
@@ -59,6 +59,31 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     })
     .join("\n");
 
+  // İÇ BAĞLANTI HALKASI. Bu sayfalar yetimdi: ana sayfanın HTML'i boş bir
+  // <div id="root"> olarak gittiği için hiçbir iç bağlantı almıyorlardı ve
+  // Google "Discovered - currently not indexed" diyordu. Her sayfa artık
+  // kendinden SONRAKİ 4 oturuma link veriyor; liste sona gelince başa döndüğü
+  // için bu bir HALKA — hiçbir oturum bağlantısız kalmaz, her birinin en az
+  // 4 iç bağlantısı olur. Sıra listenin kendi sırası olduğundan bağlantılar
+  // kararlıdır: tarayıcı her gelişinde aynı grafiği görür.
+  const hepsi = await listSessions(1000);
+  const halka: GalleryListItem[] = [];
+  if (hepsi.length > 1) {
+    const bas = Math.max(0, hepsi.findIndex((x) => x.slug === s.slug));
+    for (let k = 1; k < hepsi.length && halka.length < 4; k++) {
+      const aday = hepsi[(bas + k) % hepsi.length];
+      if (aday && aday.slug !== s.slug) halka.push(aday);
+    }
+  }
+  const tumuMetin = en ? "All published debates →" : "Tüm yayınlanan oturumlar →";
+  const halkaHtml = `<nav class="more">${
+    halka.length
+      ? `<h2>${esc(en ? "Other debates" : "Diğer oturumlar")}</h2><ul>${halka
+          .map((x) => `<li><a href="/s/${esc(x.slug)}">${esc(x.topic)}</a></li>`)
+          .join("")}</ul>`
+      : ""
+  }<p class="all"><a href="/oturumlar">${esc(tumuMetin)}</a></p></nav>`;
+
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "Article",
@@ -100,6 +125,13 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   .turn.sys { background:transparent; border-style:dashed; color:#9aa6c8; }
   .cta { display:inline-block; margin:1.4rem 0; background:linear-gradient(135deg,#f2b134,#e08c2b); color:#1a1405; font-weight:800; padding:.75rem 1.3rem; border-radius:12px; text-decoration:none; }
   .disc { color:#8a94b5; font-size:.78rem; border-top:1px solid #232c4d; padding-top:1rem; margin-top:2rem; }
+  .more { border-top:1px solid #232c4d; margin-top:2.2rem; padding-top:1.2rem; }
+  .more h2 { font-size:.95rem; color:#9aa6c8; font-weight:600; margin:0 0 .6rem; }
+  .more ul { list-style:none; margin:0; padding:0; display:grid; gap:.45rem; }
+  .more a { color:#cbd6f5; text-decoration:none; border-bottom:1px solid #2a3355; }
+  .more a:hover { color:#f2b134; border-color:#f2b134; }
+  .more .all { margin:1rem 0 0; }
+  .more .all a { color:#f2b134; border:none; font-weight:600; }
 </style>
 </head>
 <body>
@@ -109,6 +141,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   <div class="meta">${esc(guestsLabel)}: ${esc(guestNames)}</div>
   ${turns}
   <a class="cta" href="/?s=${esc(s.slug)}">${esc(watch)}</a>
+  ${halkaHtml}
   <p class="disc">${esc(disclaimer)}</p>
 </div>
 </body>

@@ -2239,3 +2239,17 @@ textarea.modbar__input {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 }
+
+/* Galeri basligindaki "tumunu gor" baglantisi — sunucudan cizilen
+   /oturumlar dizinine gider (bkz. api/sessions-page.ts). */
+.gallery__all {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gallery__all:hover {
+  text-decoration: underline;
+}
