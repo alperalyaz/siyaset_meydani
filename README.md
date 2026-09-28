@@ -1,167 +1,142 @@
-# debate.be · Siyaset Meydanı 🎙️
+# debate.be 🎙️
 
-Tarihin kayıtlı bütün zihinlerini aynı masaya oturtan yapay zekâ açık oturumu.
-Çağlar ötesi konuklar (Sokrates, Machiavelli, Marx, Marie Curie… ya da sizin
-seçtiğiniz herhangi biri) aynı konuyu tartışır; birbirinin lafını keser, laf
-sokar, hatasını yakalar, yer yer hak verir ama hep "bu masadaki en haklı benim"
-havasındadır. Siz **spikersiniz**: söz verir, yönlendirir, "durun" der, konuyu
-değiştirirsiniz.
+🇬🇧 English · 🇹🇷 [Türkçe](README.tr.md)
 
-Gerçek dünyada asla kurulamayacak bu masayı yapay zekâ mümkün kılıyor — canlı:
-**[debate.be](https://debate.be)**
+**An AI talk show where history's greatest minds debate each other, and you're the host.**
 
-Arayüz **Türkçe/İngilizce** otomatik seçilir (tarayıcı diline göre), üstten
-değiştirilebilir. **Oturumun dili konunun dilini takip eder** — İngilizce bir
-konu açarsanız tüm masa İngilizce tartışır.
+Socrates vs. Machiavelli. Hobbes vs. Nussbaum. Marie Curie vs. anyone you like.
+Guests interrupt each other, land jabs, catch each other's mistakes, occasionally concede,
+and always act like the smartest person at the table. You give the floor, steer the
+conversation, shout "stop", or change the subject. With full HD voices.
 
-## İki mod
+**Try it live: [debate.be](https://debate.be)** (no sign-up)
 
-- **🧠 Siyaset Meydanı (Debate Arena):** Derin, çekişmeli, felsefî/tarihî/toplumsal
-  tartışma. Reyting *çatışmayla* yükselir.
-- **☕ Sohbet Meydanı (Chat Arena):** Gündüz kuşağı magazin/muhabbet tonu; yıldızlar
-  masada, spiker "canlarım tatlılarım" kıvamında. Reyting *kahkahayla* yükselir.
+![debate.be home screen](docs/debate-be.jpg)
 
-Sağdaki (mobilde üstteki) **Reytingmetre** ortamın heyecanını ölçer; dibe vurunca
-sizi müdahaleye çağırır.
+The UI picks English or Turkish from your browser language. **The session follows the
+language of the topic**: open an English topic and the whole table debates in English.
 
-## Nasıl çalışır
+## Two modes
 
-- **Konuk seçimi:** Konuya göre gerçekten *ilgili* kişiler önerilir (relevans
-  çeşitlilikten önce gelir). Varsayılan 2 konuk gelir (düello formatı en akıcısı);
-  raftan ya da aramayla eklenir. Her konuk canlı olarak Vikipedi özetiyle (giriş
-  metni + görsel) zenginleştirilir — arayüz İngilizceyse en.wikipedia'dan.
-- **Persona:** Her konuğa Vikipedi metniyle beslenen ayrı bir system prompt verilir.
-  Doğum dönemine uygun ses tonu ve dilinden konuşur, gerçek kimliğine sadık kalır,
-  kısa/insanî replikler verir (ağdalı değil), arada sürçüp düzeltir, doğal tepkiler
-  ("ııı", "aaah", öksürük) kullanır. Sokrates gibi bazı isimlerin özel personası
-  vardır. **İçerik güvenliği:** kutsal figürlere/Atatürk'e hakaret içeren konular
-  hiç açılmaz, konuk bile çağrılmaz.
-- **Yönetmen (director):** Görünmez orkestratör her turda transkripti okur;
-  sıradaki konuşmacıyı, rolünü ve **anlık reytingi** tek JSON çağrısıyla belirler.
-- **Kızışma:** Tansiyon tavan yapınca (yüksek reyting) rakip konuk konuşanın
-  **sözünü ortasından keser** (ses gerçekten yarıda kesilir), kesilen tersler,
-  spiker araya girer ve zorunlu müdahale ekranı açılır ("kapışsınlar" seçeneğiyle).
-- **Akış borusu (look-ahead):** Sıradaki tur (yönetmen + replik + ses) mevcut
-  konuşma çalarken arkada hazırlanır; sıra gelince yazı ve ses anında başlar.
-  Spiker araya girerse hazırlanan tur çöpe gider, yeni yönle üretilir.
-- **Boşta koruması:** Spiker 3 dakika hiç katılmazsa (sadece söz alma sayılır)
-  oturum nazikçe duraklar ve ekranın önüne yönlendirme sorularıyla müdahale
-  ekranı çıkar — token yakmasın diye.
-- **Spiker müdahalesi:** Mesaj yazdığınızda sürmekte olan replik/ses TAM bitince
-  araya girilir (yarım kesilmez), konuklar sözünüze göre şekillenir. İsimle
-  çağırdığınız konuk cevap verir.
+- **🧠 Debate Arena.** Deep, heated philosophical, historical and social debate.
+  The ratings meter rises with *conflict*.
+- **☕ Chat Arena.** Daytime-TV talk-show tone, celebrities at the table, a gushing host.
+  The ratings meter rises with *laughter*.
 
-## Seslendirme (HD sesler)
+The **ratings meter** tracks how lively the room is. When it bottoms out, it calls on you
+to step in.
 
-Konuşmalar HD sesle seslendirilir; her konuğa cinsiyet + dönem + üsluba göre AYRI
-ve kişiliğine uygun ses atanır (spikerin kendine ait sesi vardır).
+## How it works
 
-- **Demo motoru:** Google **Cloud TTS Chirp 3 HD** (`GOOGLE_TTS_API_KEY`). Üretim
-  ürünü — günlük istek tavanı yok, ayda 1M karakter ücretsiz. Türkçe destekli.
-  IP başına günlük karakter limiti uygulanır (`TTS_DEMO_CHAR_LIMIT`).
-- **BYOK:** Kullanıcı ⚙️ ayarlardan kendi **Gemini** (`AIza…`/`AQ…`) ya da
-  **ElevenLabs** (`sk_…`) anahtarını girerse tüm oturum onunla, limitsiz.
-- **Yedek:** Anahtar yoksa/kota dolunca otomatik tarayıcı Web Speech API sesine
-  düşülür; kesinti olmaz.
+- **Guest selection.** People genuinely *relevant* to the topic are suggested (relevance
+  before variety). Two guests by default, since the duel format flows best; add more from
+  the shelf or by search. Each guest is enriched live with their Wikipedia summary and photo.
+- **Personas.** Every guest gets their own system prompt fed with their Wikipedia text.
+  They speak in the tone of their era, stay true to who they were, keep replies short and
+  human, stumble and correct themselves, and react naturally ("uhh", "aah", a cough).
+- **The director.** An invisible orchestrator reads the transcript every turn and decides,
+  in a single JSON call, who speaks next, in what role, and the current rating.
+- **Heating up.** When tension peaks, a rival guest cuts the speaker off mid-sentence
+  (the audio really stops), the interrupted guest snaps back, the host steps in, and an
+  intervention screen opens (with a "let them fight" option).
+- **Look-ahead pipeline.** The next turn (director + line + audio) is prepared while the
+  current one is playing, so text and voice start instantly. If the host interrupts, the
+  prepared turn is thrown away and regenerated in the new direction.
+- **Host interventions.** Type a message and it goes in as soon as the current line
+  *finishes* (never cut in half); guests react to what you said. Call a guest by name
+  and they answer.
+- **Idle guard.** If the host doesn't take part for 3 minutes, the session pauses politely
+  with steering questions, so it doesn't burn tokens.
+- **Content safety.** A deterministic pre-filter plus an LLM check. Topics built to insult
+  sacred figures are refused and no guests are called.
 
-Tümü `/api/tts` proxy'si üzerinden gider; kullanıcı anahtarı sunucuda tutulmaz.
+## Voices
 
-## Dil modeli / API
+Each guest is assigned a distinct voice by gender, era and style; the host has their own.
 
-Proxy **DeepSeek** API'sini kullanır (`deepseek-v4-flash`); Groq/OpenAI/Claude
-anahtarları da desteklenir (önekten otomatik algılanır). İki mod:
+- **Demo engine:** Google Cloud TTS Chirp 3 HD, with a per-IP daily character limit.
+- **Bring your own key:** enter your own Gemini or ElevenLabs key in ⚙️ settings and the
+  whole session uses it, unlimited.
+- **Fallback:** with no key or when the quota runs out, it falls back to the browser's
+  Web Speech API with no interruption.
 
-1. **Demo modu:** Sunucudaki `DEEPSEEK_API_KEY`, IP başına günlük limitle
-   (`DEMO_DAILY_LIMIT`).
-2. **BYOK:** Kullanıcı kendi anahtarını girer (⚙️). Anahtar yalnızca tarayıcının
-   `localStorage`'ında saklanır, isteklerde header ile taşınır, kalıcı tutulmaz.
+All audio goes through the `/api/tts` proxy; user keys are never stored on the server.
 
-İstekler `/api/chat` proxy'si üzerinden gider; anahtar tarayıcıdan doğrudan
-sağlayıcıya sızmaz.
+## Language model
 
-## Yayınlanan oturumlar (galeri) + SEO
+The proxy uses the DeepSeek API by default; Groq, OpenAI and Claude keys also work
+(detected from the key prefix).
 
-Tamamlanan oturumlar (opt-out; kullanıcı sonuç ekranında bilgilendirilir ve tek
-tıkla kaldırabilir) **anonim** olarak galeriye yayınlanır. Her yayın
-`debate.be/s/:slug` adresinde **sunucudan üretilen** (SSR) gerçek bir HTML
-transkript sayfası olur — meta/OG/JSON-LD etiketli, arama motorları tarafından
-indekslenebilir. Ana sayfada "Yayınlanan Oturumlar" bölümü bunları listeler.
+- **Demo mode:** the server's key, with a per-IP daily request limit.
+- **Bring your own key:** stored only in your browser's localStorage, sent per request in
+  a header, never persisted on the server.
 
-Sitemap **dinamiktir** (`/api/sitemap` → ana sayfa + tüm yayınlar); `robots.txt`,
-canonical, Open Graph görseli (`public/og.png`), Twitter card ve JSON-LD mevcuttur.
+## Published sessions and SEO
 
-Yayın verisi ve demo sayaçları **Supabase**'de tutulur (RLS kilitli tablolar,
-tüm erişim `SECURITY DEFINER` RPC'leri üzerinden): `siyaset_demo_touch`,
-`siyaset_tts_touch`, `siyaset_gallery_*`. Supabase ayarlı değilse sayaçlar
-bellek içi yedeğe düşer.
+Finished sessions are published anonymously to a public gallery (opt-out: the result
+screen tells you and lets you remove it with one click). Each one becomes a server-rendered,
+indexable transcript page at `debate.be/s/:slug` with meta, Open Graph and JSON-LD tags,
+listed in a dynamic sitemap.
 
-## Çalıştırma
+Gallery data and demo counters live in Supabase (RLS-locked tables, all access through
+`SECURITY DEFINER` RPCs). Without Supabase, counters fall back to memory.
+
+## Run it locally
 
 ```bash
 npm install
-# Demo modu istiyorsanız:
-export DEEPSEEK_API_KEY=sk-...        # dil modeli demosu
-export GOOGLE_TTS_API_KEY=...         # HD ses demosu (opsiyonel)
+export DEEPSEEK_API_KEY=sk-...      # optional: language-model demo
+export GOOGLE_TTS_API_KEY=...       # optional: HD voice demo
 npm run dev
 ```
 
-`http://localhost:5173` — `npm run dev` tek başına yeter; `api/` uçları yerel
-geliştirmede Vite middleware'i üzerinden Vercel fonksiyonlarının aynı mantığıyla
-çalışır.
+Open http://localhost:5173. `npm run dev` is all you need: the `api/` endpoints run through
+Vite middleware with the same logic as the Vercel functions. Without any server keys,
+the app still works in bring-your-own-key mode.
 
-## Yayınlama (Vercel)
+## Deploy (Vercel)
 
-Repo'yu Vercel'e bağlayın; framework otomatik "Vite" algılanır, `api/` klasörü
-serverless fonksiyon olur. Ortam değişkenleri:
+Connect the repo to Vercel; "Vite" is detected automatically and `api/` becomes serverless
+functions.
 
-| Değişken | Ne için |
+| Variable | Purpose |
 |---|---|
-| `DEEPSEEK_API_KEY` | Dil modeli demosu (yoksa yalnızca BYOK) |
-| `GOOGLE_TTS_API_KEY` | HD ses demosu (Cloud TTS Chirp 3 HD) |
-| `ELEVENLABS_API_KEY` | Alternatif ses demosu (opsiyonel) |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Kalıcı demo sayaçları + galeri |
-| `DEMO_DAILY_LIMIT` | LLM demo: istek/IP/gün (varsayılan 150) |
-| `TTS_DEMO_CHAR_LIMIT` | TTS demo: karakter/IP/gün (varsayılan 12000) |
-| `DEEPSEEK_MODEL` / `GROQ_MODEL` / `OPENAI_MODEL` / `ANTHROPIC_MODEL` / `GEMINI_TTS_MODEL` / `ELEVENLABS_MODEL` | Model override (opsiyonel) |
+| `DEEPSEEK_API_KEY` | Language-model demo (without it: bring-your-own-key only) |
+| `GOOGLE_TTS_API_KEY` | HD voice demo (Cloud TTS Chirp 3 HD) |
+| `ELEVENLABS_API_KEY` | Alternative voice demo (optional) |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Persistent demo counters + gallery |
+| `DEMO_DAILY_LIMIT` | LLM demo: requests / IP / day (default 150) |
+| `TTS_DEMO_CHAR_LIMIT` | TTS demo: characters / IP / day (default 12000) |
+| `DEEPSEEK_MODEL` / `GROQ_MODEL` / `OPENAI_MODEL` / `ANTHROPIC_MODEL` / `GEMINI_TTS_MODEL` / `ELEVENLABS_MODEL` | Model overrides (optional) |
 
-`vercel.json` içindeki rewrite'lar `/s/:slug`'ı SSR transkript sayfasına,
-`/sitemap.xml`'i dinamik sitemap'e yönlendirir.
-
-## Proje yapısı
+## Project structure
 
 ```
 api/
-  chat.ts            LLM proxy giriş noktası
-  tts.ts             HD ses proxy'si (Chirp 3 HD / ElevenLabs / Gemini)
-  context.ts         Güncel konu grounding (web özeti)
-  gallery.ts         Yayın galerisi (yayınla/oku/listele/kaldır)
-  session-page.ts    /s/:slug için SSR indekslenebilir transkript
-  sitemap.ts         Dinamik sitemap
-  _lib/              Ortak handler mantığı (chat/tts/context/gallery)
+  chat.ts            LLM proxy entry point
+  tts.ts             HD voice proxy (Chirp 3 HD / ElevenLabs / Gemini)
+  context.ts         Current-topic grounding (web summary)
+  gallery.ts         Session gallery (publish / read / list / remove)
+  session-page.ts    SSR indexable transcript for /s/:slug
+  sitemap.ts         Dynamic sitemap
 src/
   lib/
-    wikipedia.ts     Konuk seçimi + Vikipedi zenginleştirme (TR/EN)
-    pool.ts          Küratörlü kişi/konu havuzları (TR/EN)
-    prompts.ts       Persona + yönetmen + kızışma + güvenlik promptları
-    engine.ts        Yönetmen/konuk çağrıları + dil güvenlik ağı
-    elevenTts.ts     HD ses istemcisi (ses atama, önbellek, boru)
-    tts.ts           Tarayıcı Web Speech yedeği
-    gallery.ts       Galeri istemcisi (yayın + owner token)
-    i18n.ts          TR/EN sözlük + dil tespiti
-    store.ts         localStorage (anahtarlar, hız, hazır konuklar)
-    shareCard.ts     Paylaşılabilir görsel kart (Canvas)
-    moderatorLines.ts Spiker replikleri (iki dil, iki ton)
-    safety.ts        İçerik güvenliği (deterministik ön-filtre)
-    gamification.ts  Reyting takibi, rozetler, sezon sonucu
-  components/        SetupScreen, HeroStage, ChatStream, RatingMeter,
-                     ModeratorBar, ApiKeyModal, PublicGallery,
-                     SessionResultScreen, I18nProvider
-  App.tsx            Durum makinesi + tur döngüsü + akış borusu
+    wikipedia.ts     Guest selection + Wikipedia enrichment (TR/EN)
+    prompts.ts       Persona, director, heat-up and safety prompts
+    engine.ts        Director/guest calls + language safety net
+    elevenTts.ts     HD voice client (voice assignment, cache, pipeline)
+    safety.ts        Content safety (deterministic pre-filter)
+    gamification.ts  Ratings, badges, season results
+  components/        SetupScreen, HeroStage, ChatStream, RatingMeter, ModeratorBar, ...
+  App.tsx            State machine + turn loop + look-ahead pipeline
 ```
 
-## Not
+## Disclaimer
 
-Oturumlardaki konuşmalar yapay zekâ tarafından üretilmiş **kurgusal**
-canlandırmalardır; adı geçen gerçek ya da tarihî kişilerin gerçek görüşlerini
-yansıtmaz, onlar adına konuşmaz. Amaç düşündürmek ve tartışma kültürünü
-beslemektir.
+Dialogue in sessions is **fictional, AI-generated portrayal**. It does not reflect or
+speak for the real views of the real or historical people named. The goal is to provoke
+thought and nourish a culture of debate.
+
+## License
+
+[MIT](LICENSE) © 2026 Alper Alyaz
